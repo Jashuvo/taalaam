@@ -1,0 +1,7 @@
+targets:
+  $default:
+    builders:
+      riverpod_generator:
+        options:
+          # Prefix generated provider variable names — avoids naming conflicts
+          provider_name_prefix: ""

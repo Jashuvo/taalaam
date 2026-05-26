@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Volumes/WorK -name \"features.md\" -o -name \"schema.md\" 2>/dev/null)",
+      "Read(//Volumes/WorK/**)",
+      "Bash(flutter --version)",
+      "Bash(dart --version)",
+      "Bash(supabase --version)",
+      "Bash(find /Users/jashuvo -name \"flutter\" -type f 2>/dev/null | head -5; find /usr/local -name \"flutter\" -type f 2>/dev/null | head -3; find /opt -name \"flutter\" -type f 2>/dev/null | head -3)",
+      "Read(//Users/jashuvo/**)",
+      "Read(//usr/local/**)",
+      "Read(//opt/**)",
+      "Bash(ls /Users/jashuvo/development/ && ls /Applications/ | grep -i flutter)",
+      "Read(//Applications/**)",
+      "Bash(mkdir -p '/Volumes/WorK/Work FIles/Ta'\\\\''allam/docs/scaffold/__TRACKED_VAR__')",
+      "Bash(touch '/Volumes/WorK/Work FIles/Ta'\\\\''allam/docs/scaffold/__TRACKED_VAR__/.gitkeep')",
+      "Bash(chmod +x \"/Volumes/WorK/Work FIles/Ta'allam/setup.sh\")",
+      "Bash(docker --version)",
+      "Bash(docker info *)",
+      "Bash(open /Volumes/Work/Applications/Docker.app)",
+      "Bash(chmod +x setup.sh)",
+      "Bash(./setup.sh)",
+      "Bash(brew install *)",
+      "Bash(supabase init *)",
+      "Bash(supabase start *)",
+      "Bash(supabase status *)",
+      "Bash(flutter pub *)",
+      "Bash(dart run *)",
+      "Bash(flutter run *)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(flutter analyze *)",
+      "Bash(echo \"PID:$!\")",
+      "Bash(flutter build *)",
+      "Bash(supabase secrets *)",
+      "Bash(gh auth *)",
+      "Bash(git --version)"
+    ]
+  }
+}

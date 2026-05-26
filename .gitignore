@@ -1,0 +1,37 @@
+# Secrets — never commit
+taalaam/supabase/functions/.env
+.env
+*.env
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# Build artifacts
+build/
+taalaam/build/
+
+# Flutter/Dart
+taalaam/.dart_tool/
+taalaam/.flutter-plugins-dependencies
+taalaam/.pub-cache/
+taalaam/.pub/
+taalaam/coverage/
+**/doc/api/
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# iOS
+taalaam/ios/Flutter/.last_build_id
+*.symbols
+*.map.json
+taalaam/android/app/debug
+taalaam/android/app/profile
+taalaam/android/app/release
+
+# Supabase local state
+taalaam/supabase/.temp/

@@ -1,0 +1,94 @@
+name: taalaam
+description: Sahih Arabic Learning App — Bangla-first, offline-first.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management (no riverpod_annotation — write providers manually)
+  flutter_riverpod: ^2.6.1
+  hooks_riverpod: ^2.6.1
+  flutter_hooks: ^0.20.5
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # Local database (offline-first)
+  drift: ^2.21.0
+  drift_flutter: ^0.2.4
+
+  # Backend
+  supabase_flutter: ^2.8.1
+
+  # Models — immutable + serializable
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  # SRS algorithm (FSRS-4) — TODO: add when pub.dev package is confirmed
+  # fsrs4dart: ^0.2.0
+
+  # Audio playback
+  just_audio: ^0.9.42
+  flutter_cache_manager: ^3.4.1
+
+  # UI helpers
+  gap: ^3.0.1
+  google_fonts: ^6.2.1
+
+  # File picker (admin upload)
+  file_picker: ^8.1.7
+
+  # Connectivity detection
+  connectivity_plus: ^6.1.1
+
+  # Storage
+  shared_preferences: ^2.3.3
+
+  # Localizations (Bangla + Arabic + English)
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.0
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+  # Code generation (Drift + Freezed only — no riverpod_generator to avoid
+  # the analyzer_plugin 0.12/analyzer 7.x incompatibility)
+  freezed: ^2.5.7
+  json_serializable: ^6.8.0
+  build_runner: ^2.4.13
+  drift_dev: ^2.21.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/audio/
+    - assets/images/
+    - assets/fonts/
+
+  # FONTS: Download these files, then uncomment below.
+  # NotoNaskhArabic: https://fonts.google.com/noto/specimen/Noto+Naskh+Arabic
+  # HindSiliguri:    https://fonts.google.com/specimen/Hind+Siliguri
+  # Place .ttf files in assets/fonts/ then uncomment:
+  #
+  # fonts:
+  #   - family: NotoNaskhArabic
+  #     fonts:
+  #       - asset: assets/fonts/NotoNaskhArabic-Regular.ttf
+  #       - asset: assets/fonts/NotoNaskhArabic-Bold.ttf
+  #         weight: 700
+  #   - family: HindSiliguri
+  #     fonts:
+  #       - asset: assets/fonts/HindSiliguri-Regular.ttf
+  #       - asset: assets/fonts/HindSiliguri-Bold.ttf
+  #         weight: 700
