@@ -15,6 +15,7 @@ class ExerciseFillBlank extends StatefulWidget {
 
 class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
   int? _selected;
+  late List<String> _shuffled;
 
   String get _sentence =>
       widget.exercise.correctAnswer['sentence'] as String;
@@ -52,7 +53,20 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
     return opts;
   }
 
-  late final List<String> _shuffled = _options;
+  @override
+  void initState() {
+    super.initState();
+    _shuffled = _options;
+  }
+
+  @override
+  void didUpdateWidget(ExerciseFillBlank oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Vocab loads asynchronously — recompute options once it arrives
+    if (oldWidget.vocab.isEmpty && widget.vocab.isNotEmpty && _selected == null) {
+      setState(() => _shuffled = _options);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
