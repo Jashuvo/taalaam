@@ -93,10 +93,13 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                         child: Text(
                           _pairs[i]['ar']!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontFamily: 'NotoNaskhArabic',
                               fontSize: 20,
-                              height: 1.6),
+                              height: 1.6,
+                              color: matched
+                                  ? Colors.green.shade900
+                                  : theme.colorScheme.onSurface),
                         ),
                       ),
                     ),
@@ -134,7 +137,11 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                       child: Text(
                         _bnChoices[j],
                         textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyLarge,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: alreadyUsed
+                              ? Colors.green.shade900
+                              : theme.colorScheme.onSurface,
+                        ),
                       ),
                     ),
                   );

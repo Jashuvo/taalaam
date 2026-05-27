@@ -29,7 +29,6 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
         if (s != _answer) opts.add(s);
       }
     }
-    while (opts.length < 2) { opts.add('___'); }
     opts.shuffle();
     return opts;
   }
@@ -59,9 +58,9 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
             child: RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: const TextStyle(
+                style: TextStyle(
                     fontFamily: 'NotoNaskhArabic', fontSize: 24, height: 1.8,
-                    color: Colors.black),
+                    color: theme.colorScheme.onSurface),
                 children: [
                   if (parts.isNotEmpty) TextSpan(text: parts[0]),
                   WidgetSpan(

@@ -27,6 +27,7 @@ class GrammarNoteSheet extends StatelessWidget {
     final vocabMap = {for (final v in vocab) v.arabic: v};
 
     final correctWords = _resolveCorrectWords();
+    final correctPairs = _resolveCorrectPairs();
 
     return Container(
       decoration: BoxDecoration(
@@ -73,6 +74,51 @@ class GrammarNoteSheet extends StatelessWidget {
               ),
             ),
           ],
+          if (!correct && correctPairs.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'সঠিক মিলান:',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: color, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            ...correctPairs.map((pair) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: color.withValues(alpha: 0.5)),
+                    ),
+                    child: Text(
+                      pair['ar']!,
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                        fontFamily: 'NotoNaskhArabic',
+                        fontSize: 18,
+                        height: 1.6,
+                        color: color,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(Icons.arrow_forward, size: 16, color: color.withValues(alpha: 0.6)),
+                  ),
+                  Text(
+                    pair['bn']!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: color.withValues(alpha: 0.85),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
           if (grammarNote != null && grammarNote!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -108,6 +154,17 @@ class GrammarNoteSheet extends StatelessWidget {
         break;
     }
     return [];
+  }
+
+  List<Map<String, String>> _resolveCorrectPairs() {
+    if (correct || exercise?.type != ExerciseType.dragDrop) return [];
+    final pairs = exercise!.correctAnswer['pairs'];
+    if (pairs is! List) return [];
+    return pairs
+        .whereType<Map>()
+        .map((p) => {'ar': p['ar']?.toString() ?? '', 'bn': p['bn']?.toString() ?? ''})
+        .where((p) => p['ar']!.isNotEmpty)
+        .toList();
   }
 }
 
