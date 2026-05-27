@@ -41,17 +41,3 @@ jobs:
           path: taalaam/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
-      - name: Build admin APK
-        working-directory: taalaam
-        run: |
-          flutter build apk \
-            -t lib/main_admin.dart \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-
-      - name: Upload admin APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: taalaam-admin-apk
-          path: taalaam/build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
