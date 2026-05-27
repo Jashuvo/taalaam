@@ -4,6 +4,159 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+// ── State ─────────────────────────────────────────────────────────────────────
+
+class UploadFileStatus {
+  final PlatformFile file;
+  final String status;
+  final bool success;
+  final bool processing;
+
+  const UploadFileStatus({
+    required this.file,
+    this.status = 'অপেক্ষায়…',
+    this.success = false,
+    this.processing = false,
+  });
+
+  UploadFileStatus copyWith({String? status, bool? success, bool? processing}) =>
+      UploadFileStatus(
+        file: file,
+        status: status ?? this.status,
+        success: success ?? this.success,
+        processing: processing ?? this.processing,
+      );
+}
+
+class UploadPageState {
+  final List<UploadFileStatus> files;
+  final String track;
+  final bool processingAll;
+  final bool anySuccess;
+
+  const UploadPageState({
+    this.files = const [],
+    this.track = 'conversational',
+    this.processingAll = false,
+    this.anySuccess = false,
+  });
+
+  UploadPageState copyWith({
+    List<UploadFileStatus>? files,
+    String? track,
+    bool? processingAll,
+    bool? anySuccess,
+  }) =>
+      UploadPageState(
+        files: files ?? this.files,
+        track: track ?? this.track,
+        processingAll: processingAll ?? this.processingAll,
+        anySuccess: anySuccess ?? this.anySuccess,
+      );
+}
+
+class UploadNotifier extends Notifier<UploadPageState> {
+  @override
+  UploadPageState build() => const UploadPageState();
+
+  void addFiles(List<PlatformFile> incoming) {
+    final existing = state.files;
+    final toAdd = incoming
+        .where((f) => !existing.any((s) => s.file.name == f.name))
+        .map((f) => UploadFileStatus(file: f))
+        .toList();
+    if (toAdd.isEmpty) return;
+    state = state.copyWith(files: [...existing, ...toAdd]);
+  }
+
+  void removeAt(int index) {
+    final files = [...state.files];
+    files.removeAt(index);
+    state = state.copyWith(files: files);
+  }
+
+  void setTrack(String track) => state = state.copyWith(track: track);
+
+  void _updateFile(int index,
+      {String? status, bool? success, bool? processing}) {
+    final files = [...state.files];
+    files[index] =
+        files[index].copyWith(status: status, success: success, processing: processing);
+    state = state.copyWith(files: files);
+  }
+
+  Future<void> processAll(String note) async {
+    state = state.copyWith(processingAll: true);
+    final indices = [
+      for (int i = 0; i < state.files.length; i++)
+        if (!state.files[i].success && !state.files[i].processing) i
+    ];
+    for (final i in indices) {
+      await _processOne(i, note);
+    }
+    state = state.copyWith(processingAll: false);
+  }
+
+  Future<void> _processOne(int index, String note) async {
+    final fs = state.files[index];
+    if (fs.file.bytes == null) return;
+    _updateFile(index, processing: true, status: 'আপলোড হচ্ছে…');
+
+    try {
+      final supabase = Supabase.instance.client;
+      final safeName = _sanitizeFilename(fs.file.name).isEmpty
+          ? (fs.file.extension ?? 'file')
+          : _sanitizeFilename(fs.file.name);
+      final path =
+          'raw-content/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+
+      await supabase.storage.from('raw-content').uploadBinary(path, fs.file.bytes!);
+
+      final mat = await supabase.from('source_materials').insert({
+        'filename': fs.file.name,
+        'storage_path': path,
+        'file_type': fs.file.extension ?? 'unknown',
+        'processing_status': 'pending',
+        'notes': note.trim().isEmpty ? null : note.trim(),
+      }).select().single();
+
+      _updateFile(index, status: 'AI প্রসেসিং…');
+
+      final ext = fs.file.extension?.toLowerCase();
+      final String? textContent =
+          ext == 'txt' ? String.fromCharCodes(fs.file.bytes!) : null;
+
+      await supabase.functions.invoke('process-content', body: {
+        'material_id': mat['id'],
+        'track': state.track,
+        'notes': note.trim(),
+        if (textContent != null) 'text_content': textContent,
+      });
+
+      _updateFile(index, status: 'সফল ✓', success: true);
+      state = state.copyWith(anySuccess: true);
+    } catch (e) {
+      _updateFile(index, status: 'ত্রুটি: $e');
+    } finally {
+      _updateFile(index, processing: false);
+    }
+  }
+
+  String _sanitizeFilename(String name) {
+    return name
+        .replaceAll(RegExp(r'[^\x00-\x7F]'), '')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
+}
+
+// Not autoDispose — state survives navigation within the same app session
+final uploadProvider =
+    NotifierProvider<UploadNotifier, UploadPageState>(UploadNotifier.new);
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 class AdminUploadPage extends ConsumerStatefulWidget {
   const AdminUploadPage({super.key});
 
@@ -11,23 +164,8 @@ class AdminUploadPage extends ConsumerStatefulWidget {
   ConsumerState<AdminUploadPage> createState() => _AdminUploadPageState();
 }
 
-class _FileStatus {
-  final PlatformFile file;
-  String status;
-  bool success;
-  bool processing;
-  _FileStatus(this.file)
-      : status = 'অপেক্ষায়…',
-        success = false,
-        processing = false;
-}
-
 class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
-  final _files = <_FileStatus>[];
-  String _track = 'conversational';
   final _noteCtrl = TextEditingController();
-  bool _processingAll = false;
-  bool _anySuccess = false;
 
   @override
   void dispose() {
@@ -43,78 +181,18 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
       withData: true,
     );
     if (result != null && result.files.isNotEmpty) {
-      setState(() {
-        for (final f in result.files) {
-          if (!_files.any((s) => s.file.name == f.name)) {
-            _files.add(_FileStatus(f));
-          }
-        }
-      });
+      ref.read(uploadProvider.notifier).addFiles(result.files);
     }
-  }
-
-  Future<void> _processOne(_FileStatus fs) async {
-    if (fs.file.bytes == null) return;
-    setState(() {
-      fs.processing = true;
-      fs.status = 'আপলোড হচ্ছে…';
-    });
-
-    try {
-      final supabase = Supabase.instance.client;
-      final path =
-          'raw-content/${DateTime.now().millisecondsSinceEpoch}_${fs.file.name}';
-
-      await supabase.storage.from('raw-content').uploadBinary(path, fs.file.bytes!);
-
-      final mat = await supabase.from('source_materials').insert({
-        'filename': fs.file.name,
-        'storage_path': path,
-        'file_type': fs.file.extension ?? 'unknown',
-        'processing_status': 'pending',
-        'notes': _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
-      }).select().single();
-
-      setState(() => fs.status = 'AI প্রসেসিং…');
-
-      final ext = fs.file.extension?.toLowerCase();
-      final String? textContent =
-          ext == 'txt' ? String.fromCharCodes(fs.file.bytes!) : null;
-
-      await supabase.functions.invoke('process-content', body: {
-        'material_id': mat['id'],
-        'track': _track,
-        'notes': _noteCtrl.text.trim(),
-        if (textContent != null) 'text_content': textContent,
-      });
-
-      setState(() {
-        fs.status = 'সফল ✓';
-        fs.success = true;
-        _anySuccess = true;
-      });
-    } catch (e) {
-      setState(() => fs.status = 'ত্রুটি: $e');
-    } finally {
-      setState(() => fs.processing = false);
-    }
-  }
-
-  Future<void> _processAll() async {
-    setState(() => _processingAll = true);
-    for (final fs in _files) {
-      if (!fs.success && !fs.processing) {
-        await _processOne(fs);
-      }
-    }
-    setState(() => _processingAll = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasFiles = _files.isNotEmpty;
-    final allDone = hasFiles && _files.every((f) => f.success);
+    final upload = ref.watch(uploadProvider);
+    final notifier = ref.read(uploadProvider.notifier);
+
+    final hasFiles = upload.files.isNotEmpty;
+    final allDone = hasFiles && upload.files.every((f) => f.success);
 
     return Scaffold(
       appBar: AppBar(
@@ -146,16 +224,16 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                         label: Text('কুরআন'),
                         icon: Icon(Icons.menu_book)),
                   ],
-                  selected: {_track},
-                  onSelectionChanged: _processingAll
+                  selected: {upload.track},
+                  onSelectionChanged: upload.processingAll
                       ? null
-                      : (s) => setState(() => _track = s.first),
+                      : (s) => notifier.setTrack(s.first),
                 ),
                 const SizedBox(height: 24),
 
                 // File drop zone
                 GestureDetector(
-                  onTap: _processingAll ? null : _pickFiles,
+                  onTap: upload.processingAll ? null : _pickFiles,
                   child: Container(
                     height: 120,
                     decoration: BoxDecoration(
@@ -184,7 +262,7 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                         const SizedBox(height: 8),
                         Text(
                           hasFiles
-                              ? '${_files.length}টি ফাইল নির্বাচিত — আরও যোগ করতে ক্লিক করুন'
+                              ? '${upload.files.length}টি ফাইল নির্বাচিত — আরও যোগ করতে ক্লিক করুন'
                               : 'একাধিক ফাইল বেছে নিন (PDF / TXT / ছবি)',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: hasFiles
@@ -201,7 +279,7 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
 
                 // File list
                 if (hasFiles) ...[
-                  ...(_files.asMap().entries.map((e) {
+                  ...upload.files.asMap().entries.map((e) {
                     final i = e.key;
                     final fs = e.value;
                     return Card(
@@ -243,17 +321,16 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                                       ? theme.colorScheme.error
                                       : theme.colorScheme.onSurfaceVariant,
                             )),
-                        trailing: _processingAll
+                        trailing: upload.processingAll
                             ? null
                             : IconButton(
                                 icon: const Icon(Icons.close, size: 16),
-                                onPressed: () =>
-                                    setState(() => _files.removeAt(i)),
+                                onPressed: () => notifier.removeAt(i),
                                 visualDensity: VisualDensity.compact,
                               ),
                       ),
                     );
-                  })),
+                  }),
                   const SizedBox(height: 8),
                 ],
 
@@ -266,12 +343,12 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 2,
-                  enabled: !_processingAll,
+                  enabled: !upload.processingAll,
                 ),
                 const SizedBox(height: 24),
 
                 FilledButton.icon(
-                  icon: _processingAll
+                  icon: upload.processingAll
                       ? const SizedBox(
                           width: 18,
                           height: 18,
@@ -279,17 +356,17 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                               strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.auto_awesome),
-                  label: Text(_processingAll
+                  label: Text(upload.processingAll
                       ? 'প্রসেস হচ্ছে…'
                       : hasFiles
-                          ? 'AI দিয়ে ${_files.length}টি ফাইল প্রসেস করুন'
+                          ? 'AI দিয়ে ${upload.files.length}টি ফাইল প্রসেস করুন'
                           : 'AI দিয়ে পাঠ তৈরি করুন'),
-                  onPressed: _processingAll || !hasFiles || allDone
+                  onPressed: upload.processingAll || !hasFiles || allDone
                       ? null
-                      : _processAll,
+                      : () => notifier.processAll(_noteCtrl.text),
                 ),
 
-                if (_anySuccess) ...[
+                if (upload.anySuccess) ...[
                   const SizedBox(height: 12),
                   OutlinedButton(
                     onPressed: () => context.go('/admin/review'),

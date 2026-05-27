@@ -1,0 +1,57 @@
+name: Build Android APKs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        working-directory: taalaam
+        run: flutter pub get
+
+      - name: Build learner APK
+        working-directory: taalaam
+        run: |
+          flutter build apk \
+            -t lib/main.dart \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Upload learner APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: taalaam-learner-apk
+          path: taalaam/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Build admin APK
+        working-directory: taalaam
+        run: |
+          flutter build apk \
+            -t lib/main_admin.dart \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Upload admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: taalaam-admin-apk
+          path: taalaam/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30

@@ -21,10 +21,16 @@ class _ExerciseTapToBuildState extends State<ExerciseTapToBuild> {
   bool get _orderMatters =>
       widget.exercise.correctAnswer['order_matters'] as bool? ?? true;
 
+  List<String> get _distractorWords {
+    final raw = widget.exercise.correctAnswer['distractor_words'];
+    if (raw == null) return [];
+    return List<String>.from((raw as List).map((e) => e.toString()));
+  }
+
   @override
   void initState() {
     super.initState();
-    _bank = List<String>.from(_correctWords)..shuffle();
+    _bank = [..._correctWords, ..._distractorWords]..shuffle();
   }
 
   bool _checkAnswer() {

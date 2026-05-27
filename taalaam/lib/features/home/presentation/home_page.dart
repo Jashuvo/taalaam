@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../auth/presentation/auth_provider.dart';
+import '../../auth/presentation/onboarding_page.dart';
 import '../../../shared/widgets/progress_share_card.dart';
 import 'home_provider.dart';
 
@@ -13,6 +14,13 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+
+    // Onboarding gate — runs after first frame so the router is fully settled
+    ref.listen<AsyncValue<bool>>(onboardingDoneProvider, (_, next) {
+      if (next.valueOrNull == false && context.mounted) {
+        context.go('/onboarding');
+      }
+    });
     final user = ref.watch(currentUserProvider);
     final tracks = ref.watch(tracksProvider);
     final streak = ref.watch(streakProvider);
@@ -95,7 +103,19 @@ class HomePage extends ConsumerWidget {
           const OfflineBanner(),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => ref.refresh(tracksProvider.future),
+              onRefresh: () async {
+                // Full sync: tracks first, then units for every known track.
+                // This is what removes unpublished/deleted content from Drift.
+                final sync = ref.read(syncServiceProvider);
+                final knownTracks =
+                    ref.read(tracksProvider).valueOrNull ?? [];
+                await sync.syncTracks();
+                ref.invalidate(tracksProvider);
+                for (final t in knownTracks) {
+                  await sync.syncUnits(t.id);
+                  ref.invalidate(unitsForTrackProvider(t.id));
+                }
+              },
               child: CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
@@ -334,18 +354,20 @@ class _QuickAccessButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
+              Icon(icon, size: 22, color: theme.colorScheme.primary),
+              const SizedBox(height: 4),
               Text(
                 label,
-                style: theme.textTheme.bodyMedium?.copyWith(
+                style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: theme.colorScheme.primary,
                 ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

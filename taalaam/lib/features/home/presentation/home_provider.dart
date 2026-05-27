@@ -13,23 +13,22 @@ final syncServiceProvider = Provider<SyncService>((ref) {
   );
 });
 
-final tracksProvider = FutureProvider<List<Track>>((ref) async {
+final tracksProvider = StreamProvider<List<Track>>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  // Try background sync first (fire and forget)
   ref.read(syncServiceProvider).syncTracks().ignore();
   return (db.select(db.tracks)
         ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)]))
-      .get();
+      .watch();
 });
 
 final unitsForTrackProvider =
-    FutureProvider.family<List<Unit>, String>((ref, trackId) async {
+    StreamProvider.family<List<Unit>, String>((ref, trackId) {
   final db = ref.watch(appDatabaseProvider);
   ref.read(syncServiceProvider).syncUnits(trackId).ignore();
   return (db.select(db.units)
         ..where((t) => t.trackId.equals(trackId))
         ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)]))
-      .get();
+      .watch();
 });
 
 final streakProvider = FutureProvider<Streak?>((ref) async {
@@ -48,20 +47,20 @@ final dueCountProvider = FutureProvider<int>((ref) async {
 });
 
 final trackBySlugProvider =
-    FutureProvider.family<Track?, String>((ref, slug) async {
+    StreamProvider.family<Track?, String>((ref, slug) {
   final db = ref.watch(appDatabaseProvider);
   return (db.select(db.tracks)..where((t) => t.slug.equals(slug)))
-      .getSingleOrNull();
+      .watchSingleOrNull();
 });
 
 final lessonsForUnitProvider =
-    FutureProvider.family<List<Lesson>, String>((ref, unitId) async {
+    StreamProvider.family<List<Lesson>, String>((ref, unitId) {
   final db = ref.watch(appDatabaseProvider);
   ref.read(syncServiceProvider).syncLessons(unitId).ignore();
   return (db.select(db.lessons)
         ..where((t) => t.unitId.equals(unitId))
         ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)]))
-      .get();
+      .watch();
 });
 
 final completedLessonIdsProvider = FutureProvider<Set<String>>((ref) async {

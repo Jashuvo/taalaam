@@ -73,6 +73,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kOnboardingDone, true);
+    ref.invalidate(onboardingDoneProvider);
     if (mounted) context.go('/home');
   }
 

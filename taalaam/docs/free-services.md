@@ -12,7 +12,7 @@
 - **LIMIT WATCH**: Storage is the constraint — compress audio to <50KB mp3
 
 ## GEMINI API (content pipeline) — FREE TIER
-- **Model**: gemini-3.5-flash
+- **Model**: gemini-3.1-flash-lite
 - **Free**: 1,500 requests/day, no credit card required
 - Reads PDFs and images natively — no separate extraction step needed
 - Solo admin processing 200–300 lessons total = fraction of daily limit

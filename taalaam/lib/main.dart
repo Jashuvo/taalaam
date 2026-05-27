@@ -9,6 +9,15 @@ import 'shared/services/analytics_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Show errors as red text instead of blank white page
+  ErrorWidget.builder = (details) => Scaffold(
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Text('Flutter error: ${details.exception}\n\n${details.stack}',
+          style: const TextStyle(color: Colors.red, fontSize: 12)),
+    ),
+  );
+
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,

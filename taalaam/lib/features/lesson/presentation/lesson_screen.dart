@@ -32,9 +32,47 @@ class LessonScreen extends ConsumerWidget {
       data: (lesson) {
         if (lesson == null || lesson.exercises.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: const Text('পাঠ')),
-            body: const Center(
-                child: Text('কোনো অনুশীলন পাওয়া যায়নি।')),
+            appBar: AppBar(
+              title: const Text('পাঠ'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/home'),
+              ),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.sync_outlined,
+                        size: 56,
+                        color: Theme.of(context).colorScheme.outline),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'এই পাঠের অনুশীলন এখনো ডাউনলোড হয়নি।',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ইন্টারনেট সংযোগ নিশ্চিত করে পুনরায় চেষ্টা করুন।',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('পুনরায় চেষ্টা'),
+                      onPressed: () =>
+                          ref.invalidate(lessonProvider(lessonId)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
         return _LessonBody(lesson: lesson);

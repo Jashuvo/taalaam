@@ -24,13 +24,17 @@ import '../../features/track_quran/presentation/tafsir_reader_page.dart';
 final appRouterProvider =
     Provider.family<GoRouter, AppFlavor>((ref, flavor) {
   final router = GoRouter(
-    initialLocation: flavor == AppFlavor.admin ? '/admin' : '/home',
-    redirect: (context, state) async {
+    initialLocation: flavor == AppFlavor.admin ? '/admin' : '/login',
+    redirect: (context, state) {
+      final loc = state.matchedLocation;
+      if (loc == '/') return '/login';
+
+      final authState = ref.read(authStateProvider);
+      if (authState.isLoading) return loc == '/login' ? null : '/login';
+
       final user = ref.read(currentUserProvider);
       final isLoggedIn = user != null;
-      final loc = state.matchedLocation;
       final goingToLogin = loc == '/login';
-      final goingToOnboarding = loc == '/onboarding';
 
       if (!isLoggedIn && !goingToLogin) return '/login';
       if (flavor == AppFlavor.admin && isLoggedIn && !ref.read(isAdminProvider)) {
@@ -38,11 +42,6 @@ final appRouterProvider =
       }
       if (isLoggedIn && goingToLogin) {
         return flavor == AppFlavor.admin ? '/admin' : '/home';
-      }
-      // Onboarding gate: redirect new learner users on first login
-      if (flavor == AppFlavor.learner && isLoggedIn && !goingToOnboarding) {
-        final done = ref.read(onboardingDoneProvider).valueOrNull ?? true;
-        if (!done) return '/onboarding';
       }
       return null;
     },

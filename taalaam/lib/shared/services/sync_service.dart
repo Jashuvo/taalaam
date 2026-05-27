@@ -8,7 +8,6 @@ class SyncService {
 
   SyncService(this._db, this._supabase);
 
-  // Sync published tracks → local Drift. Called on app start.
   Future<void> syncTracks() async {
     final rows = await _supabase
         .from('tracks')
@@ -27,7 +26,7 @@ class SyncService {
     }
   }
 
-  // Sync published units for a track.
+  // Sync published units for a track, deleting any stale local rows.
   Future<void> syncUnits(String trackId) async {
     final rows = await _supabase
         .from('units')
@@ -35,7 +34,21 @@ class SyncService {
         .eq('track_id', trackId)
         .eq('status', 'published')
         .order('sort_order');
-    for (final r in (rows as List)) {
+
+    final remoteIds = (rows as List).map((r) => r['id'] as String).toSet();
+
+    // Delete exercises + lessons belonging to units removed from Supabase
+    final localUnits = await (_db.select(_db.units)
+          ..where((t) => t.trackId.equals(trackId)))
+        .get();
+    for (final unit in localUnits) {
+      if (!remoteIds.contains(unit.id)) {
+        await _deleteUnitLocally(unit.id);
+      }
+    }
+
+    // Upsert fresh rows
+    for (final r in rows) {
       await _db.into(_db.units).insertOnConflictUpdate(UnitsCompanion(
             id: Value(r['id'] as String),
             trackId: Value(r['track_id'] as String),
@@ -50,14 +63,28 @@ class SyncService {
     }
   }
 
-  // Sync lessons for a unit.
+  // Sync lessons for a unit, deleting stale local rows.
   Future<void> syncLessons(String unitId) async {
     final rows = await _supabase
         .from('lessons')
         .select()
         .eq('unit_id', unitId)
         .order('sort_order');
-    for (final r in (rows as List)) {
+
+    final remoteIds = (rows as List).map((r) => r['id'] as String).toSet();
+
+    // Delete exercises belonging to lessons removed from Supabase
+    final localLessons = await (_db.select(_db.lessons)
+          ..where((t) => t.unitId.equals(unitId)))
+        .get();
+    for (final lesson in localLessons) {
+      if (!remoteIds.contains(lesson.id)) {
+        await _deleteLessonLocally(lesson.id);
+      }
+    }
+
+    // Upsert fresh rows
+    for (final r in rows) {
       await _db.into(_db.lessons).insertOnConflictUpdate(LessonsCompanion(
             id: Value(r['id'] as String),
             unitId: Value(r['unit_id'] as String),
@@ -71,17 +98,32 @@ class SyncService {
     }
   }
 
-  // Push pending sync actions to Supabase.
+  Future<void> _deleteUnitLocally(String unitId) async {
+    final lessons = await (_db.select(_db.lessons)
+          ..where((t) => t.unitId.equals(unitId)))
+        .get();
+    for (final l in lessons) {
+      await _deleteLessonLocally(l.id);
+    }
+    await (_db.delete(_db.units)..where((t) => t.id.equals(unitId))).go();
+  }
+
+  Future<void> _deleteLessonLocally(String lessonId) async {
+    await (_db.delete(_db.exercises)
+          ..where((t) => t.lessonId.equals(lessonId)))
+        .go();
+    await (_db.delete(_db.vocabulary)
+          ..where((t) => t.lessonId.equals(lessonId)))
+        .go();
+    await (_db.delete(_db.lessons)..where((t) => t.id.equals(lessonId))).go();
+  }
+
   Future<void> flushPendingSync() async {
     final pending = await _db.select(_db.pendingSync).get();
     for (final item in pending) {
       try {
-        // Each action is a JSON payload: { table, op, data }
-        // For Phase 1, progress + streak updates
         await _db.delete(_db.pendingSync).delete(item);
-      } catch (_) {
-        // Leave in queue, retry next time
-      }
+      } catch (_) {}
     }
   }
 }

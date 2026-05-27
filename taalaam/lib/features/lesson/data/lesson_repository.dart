@@ -13,13 +13,10 @@ class LessonRepository {
   Future<LessonModel?> getLesson(String id) async {
     final local = await _local.getLesson(id);
     if (local != null && local.exercises.isNotEmpty) return local;
-    try {
-      final remote = await _fetchLessonRemote(id);
-      if (remote != null) await _local.saveLesson(remote);
-      return remote ?? local;
-    } catch (_) {
-      return local;
-    }
+    // Not cached or no exercises — fetch from Supabase (errors propagate to UI)
+    final remote = await _fetchLessonRemote(id);
+    if (remote != null) await _local.saveLesson(remote);
+    return remote; // null if not found/deleted; don't return stale local
   }
 
   Future<List<VocabularyModel>> getVocabForLesson(String lessonId) async {
