@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
 
 class ExerciseFillBlank extends StatefulWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
+  final List<VocabularyModel> vocab;
   const ExerciseFillBlank(
-      {required this.exercise, required this.onAnswered, super.key});
+      {required this.exercise, required this.onAnswered, this.vocab = const [], super.key});
 
   @override
   State<ExerciseFillBlank> createState() => _ExerciseFillBlankState();
@@ -18,7 +20,8 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
       widget.exercise.correctAnswer['sentence'] as String;
   String get _answer => widget.exercise.correctAnswer['answer'] as String;
 
-  // Build distractor options: correct answer + up to 3 distractors
+  // Build distractor options: correct answer + up to 3 distractors.
+  // Falls back to lesson vocabulary when the exercise has no distractors.
   List<String> get _options {
     final opts = <String>[_answer];
     final dist = widget.exercise.distractors;
@@ -26,7 +29,23 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
       for (final o in dist['options'] as List) {
         if (opts.length >= 4) break;
         final s = o.toString();
-        if (s != _answer) opts.add(s);
+        if (s.isNotEmpty && s != _answer) opts.add(s);
+      }
+    }
+    // Fill remaining slots from lesson vocabulary (same-type words preferred)
+    if (opts.length < 4 && widget.vocab.isNotEmpty) {
+      final answerType = widget.vocab
+          .firstWhere((v) => v.arabic == _answer,
+              orElse: () => widget.vocab.first)
+          .wordType;
+      // Prefer same word_type, then any other vocab word
+      final candidates = [
+        ...widget.vocab.where((v) => v.arabic != _answer && v.wordType == answerType),
+        ...widget.vocab.where((v) => v.arabic != _answer && v.wordType != answerType),
+      ];
+      for (final v in candidates) {
+        if (opts.length >= 4) break;
+        if (!opts.contains(v.arabic)) opts.add(v.arabic);
       }
     }
     opts.shuffle();

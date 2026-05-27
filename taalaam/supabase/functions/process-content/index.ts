@@ -78,10 +78,12 @@ EXERCISE TYPE SPECIFICATIONS
 [fill_in_blank] — One word missing from a short Arabic sentence
   prompt_bn: "শূন্যস্থানে সঠিক শব্দ বসাও (অর্থ: ছাত্র):"
   correct_answer: { "sentence": "هُوَ ___ جَدِيدٌ", "blank_index": 1, "answer": "تِلْمِيذٌ" }
+  distractors: { "options": ["أُسْتَاذٌ", "جَدِيدٌ"] }   ← REQUIRED: 2-3 wrong Arabic words from THIS lesson's vocabulary
   Rules:
     - sentence field: write the sentence with exactly one ___ for the blank
     - blank_index: 0-based index of the missing word
     - answer: the single Arabic word that fills the blank (with harakat)
+    - distractors.options: 2-3 plausible wrong words from this lesson's vocabulary (NOT null)
     - Prompt must include Bangla meaning of the missing word as a hint
     - difficulty: 3
 
@@ -157,6 +159,7 @@ exercises:
     "type":"fill_in_blank","sort_order":6,
     "prompt_bn":"শূন্যস্থানে সঠিক শব্দ বসাও (অর্থ: নতুন):",
     "correct_answer":{"sentence":"هُوَ تِلْمِيذٌ ___","blank_index":2,"answer":"جَدِيدٌ"},
+    "distractors":{"options":["أُسْتَاذٌ","تِلْمِيذٌ"]},
     "grammar_note_bn":"আরবিতে বিশেষণ বিশেষ্যের পরে বসে: تِلْمِيذٌ جَدِيدٌ = নতুন ছাত্র।","difficulty":3
   },
   {

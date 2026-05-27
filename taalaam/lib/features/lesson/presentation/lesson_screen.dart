@@ -169,6 +169,7 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
                     child: ExerciseEngine(
                       key: ValueKey(session.currentIndex),
                       exercise: exercise,
+                      vocab: vocab,
                       onAnswered: (correct) =>
                           ref.read(_sessionProvider.notifier).answer(correct),
                     ),
