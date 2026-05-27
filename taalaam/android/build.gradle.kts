@@ -20,12 +20,14 @@ subprojects {
 }
 
 // Force all Android library plugin subprojects to compile against SDK 36.
-// file_picker and others declare compileSdk=34 which is too low for
-// flutter_plugin_android_lifecycle which requires >= 36.
-subprojects {
-    @Suppress("DEPRECATION")
-    plugins.withId("com.android.library") {
-        (extensions.findByName("android") as? com.android.build.gradle.LibraryExtension)
+// file_picker and others hardcode compileSdk=34 in their own build scripts,
+// which is too low for flutter_plugin_android_lifecycle (requires >= 36).
+// gradle.afterProject fires AFTER each project's build script runs, so it
+// correctly overrides whatever the plugin set.
+gradle.afterProject {
+    if (project != rootProject) {
+        @Suppress("DEPRECATION")
+        (project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension)
             ?.compileSdkVersion(36)
     }
 }
