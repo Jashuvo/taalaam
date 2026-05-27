@@ -2,7 +2,7 @@
 // Triggered by admin upload. Calls Gemini API → inserts draft content into DB.
 // Deploy: supabase functions deploy process-content --no-verify-jwt
 
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
+import { GoogleGenAI } from 'npm:@google/genai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -270,11 +270,7 @@ Deno.serve(async (req: Request) => {
       .update({ processing_status: 'processing' })
       .eq('id', material_id);
 
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
-    });
+    const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')! });
 
     const INLINE_LIMIT = 19 * 1024 * 1024; // 19 MB
 
@@ -323,7 +319,7 @@ ${OUTPUT_SCHEMA}
 
 Now CREATE interactive lessons from this Arabic learning material. Follow the pedagogical rules exactly. Return only valid JSON.`;
 
-    type Part = { text: string } | { inlineData: { data: string; mimeType: string } } | { fileData: { mimeType: string; fileUri: string } };
+    type Part = { text: string } | { inlineData: { mimeType: string; data: string } } | { fileData: { mimeType: string; fileUri: string } };
     let parts: Part[];
 
     if (text_content) {
@@ -374,8 +370,20 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
       }
     }
 
-    const result = await model.generateContent(parts);
-    let responseText = result.response.text().trim();
+    // Race against a 110-second timeout so we return a proper error instead
+    // of being killed by Supabase's 150s wall-clock limit.
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini API timeout after 110 seconds')), 110_000)
+    );
+    const result = await Promise.race([
+      ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [{ role: 'user', parts }],
+        config: { systemInstruction: SYSTEM_PROMPT },
+      }),
+      timeoutPromise,
+    ]);
+    let responseText = (result.text ?? '').trim();
 
     // Strip any accidental markdown fences Gemini sometimes adds
     if (responseText.startsWith('```')) {
