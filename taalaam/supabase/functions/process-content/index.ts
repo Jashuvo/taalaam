@@ -272,7 +272,7 @@ Deno.serve(async (req: Request) => {
 
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3.5-flash',
       systemInstruction: SYSTEM_PROMPT,
     });
 
