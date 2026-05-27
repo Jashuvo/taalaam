@@ -21,8 +21,8 @@ class GrammarNoteSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = correct ? Colors.green.shade700 : theme.colorScheme.error;
-    final bgColor = correct ? Colors.green.shade50 : Colors.red.shade50;
+    final color = correct ? Colors.green.shade800 : Colors.red.shade800;
+    final bgColor = correct ? Colors.green.shade100 : Colors.red.shade100;
 
     final vocabMap = {for (final v in vocab) v.arabic: v};
 
@@ -89,9 +89,9 @@ class GrammarNoteSheet extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
+                      color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: color.withValues(alpha: 0.5)),
+                      border: Border.all(color: color),
                     ),
                     child: Text(
                       pair['ar']!,
@@ -106,12 +106,12 @@ class GrammarNoteSheet extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Icon(Icons.arrow_forward, size: 16, color: color.withValues(alpha: 0.6)),
+                    child: Icon(Icons.arrow_forward, size: 16, color: color),
                   ),
                   Text(
                     pair['bn']!,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: color.withValues(alpha: 0.85),
+                      color: color,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -123,8 +123,7 @@ class GrammarNoteSheet extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               grammarNote!,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: color.withValues(alpha: 0.85)),
+              style: theme.textTheme.bodyMedium?.copyWith(color: color),
             ),
           ],
           const SizedBox(height: 16),
@@ -189,9 +188,9 @@ class _CorrectWordTile extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
+            color: color.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withValues(alpha: 0.5)),
+            border: Border.all(color: color),
           ),
           child: Text(
             word,
@@ -209,8 +208,8 @@ class _CorrectWordTile extends StatelessWidget {
             meaningBn!,
             textDirection: TextDirection.ltr,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: color.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w500,
+              color: color,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
