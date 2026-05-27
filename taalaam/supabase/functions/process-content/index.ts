@@ -239,14 +239,24 @@ const OUTPUT_SCHEMA = `Return ONLY a valid JSON object matching this exact schem
   ]
 }`;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
     const { material_id, text_content, track, notes } = await req.json();
 
     if (!material_id || !track) {
       return new Response(
         JSON.stringify({ error: 'material_id and track are required' }),
-        { status: 400 }
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -456,13 +466,13 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
 
     return new Response(
       JSON.stringify({ success: true, unit_id: unit.id, lesson_count: parsed.lessons.length }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (err) {
     console.error('process-content error:', err);
     return new Response(
       JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 });
