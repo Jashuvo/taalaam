@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
+import 'connection_native.dart'
+    if (dart.library.html) 'connection_web.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'tables/bookmarks.dart';
 import 'tables/exercises.dart';
@@ -52,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
     },
   );
 
-  static QueryExecutor _openConnection() => driftDatabase(name: 'taalaam');
+  static QueryExecutor _openConnection() => openDatabaseConnection();
 }
 
 // Manual provider — keeps Riverpod alive for the lifetime of the app

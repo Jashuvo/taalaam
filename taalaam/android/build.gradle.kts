@@ -22,16 +22,14 @@ subprojects {
 // Force all plugin subprojects to compile with Kotlin language version 2.0.
 // posthog_flutter 4.x declares languageVersion 1.6 which KGP 2.2+ rejects.
 subprojects {
-    afterEvaluate {
-        project.plugins.withId("org.jetbrains.kotlin.android") {
-            project.tasks
-                .withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java)
-                .configureEach {
-                    compilerOptions {
-                        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
-                    }
+    project.plugins.withId("org.jetbrains.kotlin.android") {
+        project.tasks
+            .withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java)
+            .configureEach {
+                compilerOptions {
+                    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
                 }
-        }
+            }
     }
 }
 
