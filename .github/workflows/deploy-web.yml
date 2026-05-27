@@ -42,10 +42,28 @@ jobs:
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
+      - name: Build admin web app
+        working-directory: taalaam
+        run: |
+          flutter build web \
+            -t lib/main_admin.dart \
+            --output build/web-admin \
+            --base-href /taalaam/admin/ \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Combine into single Pages artifact
+        working-directory: taalaam
+        run: |
+          mkdir -p build/dist
+          cp -r build/web/. build/dist/
+          mkdir -p build/dist/admin
+          cp -r build/web-admin/. build/dist/admin/
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: taalaam/build/web
+          path: taalaam/build/dist
 
       - name: Deploy to GitHub Pages
         id: deployment
