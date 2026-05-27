@@ -52,12 +52,15 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
           final selected = _selected == i;
           final correct = i == _correctIndex;
           Color? tileColor;
+          Color? textColor;
           if (_selected != null) {
-            tileColor = correct
-                ? Colors.green.shade100
-                : selected
-                    ? Colors.red.shade100
-                    : null;
+            if (correct) {
+              tileColor = Colors.green.shade100;
+              textColor = Colors.green.shade900;
+            } else if (selected) {
+              tileColor = Colors.red.shade100;
+              textColor = Colors.red.shade900;
+            }
           }
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -79,10 +82,11 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
                     textDirection: TextDirection.rtl,
                     child: Text(
                       _options[i],
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontFamily: 'NotoNaskhArabic',
                           fontSize: 20,
-                          height: 1.8),
+                          height: 1.8,
+                          color: textColor ?? theme.colorScheme.onSurface),
                       textAlign: TextAlign.center,
                     ),
                   ),
