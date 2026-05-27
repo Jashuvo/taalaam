@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../data/local/database.dart';
 import '../../../shared/widgets/arabic_audio_button.dart';
+import '../../auth/presentation/auth_provider.dart';
+import '../../srs/data/srs_local_source.dart';
 import '../domain/exercise_model.dart';
 import 'lesson_complete_screen.dart';
 import 'lesson_provider.dart';
@@ -106,6 +109,21 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     final vocab =
         ref.watch(lessonVocabProvider(widget.lesson.id as String)).valueOrNull ??
             const [];
+    // Fallback words extracted from other exercises when vocabulary table is empty
+    final exerciseWords = _arabicWordsFromExercises(
+        session.exercises.cast<ExerciseModel>());
+
+    // Create SRS cards for every vocab item the first time the lesson completes.
+    ref.listen<LessonSessionState>(_sessionProvider, (prev, next) {
+      if (next.completed && !(prev?.completed ?? false) && vocab.isNotEmpty) {
+        final user = ref.read(currentUserProvider);
+        if (user == null) return;
+        final srs = SrsLocalSource(ref.read(appDatabaseProvider));
+        for (final v in vocab) {
+          srs.createCard(user.id, v.id);
+        }
+      }
+    });
 
     if (session.completed) {
       final xp = (widget.lesson.xpReward as int? ?? 10) +
@@ -170,6 +188,7 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
                       key: ValueKey(session.currentIndex),
                       exercise: exercise,
                       vocab: vocab,
+                      extraWords: exerciseWords,
                       onAnswered: (correct) =>
                           ref.read(_sessionProvider.notifier).answer(correct),
                     ),
@@ -191,6 +210,40 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         ],
       ),
     );
+  }
+  /// Collects all Arabic words from exercises as fallback distractors
+  /// for fill_in_blank when the vocabulary table has no entries for this lesson.
+  static List<String> _arabicWordsFromExercises(List<ExerciseModel> exercises) {
+    final words = <String>{};
+    for (final ex in exercises) {
+      final ca = ex.correctAnswer;
+      switch (ex.type) {
+        case ExerciseType.tapToBuild:
+          final w = ca['words'];
+          if (w is List) words.addAll(w.map((e) => e.toString()));
+          final d = ca['distractor_words'];
+          if (d is List) words.addAll(d.map((e) => e.toString()));
+        case ExerciseType.wordScramble:
+          final w = ca['words'];
+          if (w is List) words.addAll(w.map((e) => e.toString()));
+        case ExerciseType.fillInBlank:
+          final a = ca['answer'];
+          if (a is String && a.isNotEmpty) words.add(a);
+        case ExerciseType.dragDrop:
+          final pairs = ca['pairs'];
+          if (pairs is List) {
+            for (final p in pairs) {
+              if (p is Map) {
+                final ar = p['ar']?.toString() ?? '';
+                if (ar.isNotEmpty) words.add(ar);
+              }
+            }
+          }
+        default:
+          break;
+      }
+    }
+    return words.toList();
   }
 }
 

@@ -12,8 +12,10 @@ class ExerciseEngine extends StatelessWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
   final List<VocabularyModel> vocab;
+  final List<String> extraWords;
   const ExerciseEngine(
-      {required this.exercise, required this.onAnswered, this.vocab = const [], super.key});
+      {required this.exercise, required this.onAnswered,
+       this.vocab = const [], this.extraWords = const [], super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +25,8 @@ class ExerciseEngine extends StatelessWidget {
       ExerciseType.tapToBuild =>
         ExerciseTapToBuild(exercise: exercise, onAnswered: onAnswered),
       ExerciseType.fillInBlank =>
-        ExerciseFillBlank(exercise: exercise, onAnswered: onAnswered, vocab: vocab),
+        ExerciseFillBlank(exercise: exercise, onAnswered: onAnswered,
+            vocab: vocab, extraWords: extraWords),
       ExerciseType.dragDrop =>
         ExerciseDragDrop(exercise: exercise, onAnswered: onAnswered),
       ExerciseType.wordScramble =>

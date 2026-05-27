@@ -6,8 +6,10 @@ class ExerciseFillBlank extends StatefulWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
   final List<VocabularyModel> vocab;
+  final List<String> extraWords;
   const ExerciseFillBlank(
-      {required this.exercise, required this.onAnswered, this.vocab = const [], super.key});
+      {required this.exercise, required this.onAnswered,
+       this.vocab = const [], this.extraWords = const [], super.key});
 
   @override
   State<ExerciseFillBlank> createState() => _ExerciseFillBlankState();
@@ -39,7 +41,6 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
           .firstWhere((v) => v.arabic == _answer,
               orElse: () => widget.vocab.first)
           .wordType;
-      // Prefer same word_type, then any other vocab word
       final candidates = [
         ...widget.vocab.where((v) => v.arabic != _answer && v.wordType == answerType),
         ...widget.vocab.where((v) => v.arabic != _answer && v.wordType != answerType),
@@ -47,6 +48,13 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
       for (final v in candidates) {
         if (opts.length >= 4) break;
         if (!opts.contains(v.arabic)) opts.add(v.arabic);
+      }
+    }
+    // Last resort: Arabic words extracted from other exercises in this lesson
+    if (opts.length < 4 && widget.extraWords.isNotEmpty) {
+      for (final word in widget.extraWords) {
+        if (opts.length >= 4) break;
+        if (word.isNotEmpty && !opts.contains(word)) opts.add(word);
       }
     }
     opts.shuffle();
@@ -62,8 +70,10 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
   @override
   void didUpdateWidget(ExerciseFillBlank oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Vocab loads asynchronously — recompute options once it arrives
-    if (oldWidget.vocab.isEmpty && widget.vocab.isNotEmpty && _selected == null) {
+    // Vocab and exercise words load asynchronously — recompute once they arrive
+    final vocabArrived = oldWidget.vocab.isEmpty && widget.vocab.isNotEmpty;
+    final extraArrived = oldWidget.extraWords.isEmpty && widget.extraWords.isNotEmpty;
+    if ((vocabArrived || extraArrived) && _selected == null) {
       setState(() => _shuffled = _options);
     }
   }
