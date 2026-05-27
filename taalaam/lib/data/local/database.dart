@@ -1,7 +1,5 @@
 import 'package:drift/drift.dart';
-import 'package:drift/web.dart';
 import 'package:drift_flutter/drift_flutter.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'tables/bookmarks.dart';
 import 'tables/exercises.dart';
@@ -54,11 +52,7 @@ class AppDatabase extends _$AppDatabase {
     },
   );
 
-  // ignore: deprecated_member_use
-  static QueryExecutor _openConnection() => kIsWeb
-      // ignore: deprecated_member_use
-      ? WebDatabase('taalaam')
-      : driftDatabase(name: 'taalaam');
+  static QueryExecutor _openConnection() => driftDatabase(name: 'taalaam');
 }
 
 // Manual provider — keeps Riverpod alive for the lifetime of the app
