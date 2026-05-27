@@ -103,6 +103,9 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(_sessionProvider);
+    final vocab =
+        ref.watch(lessonVocabProvider(widget.lesson.id as String)).valueOrNull ??
+            const [];
 
     if (session.completed) {
       final xp = (widget.lesson.xpReward as int? ?? 10) +
@@ -178,6 +181,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
             GrammarNoteSheet(
               correct: session.lastCorrect ?? false,
               grammarNote: exercise.grammarNoteBn,
+              exercise: exercise,
+              vocab: vocab,
               onNext: () => ref.read(_sessionProvider.notifier).next(),
             ),
           if (session.hearts == 0 && !session.showFeedback)
