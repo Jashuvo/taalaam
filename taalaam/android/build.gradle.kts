@@ -19,6 +19,17 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Force all Android library plugin subprojects to compile against SDK 36.
+// file_picker and others declare compileSdk=34 which is too low for
+// flutter_plugin_android_lifecycle which requires >= 36.
+subprojects {
+    @Suppress("DEPRECATION")
+    plugins.withId("com.android.library") {
+        (extensions.findByName("android") as? com.android.build.gradle.LibraryExtension)
+            ?.compileSdkVersion(36)
+    }
+}
+
 // Force all plugin subprojects to compile with Kotlin language version 2.0.
 // posthog_flutter 4.x declares languageVersion 1.6 which KGP 2.2+ rejects.
 subprojects {
