@@ -478,8 +478,11 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
     );
   } catch (err) {
     console.error('process-content error:', err);
+    const message = err instanceof Error
+      ? err.message
+      : (typeof err === 'object' ? JSON.stringify(err) : String(err));
     return new Response(
-      JSON.stringify({ error: String(err) }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
