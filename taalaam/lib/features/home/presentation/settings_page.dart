@@ -3,8 +3,37 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _kSoundChime = 'sound_chime';
+const _kSoundChime   = 'sound_chime';
 const _kSoundTakbeer = 'sound_takbeer';
+const _kThemeMode    = 'theme_mode';
+
+// ── Theme mode provider ────────────────────────────────────────────────────
+
+final themeModeProvider =
+    StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+  return ThemeModeNotifier();
+});
+
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  ThemeModeNotifier() : super(ThemeMode.system) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = switch (prefs.getString(_kThemeMode)) {
+      'light'  => ThemeMode.light,
+      'dark'   => ThemeMode.dark,
+      _        => ThemeMode.system,
+    };
+  }
+
+  Future<void> setMode(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kThemeMode, mode.name);
+    state = mode;
+  }
+}
 
 final soundSettingsProvider =
     StateNotifierProvider<SoundSettingsNotifier, SoundSettings>((ref) {
@@ -59,6 +88,8 @@ class SettingsPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final settings = ref.watch(soundSettingsProvider);
     final notifier = ref.read(soundSettingsProvider.notifier);
+    final themeMode = ref.watch(themeModeProvider);
+    final themeModeNotifier = ref.read(themeModeProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -67,8 +98,52 @@ class SettingsPage extends ConsumerWidget {
       ),
       body: ListView(
         children: [
+          // ── Appearance ────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            child: Text(
+              'থিম',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SegmentedButton<ThemeMode>(
+              segments: const [
+                ButtonSegment(
+                  value: ThemeMode.system,
+                  icon: Icon(Icons.brightness_auto_outlined),
+                  label: Text('সিস্টেম'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.light,
+                  icon: Icon(Icons.light_mode_outlined),
+                  label: Text('আলো'),
+                ),
+                ButtonSegment(
+                  value: ThemeMode.dark,
+                  icon: Icon(Icons.dark_mode_outlined),
+                  label: Text('অন্ধকার'),
+                ),
+              ],
+              selected: {themeMode},
+              onSelectionChanged: (modes) =>
+                  themeModeNotifier.setMode(modes.first),
+              style: ButtonStyle(
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const Divider(height: 32),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
               'শব্দ',
               style: theme.textTheme.labelLarge?.copyWith(

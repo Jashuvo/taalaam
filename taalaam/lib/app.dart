@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/home/presentation/home_provider.dart';
+import 'features/home/presentation/settings_page.dart';
 
 enum AppFlavor { learner, admin }
 
@@ -18,10 +19,13 @@ class TaalamaApp extends ConsumerWidget {
     // Kick off background sync on app start (fire and forget)
     ref.read(syncServiceProvider).syncTracks().ignore();
 
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp.router(
       title: "Ta'allam — تعلَّم",
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
