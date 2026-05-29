@@ -114,7 +114,9 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                                   ? Colors.green.shade900
                                   : wrong
                                       ? Colors.red.shade900
-                                      : theme.colorScheme.onSurface),
+                                      : matched
+                                          ? Colors.green.shade900
+                                          : theme.colorScheme.onSurface),
                         ),
                       ),
                     ),
@@ -175,7 +177,9 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                               ? Colors.green.shade900
                               : bnWrong
                                   ? Colors.red.shade900
-                                  : theme.colorScheme.onSurface,
+                                  : alreadyUsed
+                                      ? Colors.green.shade900
+                                      : theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
