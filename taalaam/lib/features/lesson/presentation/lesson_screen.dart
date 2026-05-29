@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
+import 'package:drift/drift.dart' as drift;
 import '../../../shared/widgets/arabic_audio_button.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../srs/data/srs_local_source.dart';
@@ -125,13 +126,37 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
           HapticFeedback.mediumImpact();
         }
       }
-      // SRS cards on lesson complete
-      if (next.completed && !(prev?.completed ?? false) && vocab.isNotEmpty) {
+      // Write user_progress + SRS cards on lesson complete
+      if (next.completed && !(prev?.completed ?? false)) {
         final user = ref.read(currentUserProvider);
         if (user == null) return;
-        final srs = SrsLocalSource(ref.read(appDatabaseProvider));
-        for (final v in vocab) {
-          srs.createCard(user.id, v.id);
+        final db = ref.read(appDatabaseProvider);
+        final lessonId = widget.lesson.id as String;
+        final xp = (widget.lesson.xpReward as int? ?? 10) +
+            next.correctCount * AppConstants.xpPerExercise;
+        final pct = next.exercises.isEmpty
+            ? 0
+            : (next.correctCount / next.exercises.length * 100).round();
+
+        // Record lesson completion in local DB (idempotent via conflict update)
+        db.into(db.userProgress).insertOnConflictUpdate(
+          UserProgressCompanion(
+            id: drift.Value('${user.id}_$lessonId'),
+            userId: drift.Value(user.id),
+            lessonId: drift.Value(lessonId),
+            completedAt: drift.Value(DateTime.now()),
+            xpEarned: drift.Value(xp),
+            accuracyPct: drift.Value(pct),
+            heartsRemaining: drift.Value(next.hearts),
+          ),
+        );
+
+        // SRS cards for lesson vocab
+        if (vocab.isNotEmpty) {
+          final srs = SrsLocalSource(db);
+          for (final v in vocab) {
+            srs.createCard(user.id, v.id);
+          }
         }
       }
     });
