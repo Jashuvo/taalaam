@@ -27,11 +27,15 @@ class HomePage extends ConsumerWidget {
       appBar: AppBar(
         title: Builder(builder: (ctx) {
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return Image.asset(
-            isDark
-                ? 'assets/logo_dark-removebg-preview.png'
-                : 'assets/logo_light-removebg-preview.png',
-            height: 40,
+          return ClipOval(
+            child: Image.asset(
+              isDark
+                  ? 'assets/logo_dark-removebg-preview.png'
+                  : 'assets/logo_light-removebg-preview.png',
+              height: 46,
+              width: 46,
+              fit: BoxFit.cover,
+            ),
           );
         }),
         centerTitle: false,
