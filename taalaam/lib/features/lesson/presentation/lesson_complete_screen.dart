@@ -34,28 +34,13 @@ class LessonCompleteScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            blurRadius: 20,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/logo_badge.png',
-                          height: 110,
-                          width: 110,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
+                  Builder(builder: (ctx) {
+                    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                    return Image.asset(
+                      isDark ? 'assets/logo_dark.png' : 'assets/logo_light.png',
+                      height: 120,
+                    );
+                  }),
                   const SizedBox(height: 16),
                   Text(
                     'পাঠ সম্পন্ন! 🎉',
