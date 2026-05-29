@@ -4,6 +4,15 @@ import 'package:go_router/go_router.dart';
 import '../../../data/local/database.dart';
 import 'home_provider.dart';
 
+// ── Path geometry constants ───────────────────────────────────────────────────
+
+const _nodeSize = 64.0;
+const _rowHeight = 116.0;
+// Horizontal positions as fractions of available width: centre → right → centre → left
+const _xFractions = [0.5, 0.78, 0.5, 0.22];
+
+// ── Page shell ────────────────────────────────────────────────────────────────
+
 class TrackDetailPage extends ConsumerWidget {
   final String slug;
   const TrackDetailPage({required this.slug, super.key});
@@ -11,28 +20,24 @@ class TrackDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trackAsync = ref.watch(trackBySlugProvider(slug));
-
     return trackAsync.when(
-      loading: () => Scaffold(
-        appBar: AppBar(title: const Text('পাঠ পথ')),
-        body: const Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: const Text('পাঠ পথ')),
-        body: Center(child: Text('ত্রুটি: $e')),
-      ),
+          appBar: AppBar(), body: Center(child: Text('ত্রুটি: $e'))),
       data: (track) {
         if (track == null) {
           return Scaffold(
-            appBar: AppBar(title: const Text('পাঠ পথ')),
-            body: const Center(child: Text('কোর্স পাওয়া যায়নি')),
-          );
+              appBar: AppBar(),
+              body: const Center(child: Text('কোর্স পাওয়া যায়নি')));
         }
         return _TrackBody(track: track);
       },
     );
   }
 }
+
+// ── Body ──────────────────────────────────────────────────────────────────────
 
 class _TrackBody extends ConsumerWidget {
   final Track track;
@@ -41,341 +46,482 @@ class _TrackBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isQuranic = track.slug == 'quranic';
     final unitsAsync = ref.watch(unitsForTrackProvider(track.id));
     final completedAsync = ref.watch(completedLessonIdsProvider);
-
     final bookmarkedAsync = ref.watch(bookmarkedLessonIdsProvider);
 
+    final gradientColors = isQuranic
+        ? const [Color(0xFF1B4332), Color(0xFF2E7D52)]
+        : const [Color(0xFF0D4A4A), Color(0xFF1A8080)];
+
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(track.nameBn,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Directionality(
-              textDirection: TextDirection.rtl,
-              child: Text(
-                track.nameAr,
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 13,
-                  height: 1.4,
-                  color: theme.colorScheme.primary,
+      body: CustomScrollView(
+        slivers: [
+          // ── Collapsible gradient app bar ─────────────────────────────────
+          SliverAppBar(
+            expandedHeight: 130,
+            pinned: true,
+            backgroundColor: gradientColors[0],
+            foregroundColor: Colors.white,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: gradientColors,
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(72, 8, 24, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          track.nameBn,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: Text(
+                            track.nameAr,
+                            style: const TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              fontSize: 16,
+                              height: 1.4,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-      body: unitsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Text('পাঠ লোড হচ্ছে না।',
-              style: TextStyle(color: theme.colorScheme.error)),
-        ),
-        data: (units) {
-          if (units.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.hourglass_empty,
-                        size: 64, color: theme.colorScheme.outline),
-                    const SizedBox(height: 16),
-                    Text(
-                      'এই কোর্সে এখনও কোনো পাঠ নেই।\nশীঘ্রই আসছে ইনশাআল্লাহ!',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant),
+          ),
+
+          // ── Units + lesson path ──────────────────────────────────────────
+          unitsAsync.when(
+            loading: () => const SliverFillRemaining(
+                child: Center(child: CircularProgressIndicator())),
+            error: (e, _) => SliverFillRemaining(
+              child: Center(
+                  child: Text('পাঠ লোড হচ্ছে না।',
+                      style:
+                          TextStyle(color: theme.colorScheme.error))),
+            ),
+            data: (units) {
+              if (units.isEmpty) {
+                return SliverFillRemaining(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.hourglass_empty,
+                              size: 64,
+                              color: theme.colorScheme.outline),
+                          const SizedBox(height: 16),
+                          Text(
+                            'এই কোর্সে এখনও কোনো পাঠ নেই।\nশীঘ্রই আসছে ইনশাআল্লাহ!',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
+                );
+              }
+              final completedIds = completedAsync.valueOrNull ?? {};
+              final bookmarkedIds = bookmarkedAsync.valueOrNull ?? {};
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => _UnitSection(
+                    unit: units[i],
+                    unitNumber: i + 1,
+                    completedIds: completedIds,
+                    bookmarkedIds: bookmarkedIds,
+                    gradientColors: gradientColors,
+                  ),
+                  childCount: units.length,
                 ),
-              ),
-            );
-          }
-          final completedIds = completedAsync.valueOrNull ?? {};
-          final bookmarkedIds = bookmarkedAsync.valueOrNull ?? {};
-          return _UnitList(
-            units: units,
-            completedIds: completedIds,
-            bookmarkedIds: bookmarkedIds,
-          );
-        },
+              );
+            },
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 48)),
+        ],
       ),
     );
   }
 }
 
-class _UnitList extends StatelessWidget {
-  final List<Unit> units;
-  final Set<String> completedIds;
-  final Set<String> bookmarkedIds;
-  const _UnitList({
-    required this.units,
-    required this.completedIds,
-    required this.bookmarkedIds,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-      itemCount: units.length,
-      itemBuilder: (ctx, i) => _UnitSection(
-        unit: units[i],
-        unitNumber: i + 1,
-        completedIds: completedIds,
-        bookmarkedIds: bookmarkedIds,
-        isLast: i == units.length - 1,
-      ),
-    );
-  }
-}
+// ── Unit section ──────────────────────────────────────────────────────────────
 
 class _UnitSection extends ConsumerWidget {
   final Unit unit;
   final int unitNumber;
   final Set<String> completedIds;
   final Set<String> bookmarkedIds;
-  final bool isLast;
+  final List<Color> gradientColors;
+
   const _UnitSection({
     required this.unit,
     required this.unitNumber,
     required this.completedIds,
     required this.bookmarkedIds,
-    required this.isLast,
+    required this.gradientColors,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final lessonsAsync = ref.watch(lessonsForUnitProvider(unit.id));
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 12),
+        // Unit banner
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
+                  color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
                     '$unitNumber',
-                    style: TextStyle(
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: theme.colorScheme.onPrimaryContainer,
+                      fontSize: 18,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       unit.titleBn,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
-                    if (unit.titleAr != null && unit.titleAr!.isNotEmpty)
+                    if (unit.titleAr != null && unit.titleAr!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
                       Directionality(
                         textDirection: TextDirection.rtl,
                         child: Text(
                           unit.titleAr!,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'NotoNaskhArabic',
-                            fontSize: 14,
+                            fontSize: 13,
                             height: 1.4,
-                            color: theme.colorScheme.primary,
+                            color: Colors.white70,
                           ),
                         ),
                       ),
+                    ],
                   ],
                 ),
               ),
             ],
           ),
         ),
+
+        // Winding lesson path
         lessonsAsync.when(
           loading: () => const Padding(
-            padding: EdgeInsets.only(left: 46, bottom: 16),
-            child: LinearProgressIndicator(),
-          ),
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator())),
           error: (_, __) => const SizedBox.shrink(),
-          data: (lessons) => Padding(
-            padding: const EdgeInsets.only(left: 12, bottom: 8),
-            child: Column(
-              children: lessons
-                  .asMap()
-                  .entries
-                  .map((e) => _LessonTile(
-                        lesson: e.value,
-                        lessonNumber: e.key + 1,
-                        isDone: completedIds.contains(e.value.id),
-                        isBookmarked: bookmarkedIds.contains(e.value.id),
-                      ))
-                  .toList(),
-            ),
-          ),
+          data: (lessons) {
+            if (lessons.isEmpty) return const SizedBox.shrink();
+            return _LessonPath(
+              lessons: lessons,
+              completedIds: completedIds,
+            );
+          },
         ),
-        if (!isLast) const Divider(height: 8),
       ],
     );
   }
 }
 
-class _LessonTile extends ConsumerWidget {
-  final Lesson lesson;
-  final int lessonNumber;
-  final bool isDone;
-  final bool isBookmarked;
-  const _LessonTile({
-    required this.lesson,
-    required this.lessonNumber,
-    required this.isDone,
-    required this.isBookmarked,
+// ── Winding path ──────────────────────────────────────────────────────────────
+
+class _LessonPath extends StatelessWidget {
+  final List<Lesson> lessons;
+  final Set<String> completedIds;
+
+  const _LessonPath({
+    required this.lessons,
+    required this.completedIds,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context) {
+    final firstUndone =
+        lessons.indexWhere((l) => !completedIds.contains(l.id));
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDone
-              ? Colors.green.withValues(alpha: 0.35)
-              : theme.colorScheme.outline.withValues(alpha: 0.2),
+    return LayoutBuilder(builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      final totalHeight = lessons.length * _rowHeight + 32;
+
+      final positions = List.generate(lessons.length, (i) {
+        final xFrac = _xFractions[i % _xFractions.length];
+        final x = _nodeSize / 2 + xFrac * (width - _nodeSize);
+        final y = 16 + i * _rowHeight + _rowHeight / 2;
+        return Offset(x, y);
+      });
+
+      return SizedBox(
+        height: totalHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Path lines
+            CustomPaint(
+              size: Size(width, totalHeight),
+              painter: _PathPainter(
+                positions: positions,
+                isDoneList: lessons
+                    .map((l) => completedIds.contains(l.id))
+                    .toList(),
+              ),
+            ),
+            // Nodes
+            ...List.generate(lessons.length, (i) {
+              final pos = positions[i];
+              return Positioned(
+                left: pos.dx - _nodeSize / 2,
+                top: pos.dy - _nodeSize / 2,
+                child: _LessonNode(
+                  lesson: lessons[i],
+                  isDone: completedIds.contains(lessons[i].id),
+                  isCurrent: i == firstUndone,
+                ),
+              );
+            }),
+          ],
         ),
-      ),
-      color: isDone
-          ? Colors.green.withValues(alpha: 0.05)
-          : theme.colorScheme.surface,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => context.go('/lesson/${lesson.id}'),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color:
-                      isDone ? Colors.green : theme.colorScheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isDone ? Icons.check : Icons.play_arrow_rounded,
-                  color: isDone
-                      ? Colors.white
-                      : theme.colorScheme.onPrimaryContainer,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      lesson.titleBn,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: isDone
-                            ? theme.colorScheme.onSurface.withValues(alpha: 0.65)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Text(
-                          '${lesson.xpReward} XP',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _LevelChip(level: lesson.level),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (isDone)
-                Text(
-                  'সম্পন্ন',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: Colors.green.shade700,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              IconButton(
-                icon: Icon(
-                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                  size: 20,
-                  color: isBookmarked
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                visualDensity: VisualDensity.compact,
-                onPressed: () => ref
-                    .read(bookmarkNotifierProvider.notifier)
-                    .toggle(lesson.id, isBookmarked),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+      );
+    });
   }
 }
 
-class _LevelChip extends StatelessWidget {
-  final String level;
-  const _LevelChip({required this.level});
+// ── Path line painter ─────────────────────────────────────────────────────────
+
+class _PathPainter extends CustomPainter {
+  final List<Offset> positions;
+  final List<bool> isDoneList;
+
+  const _PathPainter({required this.positions, required this.isDoneList});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (int i = 0; i < positions.length - 1; i++) {
+      final done = isDoneList[i];
+      final paint = Paint()
+        ..color = done ? Colors.green.shade400 : Colors.grey.shade400
+        ..strokeWidth = 5
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+
+      final from = positions[i];
+      final to = positions[i + 1];
+
+      // Trim start/end so the line connects node edges, not centres
+      final delta = to - from;
+      final dist = delta.distance;
+      final unitV = Offset(delta.dx / dist, delta.dy / dist);
+      const gap = _nodeSize / 2 + 3;
+      final start = from + unitV * gap;
+      final end = to - unitV * gap;
+
+      // Smooth S-curve between the two node edges
+      final mid = (end.dy - start.dy) * 0.45;
+      final path = Path()
+        ..moveTo(start.dx, start.dy)
+        ..cubicTo(
+          start.dx, start.dy + mid,
+          end.dx, end.dy - mid,
+          end.dx, end.dy,
+        );
+
+      if (done) {
+        canvas.drawPath(path, paint);
+      } else {
+        _drawDashed(canvas, path, paint);
+      }
+    }
+  }
+
+  void _drawDashed(Canvas canvas, Path path, Paint paint) {
+    const dash = 8.0;
+    const gap = 5.5;
+    for (final metric in path.computeMetrics()) {
+      double dist = 0;
+      bool draw = true;
+      while (dist < metric.length) {
+        final seg = draw ? dash : gap;
+        final next = (dist + seg).clamp(0.0, metric.length);
+        if (draw) canvas.drawPath(metric.extractPath(dist, next), paint);
+        dist += seg;
+        draw = !draw;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PathPainter old) => true;
+}
+
+// ── Individual lesson node ────────────────────────────────────────────────────
+
+class _LessonNode extends StatelessWidget {
+  final Lesson lesson;
+  final bool isDone;
+  final bool isCurrent;
+
+  const _LessonNode({
+    required this.lesson,
+    required this.isDone,
+    required this.isCurrent,
+  });
 
   @override
   Widget build(BuildContext context) {
-    const labels = {
-      'beginner': 'সহজ',
-      'intermediate': 'মধ্যম',
-      'advanced': 'কঠিন',
-    };
-    final colors = {
-      'beginner': Colors.green.shade600,
-      'intermediate': Colors.orange.shade600,
-      'advanced': Colors.red.shade600,
-    };
-    final color = colors[level] ?? Colors.grey.shade600;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        labels[level] ?? level,
-        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w500),
+    final theme = Theme.of(context);
+
+    final Color bg;
+    final Color border;
+    final Widget nodeIcon;
+
+    if (isDone) {
+      bg = Colors.green.shade500;
+      border = Colors.green.shade700;
+      nodeIcon = const Icon(Icons.star_rounded, color: Colors.white, size: 28);
+    } else if (isCurrent) {
+      bg = theme.colorScheme.primary;
+      border = Colors.white.withValues(alpha: 0.8);
+      nodeIcon =
+          const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 32);
+    } else {
+      bg = theme.colorScheme.surfaceContainerHighest;
+      border = theme.colorScheme.outline.withValues(alpha: 0.6);
+      nodeIcon = Icon(Icons.lock_outline_rounded,
+          color: theme.colorScheme.onSurfaceVariant, size: 24);
+    }
+
+    return GestureDetector(
+      onTap: () => context.go('/lesson/${lesson.id}'),
+      child: SizedBox(
+        width: _nodeSize,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Circle node
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: _nodeSize,
+              height: _nodeSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: bg,
+                border: Border.all(
+                  color: border,
+                  width: isCurrent ? 3.5 : 2,
+                ),
+                boxShadow: [
+                  if (isCurrent)
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.45),
+                      blurRadius: 18,
+                      spreadRadius: 3,
+                    )
+                  else if (isDone)
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.28),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                ],
+              ),
+              child: Center(child: nodeIcon),
+            ),
+            const SizedBox(height: 5),
+            // XP badge
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDone
+                    ? Colors.green.shade100
+                    : isCurrent
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${lesson.xpReward} XP',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: isDone
+                      ? Colors.green.shade800
+                      : isCurrent
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
+            // Short title
+            Text(
+              lesson.titleBn,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 9.5,
+                height: 1.3,
+                color: theme.colorScheme.onSurfaceVariant
+                    .withValues(alpha: isDone ? 0.6 : 0.9),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

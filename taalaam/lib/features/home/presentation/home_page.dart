@@ -13,9 +13,6 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-
-    // Onboarding gate — runs after first frame so the router is fully settled
     ref.listen<AsyncValue<bool>>(onboardingDoneProvider, (_, next) {
       if (next.valueOrNull == false && context.mounted) {
         context.go('/onboarding');
@@ -35,12 +32,11 @@ class HomePage extends ConsumerWidget {
             style: TextStyle(
               fontFamily: 'NotoNaskhArabic',
               fontSize: 22,
-              color: theme.colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
         ),
         actions: [
-          // Due cards badge
           dueCount.when(
             data: (count) => count > 0
                 ? Padding(
@@ -104,11 +100,8 @@ class HomePage extends ConsumerWidget {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                // Full sync: tracks first, then units for every known track.
-                // This is what removes unpublished/deleted content from Drift.
                 final sync = ref.read(syncServiceProvider);
-                final knownTracks =
-                    ref.read(tracksProvider).valueOrNull ?? [];
+                final knownTracks = ref.read(tracksProvider).valueOrNull ?? [];
                 await sync.syncTracks();
                 ref.invalidate(tracksProvider);
                 for (final t in knownTracks) {
@@ -120,25 +113,25 @@ class HomePage extends ConsumerWidget {
                 slivers: [
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                       child: _StreakXpCard(streak: streak, user: user),
                     ),
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                      child: Text(
-                        'শেখার পথ বেছে নিন',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: _QuickAccessRow(),
                     ),
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                      child: _QuickAccessRow(),
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                      child: Text(
+                        'শেখার পথ',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
                     ),
                   ),
                   tracks.when(
@@ -150,9 +143,14 @@ class HomePage extends ConsumerWidget {
                                 child: Text(
                                   'কোনো কোর্স পাওয়া যায়নি।\nইন্টারনেট সংযোগ পরীক্ষা করুন।',
                                   textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
                                 ),
                               ),
                             ),
@@ -160,7 +158,8 @@ class HomePage extends ConsumerWidget {
                         : SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (ctx, i) => Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 0, 20, 14),
                                 child: _TrackCard(track: list[i]),
                               ),
                               childCount: list.length,
@@ -177,10 +176,13 @@ class HomePage extends ConsumerWidget {
                     error: (e, _) => SliverToBoxAdapter(
                       child: Center(
                         child: Text('পাঠ লোড হচ্ছে না।',
-                            style: TextStyle(color: theme.colorScheme.error)),
+                            style: TextStyle(
+                                color:
+                                    Theme.of(context).colorScheme.error)),
                       ),
                     ),
                   ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 ],
               ),
             ),
@@ -190,6 +192,8 @@ class HomePage extends ConsumerWidget {
     );
   }
 }
+
+// ── Streak / XP card ──────────────────────────────────────────────────────────
 
 class _StreakXpCard extends ConsumerWidget {
   final AsyncValue<Streak?> streak;
@@ -207,127 +211,161 @@ class _StreakXpCard extends ConsumerWidget {
     final userId = user?.id as String?;
 
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0D4A4A), Color(0xFF1A7070)],
         ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: Row(
-        children: [
-          const Text('🔥', style: TextStyle(fontSize: 32)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Flame + streak count
+            const Text('🔥', style: TextStyle(fontSize: 40)),
+            const SizedBox(width: 12),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$currentStreak দিনের ধারা',
-                  style: theme.textTheme.titleMedium?.copyWith(
+                  '$currentStreak',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
                     fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
+                    height: 1,
                   ),
                 ),
-                Row(
-                  children: [
-                    Text(
-                      '$totalXp XP অর্জিত',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (freezeCount > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '❄️ $freezeCount',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ],
+                const Text(
+                  'দিনের ধারা',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
-          ),
-          if (isAnon)
-            TextButton(
-              onPressed: () => context.go('/login'),
-              child: const Text('সংরক্ষণ করুন'),
-            )
-          else if (userId != null && currentStreak > 0)
-            Tooltip(
-              message: 'স্ট্রিক ফ্রিজ করুন (একদিন মিস হলেও স্ট্রিক বজায় থাকবে)',
-              child: IconButton(
-                icon: const Text('❄️', style: TextStyle(fontSize: 20)),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text('স্ট্রিক ফ্রিজ'),
-                      content: const Text(
-                          'একটি ফ্রিজ ব্যবহার করবেন? এটি একদিন মিস হলেও আপনার স্ট্রিক রক্ষা করবে।'),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('না')),
-                        FilledButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('হ্যাঁ')),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    await ref
-                        .read(streakFreezeProvider(userId).notifier)
-                        .freeze();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('❄️ স্ট্রিক ফ্রিজ সক্রিয় হয়েছে!')),
-                      );
-                    }
-                  }
-                },
-              ),
+            const SizedBox(width: 16),
+            // XP + freeze badges
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _Badge(label: '✨ $totalXp XP', color: Colors.white24),
+                if (freezeCount > 0) ...[
+                  const SizedBox(height: 6),
+                  _Badge(
+                      label: '❄️ $freezeCount ফ্রিজ',
+                      color: Colors.lightBlue.withValues(alpha: 0.25)),
+                ],
+              ],
             ),
-        ],
+            const Spacer(),
+            if (isAnon)
+              OutlinedButton(
+                onPressed: () => context.go('/login'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white54),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
+                child: const Text('সংরক্ষণ'),
+              )
+            else if (userId != null && currentStreak > 0)
+              Tooltip(
+                message: 'স্ট্রিক ফ্রিজ',
+                child: IconButton(
+                  icon: const Text('❄️', style: TextStyle(fontSize: 22)),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('স্ট্রিক ফ্রিজ'),
+                        content: const Text(
+                            'একটি ফ্রিজ ব্যবহার করবেন? একদিন মিস হলেও স্ট্রিক বজায় থাকবে।'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('না')),
+                          FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('হ্যাঁ')),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await ref
+                          .read(streakFreezeProvider(userId).notifier)
+                          .freeze();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('❄️ স্ট্রিক ফ্রিজ সক্রিয়!')),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Badge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(label,
+          style: const TextStyle(
+              color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+// ── Quick access row ──────────────────────────────────────────────────────────
+
 class _QuickAccessRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        Expanded(
-          child: _QuickAccessButton(
-            icon: Icons.chat_outlined,
-            label: 'কথোপকথন',
-            onTap: () => context.go('/conversation'),
-            theme: theme,
-          ),
+        _QuickAccessButton(
+          icon: Icons.chat_bubble_outline_rounded,
+          label: 'কথোপকথন',
+          color: const Color(0xFF0D8080),
+          onTap: () => context.go('/conversation'),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickAccessButton(
-            icon: Icons.psychology_outlined,
-            label: 'মুখস্থ করুন',
-            onTap: () => context.go('/memorize'),
-            theme: theme,
-          ),
+        _QuickAccessButton(
+          icon: Icons.psychology_outlined,
+          label: 'মুখস্থ',
+          color: const Color(0xFF5B4FCF),
+          onTap: () => context.go('/memorize'),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickAccessButton(
-            icon: Icons.group_outlined,
-            label: 'হালাকা',
-            onTap: () => context.go('/groups'),
-            theme: theme,
-          ),
+        _QuickAccessButton(
+          icon: Icons.groups_outlined,
+          label: 'হালাকা',
+          color: const Color(0xFF2E7D32),
+          onTap: () => context.go('/groups'),
         ),
       ],
     );
@@ -337,45 +375,53 @@ class _QuickAccessRow extends StatelessWidget {
 class _QuickAccessButton extends StatelessWidget {
   final IconData icon;
   final String label;
+  final Color color;
   final VoidCallback onTap;
-  final ThemeData theme;
-  const _QuickAccessButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    required this.theme,
-  });
+  const _QuickAccessButton(
+      {required this.icon,
+      required this.label,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 22, color: theme.colorScheme.primary),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary,
-                ),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, color.withValues(alpha: 0.7)],
               ),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 26, color: Colors.white),
           ),
-        ),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }
 }
+
+// ── Track card ────────────────────────────────────────────────────────────────
 
 class _TrackCard extends StatelessWidget {
   final Track track;
@@ -384,63 +430,131 @@ class _TrackCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final icon =
-        track.slug == 'quranic' ? Icons.menu_book : Icons.record_voice_over;
-    final subtitle = track.slug == 'quranic'
-        ? 'কুরআনের শব্দ ও ব্যাকরণ'
-        : 'দৈনন্দিন কথোপকথন';
+    final isQuranic = track.slug == 'quranic';
+
+    final gradientColors = isQuranic
+        ? const [Color(0xFF1B4332), Color(0xFF2E7D52)]
+        : const [Color(0xFF0D4A4A), Color(0xFF1A8080)];
+
+    final icon = isQuranic ? Icons.menu_book_rounded : Icons.record_voice_over_rounded;
+    final subtitle =
+        isQuranic ? 'কুরআনের শব্দ ও ব্যাকরণ' : 'দৈনন্দিন কথোপকথন';
 
     return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 3,
+      shadowColor: gradientColors[0].withValues(alpha: 0.4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: () => context.go('/track/${track.slug}'),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Gradient header
+            Container(
+              height: 96,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
                 ),
-                child: Icon(icon,
-                    size: 28, color: theme.colorScheme.onPrimaryContainer),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      track.nameBn,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Directionality(
+              child: Stack(
+                children: [
+                  // Decorative background Arabic text
+                  Positioned(
+                    right: -8,
+                    bottom: -18,
+                    child: Directionality(
                       textDirection: TextDirection.rtl,
                       child: Text(
                         track.nameAr,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'NotoNaskhArabic',
-                          fontSize: 16,
-                          height: 1.6,
-                          color: theme.colorScheme.primary,
+                          fontSize: 64,
+                          color: Colors.white10,
+                          height: 1,
                         ),
                       ),
                     ),
-                    Text(subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        )),
-                  ],
-                ),
+                  ),
+                  // Icon + name
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(icon, size: 26, color: Colors.white),
+                        ),
+                        const SizedBox(width: 14),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              track.nameBn,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 17,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Directionality(
+                              textDirection: TextDirection.rtl,
+                              child: Text(
+                                track.nameAr,
+                                style: const TextStyle(
+                                  fontFamily: 'NotoNaskhArabic',
+                                  fontSize: 14,
+                                  height: 1.4,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Icon(Icons.arrow_forward_ios,
-                  size: 16, color: theme.colorScheme.onSurfaceVariant),
-            ],
-          ),
+            ),
+            // Bottom row
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: () => context.go('/track/${track.slug}'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: gradientColors[0],
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('শুরু করুন'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
