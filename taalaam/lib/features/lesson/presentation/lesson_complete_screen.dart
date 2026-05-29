@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_theme.dart';
 
 class LessonCompleteScreen extends StatelessWidget {
   final int correctCount;
@@ -61,7 +62,7 @@ class LessonCompleteScreen extends StatelessWidget {
                     icon: Icons.stars,
                     label: 'XP অর্জিত',
                     value: '+$xpEarned XP',
-                    color: Colors.amber.shade700,
+                    color: AppColors.gold,
                   ),
                   const SizedBox(height: 12),
                   _StatRow(
@@ -69,7 +70,7 @@ class LessonCompleteScreen extends StatelessWidget {
                     label: 'নির্ভুলতা',
                     value: '$pct%',
                     color: pct >= 80
-                        ? Colors.green.shade700
+                        ? AppColors.correctBg
                         : theme.colorScheme.error,
                   ),
                   const SizedBox(height: 12),

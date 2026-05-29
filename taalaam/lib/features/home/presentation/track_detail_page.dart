@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import 'home_provider.dart';
 
@@ -52,8 +53,8 @@ class _TrackBody extends ConsumerWidget {
     final bookmarkedAsync = ref.watch(bookmarkedLessonIdsProvider);
 
     final gradientColors = isQuranic
-        ? const [Color(0xFF1B4332), Color(0xFF2E7D52)]
-        : const [Color(0xFF0D4A4A), Color(0xFF1A8080)];
+        ? AppColors.gradientQuranic
+        : AppColors.gradientConversational;
 
     return Scaffold(
       body: CustomScrollView(
@@ -352,7 +353,7 @@ class _PathPainter extends CustomPainter {
     for (int i = 0; i < positions.length - 1; i++) {
       final done = isDoneList[i];
       final paint = Paint()
-        ..color = done ? Colors.green.shade400 : Colors.grey.shade400
+        ..color = done ? AppColors.correctTile : Colors.grey.shade400
         ..strokeWidth = 5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
@@ -428,8 +429,8 @@ class _LessonNode extends StatelessWidget {
     final Widget nodeIcon;
 
     if (isDone) {
-      bg = Colors.green.shade500;
-      border = Colors.green.shade700;
+      bg = AppColors.correctTile;
+      border = AppColors.correctBg;
       nodeIcon = const Icon(Icons.star_rounded, color: Colors.white, size: 28);
     } else if (isCurrent) {
       bg = theme.colorScheme.primary;
@@ -486,7 +487,7 @@ class _LessonNode extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: isDone
-                    ? Colors.green.shade100
+                    ? AppColors.correctTile.withValues(alpha: 0.15)
                     : isCurrent
                         ? theme.colorScheme.primaryContainer
                         : theme.colorScheme.surfaceContainerHighest,
@@ -498,7 +499,7 @@ class _LessonNode extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   color: isDone
-                      ? Colors.green.shade800
+                      ? AppColors.correctBg
                       : isCurrent
                           ? theme.colorScheme.onPrimaryContainer
                           : theme.colorScheme.onSurfaceVariant,

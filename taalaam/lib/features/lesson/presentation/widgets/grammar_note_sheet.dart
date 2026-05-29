@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
 
@@ -21,8 +22,10 @@ class GrammarNoteSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = correct ? Colors.green.shade800 : Colors.red.shade800;
-    final bgColor = correct ? Colors.green.shade100 : Colors.red.shade100;
+    final color = correct ? AppColors.correctBg : AppColors.wrongBg;
+    final bgColor = correct
+        ? AppColors.correctBg.withValues(alpha: 0.12)
+        : AppColors.wrongBg.withValues(alpha: 0.12);
 
     final vocabMap = {for (final v in vocab) v.arabic: v};
 

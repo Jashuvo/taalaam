@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/exercise_model.dart';
 
 class ExerciseMultipleChoice extends StatefulWidget {
@@ -55,11 +56,11 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
           Color? textColor;
           if (_selected != null) {
             if (correct) {
-              tileColor = Colors.green.shade100;
-              textColor = Colors.green.shade900;
+              tileColor = AppColors.correctTile.withValues(alpha: 0.15);
+              textColor = AppColors.correctBg;
             } else if (selected) {
-              tileColor = Colors.red.shade100;
-              textColor = Colors.red.shade900;
+              tileColor = AppColors.wrongTile.withValues(alpha: 0.15);
+              textColor = AppColors.wrongBg;
             }
           }
           return Padding(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../auth/presentation/auth_provider.dart';
@@ -218,9 +219,9 @@ class _StreakXpCard extends ConsumerWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0D4A4A), Color(0xFF1A7070)],
+          colors: AppColors.gradientStreak,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: AppRadius.xlBorder,
         boxShadow: [
           BoxShadow(
             color: theme.colorScheme.primary.withValues(alpha: 0.35),
@@ -355,7 +356,7 @@ class _QuickAccessRow extends StatelessWidget {
         _QuickAccessButton(
           icon: Icons.chat_bubble_outline_rounded,
           label: 'কথোপকথন',
-          color: const Color(0xFF0D8080),
+          color: AppColors.teal,
           onTap: () => context.go('/conversation'),
         ),
         _QuickAccessButton(
@@ -367,7 +368,7 @@ class _QuickAccessRow extends StatelessWidget {
         _QuickAccessButton(
           icon: Icons.groups_outlined,
           label: 'হালাকা',
-          color: const Color(0xFF2E7D32),
+          color: AppColors.midGreen,
           onTap: () => context.go('/groups'),
         ),
       ],
@@ -436,8 +437,8 @@ class _TrackCard extends StatelessWidget {
     final isQuranic = track.slug == 'quranic';
 
     final gradientColors = isQuranic
-        ? const [Color(0xFF1B4332), Color(0xFF2E7D52)]
-        : const [Color(0xFF0D4A4A), Color(0xFF1A8080)];
+        ? AppColors.gradientQuranic
+        : AppColors.gradientConversational;
 
     final icon = isQuranic ? Icons.menu_book_rounded : Icons.record_voice_over_rounded;
     final subtitle =
@@ -447,7 +448,7 @@ class _TrackCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       elevation: 3,
       shadowColor: gradientColors[0].withValues(alpha: 0.4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
       child: InkWell(
         onTap: () => context.go('/track/${track.slug}'),
         child: Column(

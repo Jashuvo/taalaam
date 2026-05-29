@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/exercise_model.dart';
 
 // On web/mobile: tap-to-match (drag not needed for Phase 1)
@@ -82,22 +83,22 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                           vertical: 12, horizontal: 10),
                       decoration: BoxDecoration(
                         color: correct
-                            ? Colors.green.shade600
+                            ? AppColors.correctTile
                             : wrong
-                                ? Colors.red.shade500
+                                ? AppColors.wrongTile
                                 : matched
-                                    ? Colors.green.shade100
+                                    ? AppColors.correctTile.withValues(alpha: 0.15)
                                     : selected
                                         ? theme.colorScheme.primaryContainer
                                         : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: correct
-                              ? Colors.green.shade700
+                              ? AppColors.correctBg
                               : wrong
-                                  ? Colors.red.shade700
+                                  ? AppColors.wrongBg
                                   : matched
-                                      ? Colors.green.shade600
+                                      ? AppColors.correctTile
                                       : selected
                                           ? theme.colorScheme.primary
                                           : theme.colorScheme.outline,
@@ -116,7 +117,7 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                               color: (correct || wrong)
                                   ? Colors.white
                                   : matched
-                                      ? Colors.green.shade900
+                                      ? AppColors.correctBg
                                       : theme.colorScheme.onSurface),
                         ),
                       ),
@@ -155,20 +156,20 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                           vertical: 12, horizontal: 10),
                       decoration: BoxDecoration(
                         color: bnCorrect
-                            ? Colors.green.shade600
+                            ? AppColors.correctTile
                             : bnWrong
-                                ? Colors.red.shade500
+                                ? AppColors.wrongTile
                                 : alreadyUsed
-                                    ? Colors.green.shade100
+                                    ? AppColors.correctTile.withValues(alpha: 0.15)
                                     : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: bnCorrect
-                              ? Colors.green.shade700
+                              ? AppColors.correctBg
                               : bnWrong
-                                  ? Colors.red.shade700
+                                  ? AppColors.wrongBg
                                   : alreadyUsed
-                                      ? Colors.green.shade600
+                                      ? AppColors.correctTile
                                       : theme.colorScheme.outline,
                           width: (bnCorrect || bnWrong) ? 2 : 1,
                         ),
@@ -180,7 +181,7 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                           color: (bnCorrect || bnWrong)
                               ? Colors.white
                               : alreadyUsed
-                                  ? Colors.green.shade900
+                                  ? AppColors.correctBg
                                   : theme.colorScheme.onSurface,
                         ),
                       ),
