@@ -37,15 +37,11 @@ class LessonCompleteScreen extends StatelessWidget {
                 children: [
                   Builder(builder: (ctx) {
                     final isDark = Theme.of(ctx).brightness == Brightness.dark;
-                    return ClipOval(
-                      child: Image.asset(
-                        isDark
-                            ? 'assets/logo_dark-removebg-preview.png'
-                            : 'assets/logo_light-removebg-preview.png',
-                        height: 150,
-                        width: 150,
-                        fit: BoxFit.cover,
-                      ),
+                    return Image.asset(
+                      isDark
+                          ? 'assets/logo_dark-removebg-preview.png'
+                          : 'assets/logo_light-removebg-preview.png',
+                      height: 140,
                     );
                   }),
                   const SizedBox(height: 16),
