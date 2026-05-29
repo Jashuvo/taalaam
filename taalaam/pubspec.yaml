@@ -91,6 +91,8 @@ flutter:
     - assets/logo_badge.png
     - assets/logo_light.png
     - assets/logo_dark.png
+    - assets/logo_light-removebg-preview.png
+    - assets/logo_dark-removebg-preview.png
     - assets/audio/
     - assets/images/
     - assets/fonts/
