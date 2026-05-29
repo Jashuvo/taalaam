@@ -30,11 +30,14 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
     _bnChoices = _pairs.map((p) => p['bn']!).toList()..shuffle();
   }
 
+  bool _isPairCorrect(int arIndex) {
+    final j = _matches[arIndex];
+    return j != null && _bnChoices[j] == _pairs[arIndex]['bn'];
+  }
+
   bool _checkAnswer() {
     for (var i = 0; i < _pairs.length; i++) {
-      final matched = _matches[i];
-      if (matched == null) return false;
-      if (_bnChoices[matched] != _pairs[i]['bn']) return false;
+      if (!_isPairCorrect(i)) return false;
     }
     return true;
   }
@@ -66,6 +69,8 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                 children: List.generate(_pairs.length, (i) {
                   final selected = _selectedAr == i;
                   final matched = _matches.containsKey(i);
+                  final correct = _answered && _isPairCorrect(i);
+                  final wrong = _answered && matched && !_isPairCorrect(i);
                   return GestureDetector(
                     onTap: _answered || matched
                         ? null
@@ -76,16 +81,24 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                       padding: const EdgeInsets.symmetric(
                           vertical: 12, horizontal: 10),
                       decoration: BoxDecoration(
-                        color: matched
+                        color: correct
                             ? Colors.green.shade100
-                            : selected
-                                ? theme.colorScheme.primaryContainer
-                                : theme.colorScheme.surfaceContainerHighest,
+                            : wrong
+                                ? Colors.red.shade100
+                                : matched
+                                    ? Colors.green.shade100
+                                    : selected
+                                        ? theme.colorScheme.primaryContainer
+                                        : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: selected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.outline,
+                          color: correct
+                              ? Colors.green.shade600
+                              : wrong
+                                  ? Colors.red.shade600
+                                  : selected
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.outline,
                         ),
                       ),
                       child: Directionality(
@@ -97,9 +110,11 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                               fontFamily: 'NotoNaskhArabic',
                               fontSize: 20,
                               height: 1.6,
-                              color: matched
+                              color: correct
                                   ? Colors.green.shade900
-                                  : theme.colorScheme.onSurface),
+                                  : wrong
+                                      ? Colors.red.shade900
+                                      : theme.colorScheme.onSurface),
                         ),
                       ),
                     ),
@@ -113,6 +128,15 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
               child: Column(
                 children: List.generate(_bnChoices.length, (j) {
                   final alreadyUsed = _matches.values.contains(j);
+                  // Find which arIndex is matched to this bn slot (if any)
+                  final arIdx = _matches.entries
+                      .where((e) => e.value == j)
+                      .map((e) => e.key)
+                      .firstOrNull;
+                  final bnCorrect =
+                      _answered && arIdx != null && _isPairCorrect(arIdx);
+                  final bnWrong = _answered && arIdx != null &&
+                      !_isPairCorrect(arIdx);
                   return GestureDetector(
                     onTap: _answered || alreadyUsed || _selectedAr == null
                         ? null
@@ -127,20 +151,31 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                       padding: const EdgeInsets.symmetric(
                           vertical: 12, horizontal: 10),
                       decoration: BoxDecoration(
-                        color: alreadyUsed
+                        color: bnCorrect
                             ? Colors.green.shade100
-                            : theme.colorScheme.surfaceContainerHighest,
+                            : bnWrong
+                                ? Colors.red.shade100
+                                : alreadyUsed
+                                    ? Colors.green.shade100
+                                    : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: theme.colorScheme.outline),
+                          color: bnCorrect
+                              ? Colors.green.shade600
+                              : bnWrong
+                                  ? Colors.red.shade600
+                                  : theme.colorScheme.outline,
+                        ),
                       ),
                       child: Text(
                         _bnChoices[j],
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          color: alreadyUsed
+                          color: bnCorrect
                               ? Colors.green.shade900
-                              : theme.colorScheme.onSurface,
+                              : bnWrong
+                                  ? Colors.red.shade900
+                                  : theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
