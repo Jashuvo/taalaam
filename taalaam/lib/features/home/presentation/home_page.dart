@@ -25,7 +25,9 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Image.asset('assets/logo_badge.png', height: 38),
+        title: ClipOval(
+          child: Image.asset('assets/logo_badge.png', height: 36, width: 36, fit: BoxFit.cover),
+        ),
         centerTitle: false,
         actions: [
           dueCount.when(
