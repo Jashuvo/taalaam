@@ -25,13 +25,29 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Builder(builder: (ctx) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return Image.asset(
-            isDark ? 'assets/logo_dark.png' : 'assets/logo_light.png',
-            height: 38,
-          );
-        }),
+        title: RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: "Ta'allam  ",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              TextSpan(
+                text: 'تعلَّم',
+                style: TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  fontSize: 17,
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.75),
+                ),
+              ),
+            ],
+          ),
+        ),
         centerTitle: false,
         actions: [
           dueCount.when(

@@ -34,16 +34,36 @@ class LessonCompleteScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Builder(builder: (ctx) {
-                    final isDark = Theme.of(ctx).brightness == Brightness.dark;
-                    return Image.asset(
-                      isDark ? 'assets/logo_dark.png' : 'assets/logo_light.png',
-                      height: 120,
-                    );
-                  }),
+                  Center(
+                    child: Container(
+                      width: 110,
+                      height: 110,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.primary.withValues(alpha: 0.6),
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                            blurRadius: 24,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Text('🎉', style: TextStyle(fontSize: 52)),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'পাঠ সম্পন্ন! 🎉',
+                    'পাঠ সম্পন্ন!',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
