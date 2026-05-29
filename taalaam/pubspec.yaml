@@ -36,6 +36,7 @@ dependencies:
   # UI helpers
   gap: ^3.0.1
   google_fonts: ^6.2.1
+  confetti: ^0.7.0
 
   # File picker (admin upload)
   file_picker: ^8.1.7

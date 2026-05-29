@@ -136,25 +136,7 @@ class HomePage extends ConsumerWidget {
                   ),
                   tracks.when(
                     data: (list) => list.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Center(
-                                child: Text(
-                                  'কোনো কোর্স পাওয়া যায়নি।\nইন্টারনেট সংযোগ পরীক্ষা করুন।',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          )
+                        ? const SliverToBoxAdapter(child: _EmptyTracksState())
                         : SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (ctx, i) => Padding(
@@ -423,14 +405,16 @@ class _QuickAccessButton extends StatelessWidget {
 
 // ── Track card ────────────────────────────────────────────────────────────────
 
-class _TrackCard extends StatelessWidget {
+class _TrackCard extends ConsumerWidget {
   final Track track;
   const _TrackCard({required this.track});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isQuranic = track.slug == 'quranic';
+    final progress =
+        ref.watch(trackProgressProvider(track.id)).valueOrNull;
 
     final gradientColors = isQuranic
         ? AppColors.gradientQuranic
@@ -442,8 +426,7 @@ class _TrackCard extends StatelessWidget {
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: 3,
-      shadowColor: gradientColors[0].withValues(alpha: 0.4),
+      shadowColor: gradientColors[0].withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
       child: InkWell(
         onTap: () => context.go('/track/${track.slug}'),
@@ -529,32 +512,167 @@ class _TrackCard extends StatelessWidget {
             // Bottom row
             Padding(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
+                  const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      if (progress != null && progress.total > 0)
+                        Text(
+                          '${progress.completed}/${progress.total} পাঠ',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (progress != null && progress.total > 0) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: AppRadius.xxlBorder,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: progress.fraction),
+                        duration: const Duration(milliseconds: 600),
+                        curve: Curves.easeOut,
+                        builder: (_, val, __) => LinearProgressIndicator(
+                          value: val,
+                          minHeight: 6,
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation(
+                              gradientColors[0]),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 10),
+                  ] else
+                    const SizedBox(height: 10),
                   FilledButton(
                     onPressed: () => context.go('/track/${track.slug}'),
                     style: FilledButton.styleFrom(
                       backgroundColor: gradientColors[0],
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text('শুরু করুন'),
+                    child: Text(progress != null && progress.completed > 0
+                        ? 'চালিয়ে যান'
+                        : 'শুরু করুন'),
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+class _EmptyTracksState extends StatelessWidget {
+  const _EmptyTracksState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Logo as hero illustration
+          Image.asset(
+            isDark
+                ? 'assets/logo_dark-removebg-preview.png'
+                : 'assets/logo_light-removebg-preview.png',
+            height: 120,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'স্বাগতম!',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'আরবি শেখার যাত্রা শুরু করুন।\nকোর্স লোড হচ্ছে — একটু অপেক্ষা করুন।',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.6,
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Animated dots to indicate loading
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(3, (i) {
+              return _PulseDot(delay: Duration(milliseconds: i * 200));
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulseDot extends StatefulWidget {
+  final Duration delay;
+  const _PulseDot({required this.delay});
+
+  @override
+  State<_PulseDot> createState() => _PulseDotState();
+}
+
+class _PulseDotState extends State<_PulseDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 800));
+    _anim = Tween<double>(begin: 0.3, end: 1.0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    Future.delayed(widget.delay, () {
+      if (mounted) _ctrl.repeat(reverse: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _anim,
+      child: Container(
+        width: 8,
+        height: 8,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Theme.of(context).colorScheme.primary,
         ),
       ),
     );

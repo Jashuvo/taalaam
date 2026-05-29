@@ -446,6 +446,7 @@ class _LessonNode extends StatelessWidget {
 
     return GestureDetector(
       onTap: () => context.go('/lesson/${lesson.id}'),
+      onLongPress: () => _showLessonTooltip(context, theme),
       child: SizedBox(
         width: _nodeSize,
         child: Column(
@@ -459,10 +460,7 @@ class _LessonNode extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: bg,
-                border: Border.all(
-                  color: border,
-                  width: isCurrent ? 3.5 : 2,
-                ),
+                border: Border.all(color: border, width: isCurrent ? 3.5 : 2),
                 boxShadow: [
                   if (isCurrent)
                     BoxShadow(
@@ -472,7 +470,7 @@ class _LessonNode extends StatelessWidget {
                     )
                   else if (isDone)
                     BoxShadow(
-                      color: Colors.green.withValues(alpha: 0.28),
+                      color: AppColors.correctTile.withValues(alpha: 0.3),
                       blurRadius: 8,
                       spreadRadius: 1,
                     ),
@@ -480,18 +478,37 @@ class _LessonNode extends StatelessWidget {
               ),
               child: Center(child: nodeIcon),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 6),
+            // Lesson title — readable size, clipped to 1 line
+            SizedBox(
+              width: _nodeSize + 16,
+              child: Text(
+                lesson.titleBn,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.3,
+                  color: isCurrent
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant
+                          .withValues(alpha: isDone ? 0.55 : 0.85),
+                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 3),
             // XP badge
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                 color: isDone
                     ? AppColors.correctTile.withValues(alpha: 0.15)
                     : isCurrent
                         ? theme.colorScheme.primaryContainer
                         : theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 '${lesson.xpReward} XP',
@@ -506,19 +523,80 @@ class _LessonNode extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 3),
-            // Short title
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLessonTooltip(BuildContext context, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: AppRadius.xlBorder,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDone
+                        ? AppColors.correctTile.withValues(alpha: 0.2)
+                        : isCurrent
+                            ? theme.colorScheme.primaryContainer
+                            : theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    isDone
+                        ? '✓ সম্পন্ন'
+                        : isCurrent
+                            ? '▶ পরবর্তী'
+                            : '🔒 লক',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isDone
+                          ? AppColors.correctBg
+                          : theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${lesson.xpReward} XP',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: AppColors.gold,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Text(
               lesson.titleBn,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 9.5,
-                height: 1.3,
-                color: theme.colorScheme.onSurfaceVariant
-                    .withValues(alpha: isDone ? 0.6 : 0.9),
-                fontWeight: FontWeight.w500,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.go('/lesson/${lesson.id}');
+                },
+                child: const Text('শুরু করুন'),
               ),
             ),
           ],

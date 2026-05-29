@@ -138,3 +138,48 @@ final streakFreezeProvider = StateNotifierProvider.autoDispose
         (ref, userId) {
   return StreakFreezeNotifier(ref.watch(appDatabaseProvider), userId);
 });
+
+// ── Track progress: {total, completed} lesson counts ─────────────────────────
+
+class TrackProgress {
+  final int total;
+  final int completed;
+  const TrackProgress({required this.total, required this.completed});
+  double get fraction => total == 0 ? 0 : completed / total;
+}
+
+final trackProgressProvider =
+    FutureProvider.family<TrackProgress, String>((ref, trackId) async {
+  final db = ref.watch(appDatabaseProvider);
+  final user = ref.watch(currentUserProvider);
+
+  final units = await (db.select(db.units)
+        ..where((t) => t.trackId.equals(trackId)))
+      .get();
+
+  int total = 0;
+  for (final u in units) {
+    final lessons = await (db.select(db.lessons)
+          ..where((t) => t.unitId.equals(u.id)))
+        .get();
+    total += lessons.length;
+  }
+
+  if (user == null || total == 0) return TrackProgress(total: total, completed: 0);
+
+  final done = await (db.select(db.userProgress)
+        ..where((t) => t.userId.equals(user.id)))
+      .get();
+
+  // Count only lessons that belong to this track
+  final allLessonIds = <String>{};
+  for (final u in units) {
+    final lessons = await (db.select(db.lessons)
+          ..where((t) => t.unitId.equals(u.id)))
+        .get();
+    allLessonIds.addAll(lessons.map((l) => l.id));
+  }
+  final completed = done.where((r) => allLessonIds.contains(r.lessonId)).length;
+
+  return TrackProgress(total: total, completed: completed);
+});

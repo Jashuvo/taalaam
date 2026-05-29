@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/arabic_audio_button.dart';
 import '../../auth/presentation/auth_provider.dart';
@@ -113,8 +115,17 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     final exerciseWords = _arabicWordsFromExercises(
         session.exercises.cast<ExerciseModel>());
 
-    // Create SRS cards for every vocab item the first time the lesson completes.
+    // SRS card creation + haptic feedback on answer
     ref.listen<LessonSessionState>(_sessionProvider, (prev, next) {
+      // Haptic on answer
+      if (next.showFeedback && !(prev?.showFeedback ?? false)) {
+        if (next.lastCorrect == true) {
+          HapticFeedback.lightImpact();
+        } else {
+          HapticFeedback.mediumImpact();
+        }
+      }
+      // SRS cards on lesson complete
       if (next.completed && !(prev?.completed ?? false) && vocab.isNotEmpty) {
         final user = ref.read(currentUserProvider);
         if (user == null) return;
@@ -137,19 +148,29 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
 
     final exercise = session.exercises[session.currentIndex] as ExerciseModel;
     final theme = Theme.of(context);
-    final progress =
-        (session.currentIndex + 1) / session.exercises.length;
+    final progress = (session.currentIndex + 1) / session.exercises.length;
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close_rounded),
           onPressed: () => context.go('/home'),
         ),
-        title: LinearProgressIndicator(
-          value: progress,
-          backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+        // ── Thicker animated progress bar ──────────────────────────────
+        title: ClipRRect(
+          borderRadius: AppRadius.xxlBorder,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: progress),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+            builder: (_, val, __) => LinearProgressIndicator(
+              value: val,
+              minHeight: 10,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              valueColor:
+                  AlwaysStoppedAnimation(theme.colorScheme.primary),
+            ),
+          ),
         ),
         actions: [
           Padding(
@@ -157,12 +178,21 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
             child: Row(
               children: List.generate(
                 AppConstants.heartsPerLesson,
-                (i) => Icon(
-                  Icons.favorite,
-                  size: 20,
-                  color: i < session.hearts
-                      ? Colors.red
-                      : Colors.grey.shade300,
+                (i) => Padding(
+                  padding: const EdgeInsets.only(left: 2),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
+                    child: Icon(
+                      Icons.favorite_rounded,
+                      key: ValueKey('heart_${i}_${i < session.hearts}'),
+                      size: 20,
+                      color: i < session.hearts
+                          ? Colors.red
+                          : theme.colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -183,28 +213,59 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
                       alignment: Alignment.centerRight,
                       child: ArabicAudioButton(audioUrl: exercise.audioUrl),
                     ),
+                  // ── Animated exercise transition ──────────────────────
                   RepaintBoundary(
-                    child: ExerciseEngine(
-                      key: ValueKey(session.currentIndex),
-                      exercise: exercise,
-                      vocab: vocab,
-                      extraWords: exerciseWords,
-                      onAnswered: (correct) =>
-                          ref.read(_sessionProvider.notifier).answer(correct),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 350),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      transitionBuilder: (child, animation) =>
+                          FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.06, 0),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                      child: ExerciseEngine(
+                        key: ValueKey(session.currentIndex),
+                        exercise: exercise,
+                        vocab: vocab,
+                        extraWords: exerciseWords,
+                        onAnswered: (correct) =>
+                            ref.read(_sessionProvider.notifier).answer(correct),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          if (session.showFeedback)
-            GrammarNoteSheet(
-              correct: session.lastCorrect ?? false,
-              grammarNote: exercise.grammarNoteBn,
-              exercise: exercise,
-              vocab: vocab,
-              onNext: () => ref.read(_sessionProvider.notifier).next(),
+          // ── Animated feedback sheet slide-up ──────────────────────────
+          AnimatedSlide(
+            offset: session.showFeedback
+                ? Offset.zero
+                : const Offset(0, 1),
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+            child: AnimatedOpacity(
+              opacity: session.showFeedback ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: session.showFeedback
+                  ? GrammarNoteSheet(
+                      correct: session.lastCorrect ?? false,
+                      grammarNote: exercise.grammarNoteBn,
+                      exercise: exercise,
+                      vocab: vocab,
+                      onNext: () =>
+                          ref.read(_sessionProvider.notifier).next(),
+                    )
+                  : const SizedBox.shrink(),
             ),
+          ),
           if (session.hearts == 0 && !session.showFeedback)
             _OutOfHeartsBar(onQuit: () => context.go('/home')),
         ],
