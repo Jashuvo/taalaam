@@ -25,17 +25,8 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Directionality(
-          textDirection: TextDirection.rtl,
-          child: Text(
-            'تعلَّم',
-            style: TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 22,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
+        title: Image.asset('assets/logo_badge.png', height: 38),
+        centerTitle: false,
         actions: [
           dueCount.when(
             data: (count) => count > 0

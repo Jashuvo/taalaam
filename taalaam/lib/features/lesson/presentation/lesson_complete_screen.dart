@@ -34,11 +34,12 @@ class LessonCompleteScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('🎉', style: TextStyle(fontSize: 72),
-                      textAlign: TextAlign.center),
+                  Center(
+                    child: Image.asset('assets/logo_badge.png', height: 110),
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    'পাঠ সম্পন্ন!',
+                    'পাঠ সম্পন্ন! 🎉',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
