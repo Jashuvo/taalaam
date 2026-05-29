@@ -82,9 +82,9 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                           vertical: 12, horizontal: 10),
                       decoration: BoxDecoration(
                         color: correct
-                            ? Colors.green.shade100
+                            ? Colors.green.shade600
                             : wrong
-                                ? Colors.red.shade100
+                                ? Colors.red.shade500
                                 : matched
                                     ? Colors.green.shade100
                                     : selected
@@ -93,12 +93,15 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: correct
-                              ? Colors.green.shade600
+                              ? Colors.green.shade700
                               : wrong
-                                  ? Colors.red.shade600
-                                  : selected
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.outline,
+                                  ? Colors.red.shade700
+                                  : matched
+                                      ? Colors.green.shade600
+                                      : selected
+                                          ? theme.colorScheme.primary
+                                          : theme.colorScheme.outline,
+                          width: (correct || wrong) ? 2 : 1,
                         ),
                       ),
                       child: Directionality(
@@ -110,13 +113,11 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                               fontFamily: 'NotoNaskhArabic',
                               fontSize: 20,
                               height: 1.6,
-                              color: correct
-                                  ? Colors.green.shade900
-                                  : wrong
-                                      ? Colors.red.shade900
-                                      : matched
-                                          ? Colors.green.shade900
-                                          : theme.colorScheme.onSurface),
+                              color: (correct || wrong)
+                                  ? Colors.white
+                                  : matched
+                                      ? Colors.green.shade900
+                                      : theme.colorScheme.onSurface),
                         ),
                       ),
                     ),
@@ -154,32 +155,33 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
                           vertical: 12, horizontal: 10),
                       decoration: BoxDecoration(
                         color: bnCorrect
-                            ? Colors.green.shade100
+                            ? Colors.green.shade600
                             : bnWrong
-                                ? Colors.red.shade100
+                                ? Colors.red.shade500
                                 : alreadyUsed
                                     ? Colors.green.shade100
                                     : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: bnCorrect
-                              ? Colors.green.shade600
+                              ? Colors.green.shade700
                               : bnWrong
-                                  ? Colors.red.shade600
-                                  : theme.colorScheme.outline,
+                                  ? Colors.red.shade700
+                                  : alreadyUsed
+                                      ? Colors.green.shade600
+                                      : theme.colorScheme.outline,
+                          width: (bnCorrect || bnWrong) ? 2 : 1,
                         ),
                       ),
                       child: Text(
                         _bnChoices[j],
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          color: bnCorrect
-                              ? Colors.green.shade900
-                              : bnWrong
-                                  ? Colors.red.shade900
-                                  : alreadyUsed
-                                      ? Colors.green.shade900
-                                      : theme.colorScheme.onSurface,
+                          color: (bnCorrect || bnWrong)
+                              ? Colors.white
+                              : alreadyUsed
+                                  ? Colors.green.shade900
+                                  : theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
