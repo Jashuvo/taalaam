@@ -91,9 +91,14 @@ class BookmarkNotifier extends StateNotifier<void> {
   Future<void> toggle(String lessonId, bool currentlyBookmarked) async {
     final id = '${_userId}_$lessonId';
     if (currentlyBookmarked) {
-      await (_db.delete(_db.bookmarks)
-            ..where((t) => t.id.equals(id)))
-          .go();
+      await (_db.delete(_db.bookmarks)..where((t) => t.id.equals(id))).go();
+      // Remove from Supabase (fire-and-forget)
+      Supabase.instance.client
+          .from('bookmarks')
+          .delete()
+          .eq('id', id)
+          .then((_) {})
+          .catchError((_) {});
     } else {
       await _db.into(_db.bookmarks).insertOnConflictUpdate(
             BookmarksCompanion.insert(
@@ -102,6 +107,12 @@ class BookmarkNotifier extends StateNotifier<void> {
               lessonId: lessonId,
             ),
           );
+      // Push to Supabase (fire-and-forget)
+      Supabase.instance.client.from('bookmarks').upsert({
+        'id': id,
+        'user_id': _userId,
+        'lesson_id': lessonId,
+      }).then((_) {}).catchError((_) {});
     }
   }
 }

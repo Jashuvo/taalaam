@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/presentation/auth_provider.dart';
 import 'features/home/presentation/home_provider.dart';
 import 'features/home/presentation/settings_page.dart';
 
@@ -18,6 +20,17 @@ class TaalamaApp extends ConsumerWidget {
 
     // Kick off background sync on app start (fire and forget)
     ref.read(syncServiceProvider).syncTracks().ignore();
+
+    // Restore user data from Supabase whenever a session is established
+    ref.listen<AsyncValue<AuthState>>(authStateProvider, (_, next) {
+      final event = next.valueOrNull?.event;
+      final userId = next.valueOrNull?.session?.user.id;
+      if (userId != null &&
+          (event == AuthChangeEvent.signedIn ||
+              event == AuthChangeEvent.tokenRefreshed)) {
+        ref.read(syncServiceProvider).restoreUserData(userId).ignore();
+      }
+    });
 
     final themeMode = ref.watch(themeModeProvider);
 

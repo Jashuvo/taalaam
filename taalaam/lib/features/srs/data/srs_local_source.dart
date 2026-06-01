@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/local/database.dart';
 import 'fsrs_algorithm.dart';
 
@@ -25,13 +26,23 @@ class SrsLocalSource {
   }
 
   Future<void> createCard(String userId, String vocabularyId) async {
+    final id = '${userId}_$vocabularyId';
+    final now = DateTime.now();
     await _db.into(_db.srsCards).insertOnConflictUpdate(SrsCardsCompanion(
-          id: Value('${userId}_$vocabularyId'),
+          id: Value(id),
           userId: Value(userId),
           vocabularyId: Value(vocabularyId),
-          dueDate: Value(DateTime.now()),
+          dueDate: Value(now),
           state: const Value(0),
         ));
+    // Push to Supabase (fire-and-forget)
+    Supabase.instance.client.from('srs_cards').upsert({
+      'id': id,
+      'user_id': userId,
+      'vocabulary_id': vocabularyId,
+      'due_date': now.toIso8601String(),
+      'state': 0,
+    }).then((_) {}).catchError((_) {});
   }
 
   Future<void> reviewCard(SrsCard card, int rating) async {
@@ -61,19 +72,41 @@ class SrsLocalSource {
     }
 
     final newState = rating >= 3 ? 2 : (card.reps == 0 ? 1 : 3);
+    final now = DateTime.now();
+    final newElapsed = card.lastReview != null
+        ? now.difference(card.lastReview!).inDays
+        : 0;
+    final newDue = now.add(Duration(days: interval));
+    final newReps = card.reps + 1;
+    final newLapses = rating == 1 ? card.lapses + 1 : card.lapses;
+
     await (_db.update(_db.srsCards)..where((t) => t.id.equals(card.id)))
         .write(SrsCardsCompanion(
       stability: Value(newStability),
       difficulty: Value(newDifficulty),
       scheduledDays: Value(interval),
-      elapsedDays: Value(card.lastReview != null
-          ? DateTime.now().difference(card.lastReview!).inDays
-          : 0),
-      reps: Value(card.reps + 1),
-      lapses: Value(rating == 1 ? card.lapses + 1 : card.lapses),
+      elapsedDays: Value(newElapsed),
+      reps: Value(newReps),
+      lapses: Value(newLapses),
       state: Value(newState),
-      lastReview: Value(DateTime.now()),
-      dueDate: Value(DateTime.now().add(Duration(days: interval))),
+      lastReview: Value(now),
+      dueDate: Value(newDue),
     ));
+
+    // Push review result to Supabase (fire-and-forget)
+    Supabase.instance.client.from('srs_cards').upsert({
+      'id': card.id,
+      'user_id': card.userId,
+      'vocabulary_id': card.vocabularyId,
+      'due_date': newDue.toIso8601String(),
+      'stability': newStability,
+      'difficulty': newDifficulty,
+      'elapsed_days': newElapsed,
+      'scheduled_days': interval,
+      'reps': newReps,
+      'lapses': newLapses,
+      'state': newState,
+      'last_review': now.toIso8601String(),
+    }).then((_) {}).catchError((_) {});
   }
 }
