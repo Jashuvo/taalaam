@@ -155,14 +155,16 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         );
 
         // Push user_progress to Supabase (fire-and-forget)
+        // No `id` — Supabase column is uuid, local id is a string composite key.
+        // Use onConflict on the unique(user_id, lesson_id) constraint instead.
         Supabase.instance.client.from('user_progress').upsert({
-          'id': '${user.id}_$lessonId',
           'user_id': user.id,
           'lesson_id': lessonId,
           'completed_at': now.toIso8601String(),
           'xp_earned': xp,
           'accuracy_pct': pct,
-        }).then((_) {}).catchError((_) {});
+          'hearts_remaining': next.hearts,
+        }, onConflict: 'user_id,lesson_id').then((_) {}).catchError((_) {});
 
         // Update streaks locally + push to Supabase
         _updateStreak(db, user.id, xp, now);

@@ -390,57 +390,59 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
         ),
         actions: [
           if (!_loading && _error == null) ...[
-            if (_sorting)
+            if (_sorting || _publishing)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: SizedBox(
-                  width: 18, height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.auto_awesome_outlined),
-                tooltip: 'AI Sort Lessons',
-                onPressed: _aiSortLessons,
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
               ),
-            IconButton(
-              icon: const Icon(Icons.preview_outlined),
-              tooltip: 'Preview',
-              onPressed: _showPreview,
-            ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               onSelected: (v) {
+                if (v == 'sort') _aiSortLessons();
+                if (v == 'preview') _showPreview();
                 if (v == 'export') _exportJson();
+                if (v == 'publish') _publishUnit();
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'sort',
+                  child: Row(children: [
+                    Icon(Icons.auto_awesome_outlined, size: 18),
+                    SizedBox(width: 10),
+                    Text('AI Sort Lessons'),
+                  ]),
+                ),
+                const PopupMenuItem(
+                  value: 'preview',
+                  child: Row(children: [
+                    Icon(Icons.preview_outlined, size: 18),
+                    SizedBox(width: 10),
+                    Text('Preview'),
+                  ]),
+                ),
+                const PopupMenuItem(
                   value: 'export',
                   child: Row(children: [
                     Icon(Icons.download_outlined, size: 18),
-                    SizedBox(width: 8),
+                    SizedBox(width: 10),
                     Text('Export JSON'),
                   ]),
                 ),
+                if (!isPublished)
+                  const PopupMenuItem(
+                    value: 'publish',
+                    child: Row(children: [
+                      Icon(Icons.publish, size: 18,
+                          color: Colors.green),
+                      SizedBox(width: 10),
+                      Text('Publish Unit',
+                          style: TextStyle(color: Colors.green)),
+                    ]),
+                  ),
               ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilledButton.icon(
-                icon: _publishing
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Icon(isPublished ? Icons.check_circle : Icons.publish, size: 18),
-                label: Text(isPublished ? 'প্রকাশিত' : 'প্রকাশ করুন'),
-                onPressed: isPublished || _publishing ? null : _publishUnit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: isPublished ? Colors.green.shade700 : null,
-                ),
-              ),
             ),
           ],
         ],

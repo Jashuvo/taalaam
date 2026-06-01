@@ -23,6 +23,7 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
   late final TabController _tabs;
   List<Map<String, dynamic>>? _localOrder;
   bool _reordering = false;
+  bool _sorting = false;
 
   @override
   void initState() {
@@ -39,6 +40,56 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
   void _refresh() {
     setState(() => _localOrder = null);
     ref.invalidate(_allUnitsProvider);
+  }
+
+  Future<void> _aiSortUnits() async {
+    final units = (_localOrder ?? ref.read(_allUnitsProvider).valueOrNull ?? []);
+    final trackIds = units.map((u) => u['track_id'] as String).toSet();
+    if (trackIds.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('AI Sort All Units?'),
+        content: Text(
+          'Gemini will reorder units across ${trackIds.length} track(s) into the optimal learning sequence.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton.icon(
+            icon: const Icon(Icons.auto_awesome, size: 16),
+            label: const Text('Sort'),
+            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _sorting = true);
+    try {
+      for (final trackId in trackIds) {
+        await Supabase.instance.client.functions
+            .invoke('sort-units', body: {'track_id': trackId});
+      }
+      _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Units sorted successfully!'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _sorting = false);
+    }
   }
 
   Future<void> _onReorder(
@@ -78,13 +129,19 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
           onPressed: () => context.go('/admin'),
         ),
         actions: [
-          if (_reordering)
+          if (_reordering || _sorting)
             const Padding(
-              padding: EdgeInsets.only(right: 16),
+              padding: EdgeInsets.only(right: 4),
               child: SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.auto_awesome_outlined),
+              tooltip: 'AI Sort Units',
+              onPressed: _aiSortUnits,
             ),
           IconButton(
             icon: const Icon(Icons.refresh),

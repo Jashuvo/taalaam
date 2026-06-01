@@ -35,14 +35,15 @@ class SrsLocalSource {
           dueDate: Value(now),
           state: const Value(0),
         ));
-    // Push to Supabase (fire-and-forget)
+    // Skip Supabase push for synthetic vocab (no matching FK in remote vocabulary).
+    // Supabase id column is uuid — omit it, use unique(user_id,vocabulary_id).
+    if (vocabularyId.startsWith('syn_')) return;
     Supabase.instance.client.from('srs_cards').upsert({
-      'id': id,
       'user_id': userId,
       'vocabulary_id': vocabularyId,
       'due_date': now.toIso8601String(),
       'state': 0,
-    }).then((_) {}).catchError((_) {});
+    }, onConflict: 'user_id,vocabulary_id').then((_) {}).catchError((_) {});
   }
 
   Future<void> reviewCard(SrsCard card, int rating) async {
@@ -93,9 +94,9 @@ class SrsLocalSource {
       dueDate: Value(newDue),
     ));
 
-    // Push review result to Supabase (fire-and-forget)
+    // Skip Supabase push for synthetic vocab.
+    if (card.vocabularyId.startsWith('syn_')) return;
     Supabase.instance.client.from('srs_cards').upsert({
-      'id': card.id,
       'user_id': card.userId,
       'vocabulary_id': card.vocabularyId,
       'due_date': newDue.toIso8601String(),
@@ -107,6 +108,6 @@ class SrsLocalSource {
       'lapses': newLapses,
       'state': newState,
       'last_review': now.toIso8601String(),
-    }).then((_) {}).catchError((_) {});
+    }, onConflict: 'user_id,vocabulary_id').then((_) {}).catchError((_) {});
   }
 }
