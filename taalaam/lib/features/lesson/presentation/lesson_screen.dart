@@ -4,8 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../data/local/database.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../data/local/database.dart';
 import '../../../shared/widgets/arabic_audio_button.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../srs/data/srs_local_source.dart';
@@ -138,18 +139,33 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
             ? 0
             : (next.correctCount / next.exercises.length * 100).round();
 
+        final now = DateTime.now();
+
         // Record lesson completion in local DB (idempotent via conflict update)
         db.into(db.userProgress).insertOnConflictUpdate(
           UserProgressCompanion(
             id: drift.Value('${user.id}_$lessonId'),
             userId: drift.Value(user.id),
             lessonId: drift.Value(lessonId),
-            completedAt: drift.Value(DateTime.now()),
+            completedAt: drift.Value(now),
             xpEarned: drift.Value(xp),
             accuracyPct: drift.Value(pct),
             heartsRemaining: drift.Value(next.hearts),
           ),
         );
+
+        // Push user_progress to Supabase (fire-and-forget)
+        Supabase.instance.client.from('user_progress').upsert({
+          'id': '${user.id}_$lessonId',
+          'user_id': user.id,
+          'lesson_id': lessonId,
+          'completed_at': now.toIso8601String(),
+          'xp_earned': xp,
+          'accuracy_pct': pct,
+        }).then((_) {}).catchError((_) {});
+
+        // Update streaks locally + push to Supabase
+        _updateStreak(db, user.id, xp, now);
 
         // SRS cards for lesson vocab
         if (vocab.isNotEmpty) {
@@ -297,6 +313,67 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
       ),
     );
   }
+  /// Updates streak counter and total XP locally + pushes to Supabase.
+  Future<void> _updateStreak(
+      AppDatabase db, String userId, int xpEarned, DateTime now) async {
+    final today = DateTime(now.year, now.month, now.day);
+
+    final existing = await (db.select(db.streaks)
+          ..where((t) => t.userId.equals(userId)))
+        .getSingleOrNull();
+
+    int newStreak;
+    int newLongest;
+    int newTotalXp;
+
+    if (existing == null) {
+      newStreak = 1;
+      newLongest = 1;
+      newTotalXp = xpEarned;
+    } else {
+      newTotalXp = existing.totalXp + xpEarned;
+      final lastDate = existing.lastActivityDate;
+      if (lastDate == null) {
+        newStreak = 1;
+      } else {
+        final lastDay =
+            DateTime(lastDate.year, lastDate.month, lastDate.day);
+        final diff = today.difference(lastDay).inDays;
+        if (diff == 0) {
+          // Same day — don't increment streak, just add XP
+          newStreak = existing.currentStreak;
+        } else if (diff == 1) {
+          // Consecutive day — increment
+          newStreak = existing.currentStreak + 1;
+        } else {
+          // Gap — reset streak
+          newStreak = 1;
+        }
+      }
+      newLongest = newStreak > existing.longestStreak
+          ? newStreak
+          : existing.longestStreak;
+    }
+
+    await db.into(db.streaks).insertOnConflictUpdate(StreaksCompanion(
+          userId: drift.Value(userId),
+          currentStreak: drift.Value(newStreak),
+          longestStreak: drift.Value(newLongest),
+          lastActivityDate: drift.Value(today),
+          totalXp: drift.Value(newTotalXp),
+          updatedAt: drift.Value(now),
+        ));
+
+    // Push to Supabase (fire-and-forget)
+    Supabase.instance.client.from('streaks').upsert({
+      'user_id': userId,
+      'current_streak': newStreak,
+      'longest_streak': newLongest,
+      'last_activity_date': today.toIso8601String().substring(0, 10),
+      'total_xp': newTotalXp,
+    }).then((_) {}).catchError((_) {});
+  }
+
   /// Collects all Arabic words from exercises as fallback distractors
   /// for fill_in_blank when the vocabulary table has no entries for this lesson.
   static List<String> _arabicWordsFromExercises(List<ExerciseModel> exercises) {

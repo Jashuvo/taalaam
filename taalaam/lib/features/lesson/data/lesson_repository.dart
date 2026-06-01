@@ -23,7 +23,9 @@ class LessonRepository {
     final local = await _local.getVocabForLesson(lessonId);
     if (local.isNotEmpty) return local;
     try {
-      return await _fetchVocabRemote(lessonId);
+      final remote = await _fetchVocabRemote(lessonId);
+      if (remote.isNotEmpty) await _local.saveVocab(remote);
+      return remote;
     } catch (_) {
       return [];
     }

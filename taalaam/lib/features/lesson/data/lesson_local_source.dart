@@ -36,6 +36,24 @@ class LessonLocalSource {
     return rows.map(_vocabFromRow).toList();
   }
 
+  Future<void> saveVocab(List<VocabularyModel> vocab) async {
+    for (final v in vocab) {
+      await _db.into(_db.vocabulary).insertOnConflictUpdate(VocabularyCompanion(
+        id: Value(v.id),
+        arabic: Value(v.arabic),
+        transliteration: Value(v.transliteration),
+        meaningBn: Value(v.meaningBn),
+        meaningEn: Value(v.meaningEn),
+        rootLetters: Value(v.rootLetters),
+        wordType: Value(v.wordType),
+        gender: Value(v.gender),
+        audioUrl: Value(v.audioUrl),
+        lessonId: Value(v.lessonId),
+        frequencyRank: Value(v.frequencyRank),
+      ));
+    }
+  }
+
   Future<void> saveLesson(LessonModel lesson) async {
     await _db.into(_db.lessons).insertOnConflictUpdate(LessonsCompanion(
       id: Value(lesson.id),

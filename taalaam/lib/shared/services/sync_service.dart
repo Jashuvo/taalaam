@@ -83,10 +83,11 @@ class SyncService {
       }
     }
 
-    // Upsert fresh rows
+    // Upsert fresh rows + their vocabulary
     for (final r in rows) {
+      final lessonId = r['id'] as String;
       await _db.into(_db.lessons).insertOnConflictUpdate(LessonsCompanion(
-            id: Value(r['id'] as String),
+            id: Value(lessonId),
             unitId: Value(r['unit_id'] as String),
             titleBn: Value(r['title_bn'] as String),
             titleAr: Value(r['title_ar'] as String?),
@@ -95,6 +96,33 @@ class SyncService {
             status: Value((r['status'] as String?) ?? 'draft'),
             level: Value((r['level'] as String?) ?? 'beginner'),
           ));
+      await syncVocabulary(lessonId);
+    }
+  }
+
+  Future<void> syncVocabulary(String lessonId) async {
+    try {
+      final rows = await _supabase
+          .from('vocabulary')
+          .select()
+          .eq('lesson_id', lessonId);
+      for (final r in (rows as List)) {
+        await _db.into(_db.vocabulary).insertOnConflictUpdate(VocabularyCompanion(
+              id: Value(r['id'] as String),
+              arabic: Value(r['arabic'] as String),
+              transliteration: Value(r['transliteration'] as String?),
+              meaningBn: Value(r['meaning_bn'] as String),
+              meaningEn: Value(r['meaning_en'] as String?),
+              rootLetters: Value(r['root_letters'] as String?),
+              wordType: Value(r['word_type'] as String?),
+              gender: Value(r['gender'] as String?),
+              audioUrl: Value(r['audio_url'] as String?),
+              lessonId: Value(lessonId),
+              frequencyRank: Value(r['frequency_rank'] as int?),
+            ));
+      }
+    } catch (_) {
+      // Vocabulary sync failure is non-fatal
     }
   }
 
