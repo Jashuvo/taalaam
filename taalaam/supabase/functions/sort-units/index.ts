@@ -15,51 +15,36 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { track_id } = await req.json();
-    if (!track_id) {
-      return new Response(JSON.stringify({ error: 'track_id is required' }), {
-        status: 400,
-        headers: { ...cors, 'Content-Type': 'application/json' },
-      });
-    }
+    if (!track_id) throw new Error('track_id is required');
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Fetch units — titles only, no per-unit DB calls (avoids timeout)
+    // Fetch units — titles only, no extra DB calls
     const { data: units, error: unitErr } = await supabase
       .from('units')
-      .select('id, title_bn, title_ar')
+      .select('id, title_bn')
       .eq('track_id', track_id)
       .order('sort_order');
 
-    if (unitErr) throw unitErr;
+    if (unitErr) throw new Error(unitErr.message);
     if (!units || units.length < 2) {
-      // Nothing to sort
-      return new Response(JSON.stringify({ sorted_ids: units?.map((u) => u.id) ?? [] }), {
-        headers: { ...cors, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ sorted_ids: units?.map((u: any) => u.id) ?? [] }),
+        { headers: { ...cors, 'Content-Type': 'application/json' } },
+      );
     }
 
     const prompt = `You are a curriculum designer for Arabic learning for Bengali speakers.
-
 Arrange these units in the optimal pedagogical sequence — foundational first, advanced last.
-
-Principles (teach earlier = lower number):
-1. Alphabet / letters / pronunciation
-2. Basic vocabulary (greetings, numbers, family)
-3. Everyday words and simple phrases
-4. Sentence structure basics
-5. Grammar concepts
-6. Topic vocabulary (weather, jobs, places)
-7. Quranic / religious phrases
-8. Advanced grammar
+Principles: alphabet/pronunciation → basic vocabulary → everyday phrases → sentence structure → grammar → advanced topics → Quranic content.
 
 Units:
-${units.map((u, i) => `${i + 1}. ID:${u.id}  Title:${u.title_bn}`).join('\n')}
+${units.map((u: any, i: number) => `${i + 1}. ID:${u.id}  Title:${u.title_bn}`).join('\n')}
 
-Reply with ONLY a JSON array of IDs in order. No text, no markdown:`;
+Reply with ONLY a JSON array of IDs in order. No text, no markdown. Example: ["id1","id2"]`;
 
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
@@ -68,23 +53,30 @@ Reply with ONLY a JSON array of IDs in order. No text, no markdown:`;
       .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
     const sortedIds: string[] = JSON.parse(raw);
-    const knownIds = new Set(units.map((u) => u.id));
-    if (!sortedIds.every((id) => knownIds.has(id))) {
-      throw new Error('Response contained unknown unit IDs');
+    const knownIds = new Set(units.map((u: any) => u.id));
+    if (!sortedIds.every((id: string) => knownIds.has(id))) {
+      throw new Error('Gemini returned unknown unit IDs');
     }
 
-    // Update all sort_orders in one batch using upsert
-    const updates = sortedIds.map((id, i) => ({ id, sort_order: i }));
-    const { error: updateErr } = await supabase.from('units').upsert(updates, {
-      onConflict: 'id',
-    });
-    if (updateErr) throw updateErr;
+    // Individual updates — do NOT upsert (avoids NOT NULL violations on other columns)
+    const updateErrors: string[] = [];
+    await Promise.all(
+      sortedIds.map(async (id: string, i: number) => {
+        const { error } = await supabase
+          .from('units')
+          .update({ sort_order: i })
+          .eq('id', id);
+        if (error) updateErrors.push(error.message);
+      }),
+    );
+    if (updateErrors.length > 0) throw new Error(updateErrors.join('; '));
 
     return new Response(JSON.stringify({ sorted_ids: sortedIds }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
