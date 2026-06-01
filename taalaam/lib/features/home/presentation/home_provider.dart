@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/services/sync_service.dart';
 import '../../auth/presentation/auth_provider.dart';
-import '../../srs/presentation/srs_provider.dart';
 
 final syncServiceProvider = Provider<SyncService>((ref) {
   return SyncService(
@@ -31,19 +30,25 @@ final unitsForTrackProvider =
       .watch();
 });
 
-final streakProvider = FutureProvider<Streak?>((ref) async {
+final streakProvider = StreamProvider<Streak?>((ref) {
   final user = ref.watch(currentUserProvider);
-  if (user == null) return null;
+  if (user == null) return Stream.value(null);
   final db = ref.watch(appDatabaseProvider);
   return (db.select(db.streaks)
         ..where((t) => t.userId.equals(user.id)))
-      .getSingleOrNull();
+      .watchSingleOrNull();
 });
 
-final dueCountProvider = FutureProvider<int>((ref) async {
+final dueCountProvider = StreamProvider<int>((ref) {
   final user = ref.watch(currentUserProvider);
-  if (user == null) return 0;
-  return ref.read(srsLocalSourceProvider).countDueCards(user.id);
+  if (user == null) return Stream.value(0);
+  final db = ref.watch(appDatabaseProvider);
+  final now = DateTime.now();
+  return (db.select(db.srsCards)
+        ..where((t) =>
+            t.userId.equals(user.id) & t.dueDate.isSmallerOrEqualValue(now)))
+      .watch()
+      .map((cards) => cards.length);
 });
 
 final trackBySlugProvider =
@@ -57,20 +62,33 @@ final lessonsForUnitProvider =
     StreamProvider.family<List<Lesson>, String>((ref, unitId) {
   final db = ref.watch(appDatabaseProvider);
   ref.read(syncServiceProvider).syncLessons(unitId).ignore();
+  // Level-first sort: beginner → intermediate → advanced, then sort_order.
+  // This ensures curriculum order regardless of upload sequence.
+  const levelTier = {'beginner': 0, 'intermediate': 1, 'advanced': 2};
   return (db.select(db.lessons)
         ..where((t) => t.unitId.equals(unitId))
         ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)]))
-      .watch();
+      .watch()
+      .map((rows) {
+    final sorted = [...rows];
+    sorted.sort((a, b) {
+      final la = levelTier[a.level] ?? 1;
+      final lb = levelTier[b.level] ?? 1;
+      if (la != lb) return la.compareTo(lb);
+      return a.sortOrder.compareTo(b.sortOrder);
+    });
+    return sorted;
+  });
 });
 
-final completedLessonIdsProvider = FutureProvider<Set<String>>((ref) async {
+final completedLessonIdsProvider = StreamProvider<Set<String>>((ref) {
   final user = ref.watch(currentUserProvider);
-  if (user == null) return {};
+  if (user == null) return Stream.value({});
   final db = ref.watch(appDatabaseProvider);
-  final rows = await (db.select(db.userProgress)
+  return (db.select(db.userProgress)
         ..where((t) => t.userId.equals(user.id)))
-      .get();
-  return rows.map((r) => r.lessonId).toSet();
+      .watch()
+      .map((rows) => rows.map((r) => r.lessonId).toSet());
 });
 
 final bookmarkedLessonIdsProvider = StreamProvider<Set<String>>((ref) {
@@ -162,27 +180,14 @@ class TrackProgress {
 final trackProgressProvider =
     FutureProvider.family<TrackProgress, String>((ref, trackId) async {
   final db = ref.watch(appDatabaseProvider);
-  final user = ref.watch(currentUserProvider);
+  // Watch completedLessonIdsProvider so this rebuilds whenever progress changes
+  final completedIds =
+      ref.watch(completedLessonIdsProvider).valueOrNull ?? {};
 
   final units = await (db.select(db.units)
         ..where((t) => t.trackId.equals(trackId)))
       .get();
 
-  int total = 0;
-  for (final u in units) {
-    final lessons = await (db.select(db.lessons)
-          ..where((t) => t.unitId.equals(u.id)))
-        .get();
-    total += lessons.length;
-  }
-
-  if (user == null || total == 0) return TrackProgress(total: total, completed: 0);
-
-  final done = await (db.select(db.userProgress)
-        ..where((t) => t.userId.equals(user.id)))
-      .get();
-
-  // Count only lessons that belong to this track
   final allLessonIds = <String>{};
   for (final u in units) {
     final lessons = await (db.select(db.lessons)
@@ -190,7 +195,10 @@ final trackProgressProvider =
         .get();
     allLessonIds.addAll(lessons.map((l) => l.id));
   }
-  final completed = done.where((r) => allLessonIds.contains(r.lessonId)).length;
+
+  final total = allLessonIds.length;
+  final completed =
+      completedIds.where((id) => allLessonIds.contains(id)).length;
 
   return TrackProgress(total: total, completed: completed);
 });

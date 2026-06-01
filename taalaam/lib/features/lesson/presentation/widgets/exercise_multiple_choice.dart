@@ -15,11 +15,21 @@ class ExerciseMultipleChoice extends StatefulWidget {
 
 class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
   int? _selected;
+  late final List<String> _options;
+  late final int _correctIdx;
 
-  List<String> get _options =>
-      List<String>.from(widget.exercise.correctAnswer['options'] as List);
-  int get _correctIndex =>
-      widget.exercise.correctAnswer['correct_index'] as int;
+  @override
+  void initState() {
+    super.initState();
+    // Identify correct answer by VALUE so shuffle doesn't break the answer
+    final raw = List<String>.from(
+        widget.exercise.correctAnswer['options'] as List);
+    final correctAnswer =
+        raw[widget.exercise.correctAnswer['correct_index'] as int];
+    raw.shuffle();
+    _options = raw;
+    _correctIdx = raw.indexOf(correctAnswer);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +61,7 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
           ),
         ...List.generate(_options.length, (i) {
           final selected = _selected == i;
-          final correct = i == _correctIndex;
+          final correct = i == _correctIdx;
           Color? tileColor;
           Color? textColor;
           if (_selected != null) {
@@ -63,32 +73,46 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
               textColor = AppColors.wrongBg;
             }
           }
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Material(
-              color: tileColor ?? theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
+          // Staggered slide-in animation per option
+          return TweenAnimationBuilder<double>(
+            key: ValueKey(i),
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: Duration(milliseconds: 180 + i * 60),
+            curve: Curves.easeOut,
+            builder: (context, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, 16 * (1 - value)),
+                child: child,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: tileColor ?? theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
-                onTap: _selected != null
-                    ? null
-                    : () {
-                        setState(() => _selected = i);
-                        widget.onAnswered(i == _correctIndex);
-                      },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      vertical: 16, horizontal: 20),
-                  child: Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: Text(
-                      _options[i],
-                      style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 20,
-                          height: 1.8,
-                          color: textColor ?? theme.colorScheme.onSurface),
-                      textAlign: TextAlign.center,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _selected != null
+                      ? null
+                      : () {
+                          setState(() => _selected = i);
+                          widget.onAnswered(i == _correctIdx);
+                        },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 16, horizontal: 20),
+                    child: Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: Text(
+                        _options[i],
+                        style: TextStyle(
+                            fontFamily: 'NotoNaskhArabic',
+                            fontSize: 20,
+                            height: 1.8,
+                            color: textColor ?? theme.colorScheme.onSurface),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
                 ),

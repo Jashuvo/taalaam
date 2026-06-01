@@ -22,6 +22,7 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
   bool _loading = true;
   String? _error;
   bool _publishing = false;
+  bool _sorting = false;
 
   @override
   void initState() {
@@ -132,7 +133,10 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
         content: const Text('এই এক্সারসাইজটি AI দিয়ে নতুন করে তৈরি হবে। পুরানো বিষয়বস্তু প্রতিস্থাপিত হবে।'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('না')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('হ্যাঁ')),
+          FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('হ্যাঁ')),
         ],
       ),
     );
@@ -293,6 +297,59 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     );
   }
 
+  Future<void> _aiSortLessons() async {
+    if (_lessons.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('AI দিয়ে পাঠ সাজাবেন?'),
+        content: const Text(
+          'Claude AI পাঠের শিরোনাম, শব্দভাণ্ডার ও অনুশীলন বিশ্লেষণ করে '
+          'সর্বোত্তম শেখার ক্রম নির্ধারণ করবে এবং sort_order আপডেট করবে।',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('বাতিল')),
+          FilledButton.icon(
+            icon: const Icon(Icons.auto_awesome, size: 16),
+            label: const Text('সাজান'),
+            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _sorting = true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI পাঠের ক্রম বিশ্লেষণ করছে…')),
+      );
+    }
+    try {
+      await Supabase.instance.client.functions
+          .invoke('sort-lessons', body: {'unit_id': widget.unitId});
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('পাঠগুলো সফলভাবে সাজানো হয়েছে!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _sorting = false);
+    }
+  }
+
   Future<void> _deleteExercise(String exerciseId) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -300,7 +357,10 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
         title: const Text('এক্সারসাইজ মুছবেন?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('না')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('হ্যাঁ')),
+          FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('হ্যাঁ')),
         ],
       ),
     );
@@ -330,6 +390,20 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
         ),
         actions: [
           if (!_loading && _error == null) ...[
+            if (_sorting)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: SizedBox(
+                  width: 18, height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.auto_awesome_outlined),
+                tooltip: 'AI Sort Lessons',
+                onPressed: _aiSortLessons,
+              ),
             IconButton(
               icon: const Icon(Icons.preview_outlined),
               tooltip: 'Preview',

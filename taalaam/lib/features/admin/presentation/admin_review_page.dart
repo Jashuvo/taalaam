@@ -184,6 +184,49 @@ class _UnitCard extends StatefulWidget {
 class _UnitCardState extends State<_UnitCard> {
   bool _busy = false;
 
+  Future<void> _aiSort() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('AI Sort Lessons?'),
+        content: const Text(
+            'Gemini will analyse the lessons in this unit and reorder them in the optimal learning sequence.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton.icon(
+            icon: const Icon(Icons.auto_awesome, size: 16),
+            label: const Text('Sort'),
+            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.functions
+          .invoke('sort-lessons', body: {'unit_id': widget.unit['id']});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Lessons sorted successfully!'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _publish() async {
     setState(() => _busy = true);
     try {
@@ -236,7 +279,9 @@ class _UnitCardState extends State<_UnitCard> {
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+                backgroundColor: Colors.red,
+                minimumSize: const Size(88, 44)),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -277,95 +322,141 @@ class _UnitCardState extends State<_UnitCard> {
     final isDraft = widget.isDraft;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Title row ───────────────────────────────────────────────────
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isDraft
-                        ? Colors.orange.shade100
-                        : Colors.green.shade100,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    isDraft ? 'DRAFT' : 'PUBLISHED',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isDraft
-                            ? Colors.orange.shade800
-                            : Colors.green.shade800),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(titleBn,
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      if (titleAr != null && titleAr.isNotEmpty)
+                        Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: Text(
+                            titleAr,
+                            style: const TextStyle(
+                                fontFamily: 'NotoNaskhArabic',
+                                fontSize: 14,
+                                height: 1.6),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(titleBn,
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold)),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isDraft
+                            ? Colors.orange.shade100
+                            : Colors.green.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isDraft ? 'DRAFT' : 'LIVE',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: isDraft
+                                ? Colors.orange.shade800
+                                : Colors.green.shade800),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.drag_handle,
+                        color: Colors.grey, size: 18),
+                  ],
                 ),
-                const Icon(Icons.drag_handle, color: Colors.grey, size: 20),
               ],
             ),
-            if (titleAr != null && titleAr.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Directionality(
-                textDirection: TextDirection.rtl,
-                child: Text(
-                  titleAr,
-                  style: const TextStyle(
-                      fontFamily: 'NotoNaskhArabic',
-                      fontSize: 16,
-                      height: 1.6),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            // ── Action row ───────────────────────────────────────────────────
             if (_busy)
-              const Center(
-                  child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2)))
+              const SizedBox(
+                  height: 28,
+                  child: Center(
+                      child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))))
             else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              Row(
                 children: [
+                  // AI Sort — highlighted so it's always easy to find
+                  FilledButton.icon(
+                    icon: const Icon(Icons.auto_awesome, size: 14),
+                    label: const Text('AI Sort'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      backgroundColor:
+                          theme.colorScheme.secondaryContainer,
+                      foregroundColor:
+                          theme.colorScheme.onSecondaryContainer,
+                    ),
+                    onPressed: _aiSort,
+                  ),
+                  const SizedBox(width: 6),
                   OutlinedButton.icon(
-                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    icon: const Icon(Icons.edit_outlined, size: 14),
                     label: const Text('Edit'),
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 34),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                     onPressed: () =>
                         context.go('/admin/review/${widget.unit['id']}'),
                   ),
+                  const Spacer(),
                   if (isDraft)
-                    FilledButton.icon(
-                      icon: const Icon(Icons.publish, size: 16),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.publish, size: 14),
                       label: const Text('Publish'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 34),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        foregroundColor: Colors.green.shade700,
+                        side: BorderSide(color: Colors.green.shade400),
+                      ),
                       onPressed: _publish,
-                      style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green.shade700),
                     )
                   else
                     OutlinedButton.icon(
-                      icon: const Icon(Icons.unpublished_outlined, size: 16),
+                      icon: const Icon(Icons.unpublished_outlined,
+                          size: 14),
                       label: const Text('Unpublish'),
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 34),
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 10),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                       onPressed: _unpublish,
                     ),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.delete_outline, size: 16),
-                    label: const Text('Delete'),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline,
+                        size: 18, color: theme.colorScheme.error),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Delete',
                     onPressed: _delete,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
-                      side: BorderSide(color: theme.colorScheme.error),
-                    ),
                   ),
                 ],
               ),

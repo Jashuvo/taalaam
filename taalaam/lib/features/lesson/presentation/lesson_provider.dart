@@ -1,9 +1,11 @@
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/local/database.dart';
 import '../../../data/models/vocabulary_model.dart';
 import '../data/lesson_local_source.dart';
 import '../data/lesson_repository.dart';
+import '../domain/exercise_model.dart';
 import '../domain/lesson_model.dart';
 
 final lessonLocalSourceProvider = Provider<LessonLocalSource>((ref) {
@@ -73,7 +75,25 @@ class LessonSessionState {
 
 class LessonSessionNotifier extends StateNotifier<LessonSessionState> {
   LessonSessionNotifier(List<dynamic> exercises)
-      : super(LessonSessionState(exercises: exercises));
+      : super(LessonSessionState(exercises: _smartOrder(exercises)));
+
+  // Fully random shuffle so every session feels different.
+  // Only guarantee: first exercise is the easiest type available,
+  // so learners never open a lesson with a hard exercise cold.
+  static List<dynamic> _smartOrder(List<dynamic> raw) {
+    if (raw.isEmpty) return raw;
+    final rng = Random();
+    final shuffled = [...raw]..shuffle(rng);
+
+    const warmupTypes = {ExerciseType.trueFalse, ExerciseType.multipleChoice};
+    final warmupIdx = shuffled.indexWhere(
+        (ex) => warmupTypes.contains((ex as ExerciseModel).type));
+    if (warmupIdx > 0) {
+      final first = shuffled.removeAt(warmupIdx);
+      shuffled.insert(0, first);
+    }
+    return shuffled;
+  }
 
   void answer(bool correct) {
     state = state.copyWith(
