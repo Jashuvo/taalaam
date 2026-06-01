@@ -2,22 +2,13 @@
 // Reorders lessons within a unit in optimal pedagogical sequence.
 // Deploy: supabase functions deploy sort-lessons --no-verify-jwt
 
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
+import { GoogleGenAI } from 'npm:@google/genai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
-    ),
-  ]);
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -53,16 +44,18 @@ Deno.serve(async (req: Request) => {
         `${i + 1}. ID:${l.id} Title:${l.title_bn} Level:${l.level}`
       ).join('\n');
 
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')! });
 
-    const geminiResult = await withTimeout(
-      model.generateContent(prompt),
-      30_000,
-      'Gemini generateContent',
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Gemini timeout after 30s')), 30_000),
     );
 
-    const raw = geminiResult.response.text().trim()
+    const result = await Promise.race([
+      ai.models.generateContent({ model: 'gemini-3.5-flash', contents: prompt }),
+      timeoutPromise,
+    ]);
+
+    const raw = (result.text ?? '').trim()
       .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
     const sortedIds: string[] = JSON.parse(raw);
@@ -71,6 +64,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Gemini returned invalid or unknown lesson IDs');
     }
 
+    // Individual updates — never upsert with partial data (NOT NULL violations)
     await Promise.all(
       sortedIds.map((id, i) =>
         supabase.from('lessons').update({ sort_order: i }).eq('id', id),
