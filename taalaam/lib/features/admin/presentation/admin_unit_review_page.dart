@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 
 class AdminUnitReviewPage extends StatefulWidget {
   final String unitId;
@@ -126,21 +127,12 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
   }
 
   Future<void> _regenExercise(String exerciseId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('AI দিয়ে পুনরায় তৈরি করবেন?'),
-        content: const Text('এই এক্সারসাইজটি AI দিয়ে নতুন করে তৈরি হবে। পুরানো বিষয়বস্তু প্রতিস্থাপিত হবে।'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('না')),
-          FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('হ্যাঁ')),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'AI দিয়ে পুনরায় তৈরি করবেন?',
+      body: 'এই এক্সারসাইজটি AI দিয়ে নতুন করে তৈরি হবে। পুরানো বিষয়বস্তু প্রতিস্থাপিত হবে।',
     );
-    if (confirm != true) return;
+    if (!confirm) return;
     try {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -299,28 +291,14 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
 
   Future<void> _aiSortLessons() async {
     if (_lessons.isEmpty) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('AI দিয়ে পাঠ সাজাবেন?'),
-        content: const Text(
-          'Claude AI পাঠের শিরোনাম, শব্দভাণ্ডার ও অনুশীলন বিশ্লেষণ করে '
-          'সর্বোত্তম শেখার ক্রম নির্ধারণ করবে এবং sort_order আপডেট করবে।',
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('বাতিল')),
-          FilledButton.icon(
-            icon: const Icon(Icons.auto_awesome, size: 16),
-            label: const Text('সাজান'),
-            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
-            onPressed: () => Navigator.pop(ctx, true),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'AI দিয়ে পাঠ সাজাবেন?',
+      body: 'Gemini পাঠের শিরোনাম বিশ্লেষণ করে সর্বোত্তম শেখার ক্রম নির্ধারণ করবে।',
+      confirmLabel: 'সাজান',
+      cancelLabel: 'বাতিল',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _sorting = true);
     if (mounted) {
@@ -351,20 +329,13 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
   }
 
   Future<void> _deleteExercise(String exerciseId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('এক্সারসাইজ মুছবেন?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('না')),
-          FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('হ্যাঁ')),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: 'এক্সারসাইজ মুছবেন?',
+      body: 'এই অনুশীলনটি স্থায়ীভাবে মুছে যাবে।',
+      danger: true,
     );
-    if (confirm != true) return;
+    if (!confirm) return;
     try {
       await Supabase.instance.client.from('exercises').delete().eq('id', exerciseId);
       await _load();

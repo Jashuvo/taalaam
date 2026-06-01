@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 
 final _allUnitsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final rows = await Supabase.instance.client
@@ -47,26 +48,14 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     final trackIds = units.map((u) => u['track_id'] as String).toSet();
     if (trackIds.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('AI Sort All Units?'),
-        content: Text(
-          'Gemini will reorder units across ${trackIds.length} track(s) into the optimal learning sequence.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton.icon(
-            icon: const Icon(Icons.auto_awesome, size: 16),
-            label: const Text('Sort'),
-            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
-            onPressed: () => Navigator.pop(ctx, true),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'AI Sort All Units?',
+      body: 'Gemini will reorder units across ${trackIds.length} track(s) into the optimal learning sequence.',
+      confirmLabel: 'Sort',
+      cancelLabel: 'Cancel',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _sorting = true);
     try {
@@ -242,26 +231,14 @@ class _UnitCardState extends State<_UnitCard> {
   bool _busy = false;
 
   Future<void> _aiSort() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('AI Sort Lessons?'),
-        content: const Text(
-            'Gemini will analyse the lessons in this unit and reorder them in the optimal learning sequence.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton.icon(
-            icon: const Icon(Icons.auto_awesome, size: 16),
-            label: const Text('Sort'),
-            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
-            onPressed: () => Navigator.pop(ctx, true),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'AI Sort Lessons?',
+      body: 'Gemini will analyse the lessons in this unit and reorder them in the optimal learning sequence.',
+      confirmLabel: 'Sort',
+      cancelLabel: 'Cancel',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _busy = true);
     try {
@@ -325,25 +302,13 @@ class _UnitCardState extends State<_UnitCard> {
   }
 
   Future<void> _delete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Unit?'),
-        content: Text(
-            'Delete "${widget.unit['title_bn']}" and all its lessons and exercises?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
-                minimumSize: const Size(88, 44)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Delete Unit?',
+      body: 'Delete "${widget.unit['title_bn']}" and all its lessons and exercises?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      danger: true,
     );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);

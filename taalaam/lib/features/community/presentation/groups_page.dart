@@ -126,6 +126,7 @@ class _GroupsBody extends ConsumerWidget {
               onPressed: () => Navigator.pop(context, false),
               child: const Text('বাতিল')),
           FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('তৈরি করুন')),
         ],

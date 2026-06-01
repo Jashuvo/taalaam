@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auth/presentation/auth_provider.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 import 'groups_provider.dart';
 
 final _groupDetailProvider =
@@ -214,22 +215,12 @@ class _DetailBody extends ConsumerWidget {
 
   void _onMenu(BuildContext context, WidgetRef ref, String action) async {
     if (action == 'leave' && currentUserId != null) {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('গ্রুপ ছেড়ে যান'),
-          content: const Text('আপনি কি এই হালাকা ছেড়ে যেতে চান?'),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('না')),
-            FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('হ্যাঁ')),
-          ],
-        ),
+      final confirm = await showConfirmDialog(
+        context,
+        title: 'গ্রুপ ছেড়ে যান',
+        body: 'আপনি কি এই হালাকা ছেড়ে যেতে চান?',
       );
-      if (confirm == true && context.mounted) {
+      if (confirm && context.mounted) {
         await ref
             .read(groupsNotifierProvider(currentUserId!).notifier)
             .leaveGroup(group.id);
@@ -260,6 +251,7 @@ class _DetailBody extends ConsumerWidget {
                 onPressed: () => Navigator.pop(context, false),
                 child: const Text('বাতিল')),
             FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
                 onPressed: () => Navigator.pop(context, true),
                 child: const Text('সংরক্ষণ করুন')),
           ],

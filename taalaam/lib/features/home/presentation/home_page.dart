@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../auth/presentation/onboarding_page.dart';
@@ -72,20 +73,10 @@ class HomePage extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('সাইন আউট'),
-                  content: const Text('আপনি কি সাইন আউট করতে চান?'),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('না')),
-                    FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('হ্যাঁ')),
-                  ],
-                ),
+              final confirm = await showConfirmDialog(
+                context,
+                title: 'সাইন আউট',
+                body: 'আপনি কি সাইন আউট করতে চান?',
               );
               if (confirm == true && context.mounted) {
                 await ref.read(authServiceProvider).signOut();
@@ -266,21 +257,10 @@ class _StreakXpCard extends ConsumerWidget {
                 child: IconButton(
                   icon: const Text('❄️', style: TextStyle(fontSize: 22)),
                   onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('স্ট্রিক ফ্রিজ'),
-                        content: const Text(
-                            'একটি ফ্রিজ ব্যবহার করবেন? একদিন মিস হলেও স্ট্রিক বজায় থাকবে।'),
-                        actions: [
-                          TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('না')),
-                          FilledButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text('হ্যাঁ')),
-                        ],
-                      ),
+                    final confirm = await showConfirmDialog(
+                      context,
+                      title: 'স্ট্রিক ফ্রিজ',
+                      body: 'একটি ফ্রিজ ব্যবহার করবেন? একদিন মিস হলেও স্ট্রিক বজায় থাকবে।',
                     );
                     if (confirm == true) {
                       await ref

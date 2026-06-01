@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 
 const _kSoundChime   = 'sound_chime';
 const _kSoundTakbeer = 'sound_takbeer';
@@ -199,29 +200,13 @@ class SettingsPage extends ConsumerWidget {
               subtitle: const Text('পরবর্তী বার অ্যাপ খুললে প্রথম প্রশ্ন দেখাবে'),
               shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
               onTap: () async {
-                final cs = Theme.of(context).colorScheme;
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: cs.surfaceContainerHigh,
-                    surfaceTintColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.xlBorder),
-                    title: const Text('রিসেট করবেন?'),
-                    content: const Text('অনবোর্ডিং তথ্য মুছে যাবে।'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('না')),
-                      FilledButton(
-                          style: FilledButton.styleFrom(
-                              minimumSize: const Size(88, 44)),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('হ্যাঁ')),
-                    ],
-                  ),
+                final confirm = await showConfirmDialog(
+                  context,
+                  title: 'রিসেট করবেন?',
+                  body: 'অনবোর্ডিং তথ্য মুছে যাবে।',
+                  danger: true,
                 );
-                if (confirm == true) {
+                if (confirm) {
                   // shared_prefs onboarding reset handled at app level
                 }
               },

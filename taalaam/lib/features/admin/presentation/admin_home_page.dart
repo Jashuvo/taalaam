@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -13,32 +14,16 @@ class _AdminHomePageState extends State<AdminHomePage> {
   bool _clearing = false;
 
   Future<void> _confirmAndClearAll() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 40),
-        title: const Text('Clear All Content?'),
-        content: const Text(
-          'This will permanently delete ALL units, lessons, exercises, '
-          'vocabulary, and source materials from the database.\n\n'
-          'This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
-                minimumSize: const Size(88, 44)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete Everything'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'Clear All Content?',
+      body: 'This will permanently delete ALL units, lessons, exercises, '
+          'vocabulary, and source materials from the database.\n\nThis cannot be undone.',
+      confirmLabel: 'Delete Everything',
+      cancelLabel: 'Cancel',
+      danger: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _clearing = true);
     try {
