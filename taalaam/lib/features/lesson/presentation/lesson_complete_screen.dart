@@ -1,16 +1,74 @@
 import 'dart:math';
 import 'package:confetti/confetti.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/local/database.dart';
 
-class LessonCompleteScreen extends StatefulWidget {
+// Finds the next lesson after the current one within the same unit,
+// then falls back to the first lesson of the next unit.
+final _nextLessonProvider =
+    FutureProvider.family<Lesson?, _NextLessonArgs>((ref, args) async {
+  final db = ref.watch(appDatabaseProvider);
+
+  // Next lesson in same unit
+  final siblings = await (db.select(db.lessons)
+        ..where((t) => t.unitId.equals(args.unitId))
+        ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)]))
+      .get();
+
+  final currentIdx = siblings.indexWhere((l) => l.id == args.lessonId);
+  if (currentIdx != -1 && currentIdx + 1 < siblings.length) {
+    return siblings[currentIdx + 1];
+  }
+
+  // First lesson of the next unit in same track
+  final currentUnit = await (db.select(db.units)
+        ..where((t) => t.id.equals(args.unitId)))
+      .getSingleOrNull();
+  if (currentUnit == null) return null;
+
+  final nextUnits = await (db.select(db.units)
+        ..where((t) =>
+            t.trackId.equals(currentUnit.trackId) &
+            t.sortOrder.isBiggerThanValue(currentUnit.sortOrder))
+        ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)])
+        ..limit(1))
+      .get();
+  if (nextUnits.isEmpty) return null;
+
+  final firstOfNext = await (db.select(db.lessons)
+        ..where((t) => t.unitId.equals(nextUnits.first.id))
+        ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)])
+        ..limit(1))
+      .get();
+  return firstOfNext.isEmpty ? null : firstOfNext.first;
+});
+
+class _NextLessonArgs {
+  final String lessonId;
+  final String unitId;
+  const _NextLessonArgs(this.lessonId, this.unitId);
+  @override
+  bool operator ==(Object o) =>
+      o is _NextLessonArgs && o.lessonId == lessonId && o.unitId == unitId;
+  @override
+  int get hashCode => Object.hash(lessonId, unitId);
+}
+
+class LessonCompleteScreen extends ConsumerStatefulWidget {
+  final String lessonId;
+  final String unitId;
   final int correctCount;
   final int totalCount;
   final int xpEarned;
 
   const LessonCompleteScreen({
+    required this.lessonId,
+    required this.unitId,
     required this.correctCount,
     required this.totalCount,
     required this.xpEarned,
@@ -18,10 +76,11 @@ class LessonCompleteScreen extends StatefulWidget {
   });
 
   @override
-  State<LessonCompleteScreen> createState() => _LessonCompleteScreenState();
+  ConsumerState<LessonCompleteScreen> createState() =>
+      _LessonCompleteScreenState();
 }
 
-class _LessonCompleteScreenState extends State<LessonCompleteScreen>
+class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
     with SingleTickerProviderStateMixin {
   late final ConfettiController _confetti;
   late final AnimationController _fadeIn;
@@ -52,6 +111,10 @@ class _LessonCompleteScreenState extends State<LessonCompleteScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final nextLesson = ref
+        .watch(_nextLessonProvider(
+            _NextLessonArgs(widget.lessonId, widget.unitId)))
+        .valueOrNull;
     final pct =
         widget.totalCount > 0
             ? (widget.correctCount / widget.totalCount * 100).round()
@@ -191,9 +254,26 @@ class _LessonCompleteScreenState extends State<LessonCompleteScreen>
                           ),
                         ),
                         const SizedBox(height: 28),
+                        if (nextLesson != null) ...[
+                          FilledButton.icon(
+                            icon: const Icon(Icons.arrow_forward_rounded),
+                            label: Text('পরবর্তী: ${nextLesson.titleBn}',
+                                overflow: TextOverflow.ellipsis),
+                            onPressed: () =>
+                                context.go('/lesson/${nextLesson.id}'),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
                         FilledButton.icon(
                           icon: const Icon(Icons.home_rounded),
                           label: const Text('হোমে ফিরুন'),
+                          style: nextLesson != null
+                              ? FilledButton.styleFrom(
+                                  backgroundColor: theme
+                                      .colorScheme.surfaceContainerHighest,
+                                  foregroundColor:
+                                      theme.colorScheme.onSurface)
+                              : null,
                           onPressed: () => context.go('/home'),
                         ),
                         const SizedBox(height: 12),

@@ -167,12 +167,16 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         // Update streaks locally + push to Supabase
         _updateStreak(db, user.id, xp, now);
 
-        // SRS cards for lesson vocab
+        // SRS cards: use vocab if available, else extract pairs from exercises
+        final srs = SrsLocalSource(db);
         if (vocab.isNotEmpty) {
-          final srs = SrsLocalSource(db);
           for (final v in vocab) {
             srs.createCard(user.id, v.id);
           }
+        } else {
+          _createSrsFromExercisePairs(
+              db, srs, user.id, lessonId,
+              next.exercises.cast<ExerciseModel>());
         }
       }
     });
@@ -181,6 +185,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
       final xp = (widget.lesson.xpReward as int? ?? 10) +
           session.correctCount * AppConstants.xpPerExercise;
       return LessonCompleteScreen(
+        lessonId: widget.lesson.id as String,
+        unitId: widget.lesson.unitId as String,
         correctCount: session.correctCount,
         totalCount: session.exercises.length,
         xpEarned: xp,
@@ -313,6 +319,39 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
       ),
     );
   }
+  /// Creates SRS cards from drag_drop exercise pairs when vocab table is empty.
+  /// Inserts synthetic vocabulary rows (with real AR+BN meaning) so the
+  /// foreign key on srs_cards.vocabulary_id is satisfied.
+  static Future<void> _createSrsFromExercisePairs(
+    AppDatabase db,
+    SrsLocalSource srs,
+    String userId,
+    String lessonId,
+    List<ExerciseModel> exercises,
+  ) async {
+    for (final ex in exercises) {
+      if (ex.type != ExerciseType.dragDrop) continue;
+      final pairs = ex.correctAnswer['pairs'];
+      if (pairs is! List) continue;
+      for (final p in pairs) {
+        if (p is! Map) continue;
+        final ar = p['ar']?.toString() ?? '';
+        final bn = p['bn']?.toString() ?? '';
+        if (ar.isEmpty || bn.isEmpty) continue;
+        final vocabId = 'syn_${lessonId}_${ar.hashCode.abs()}';
+        await db.into(db.vocabulary).insertOnConflictUpdate(
+          VocabularyCompanion(
+            id: drift.Value(vocabId),
+            arabic: drift.Value(ar),
+            meaningBn: drift.Value(bn),
+            lessonId: drift.Value(lessonId),
+          ),
+        );
+        await srs.createCard(userId, vocabId);
+      }
+    }
+  }
+
   /// Updates streak counter and total XP locally + pushes to Supabase.
   Future<void> _updateStreak(
       AppDatabase db, String userId, int xpEarned, DateTime now) async {
