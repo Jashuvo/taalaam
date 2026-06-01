@@ -10,6 +10,15 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -22,7 +31,6 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Fetch units — titles only, no extra DB calls
     const { data: units, error: unitErr } = await supabase
       .from('units')
       .select('id, title_bn')
@@ -37,45 +45,43 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const prompt = `You are a curriculum designer for Arabic learning for Bengali speakers.
-Arrange these units in the optimal pedagogical sequence — foundational first, advanced last.
-Principles: alphabet/pronunciation → basic vocabulary → everyday phrases → sentence structure → grammar → advanced topics → Quranic content.
-
-Units:
-${units.map((u: any, i: number) => `${i + 1}. ID:${u.id}  Title:${u.title_bn}`).join('\n')}
-
-Reply with ONLY a JSON array of IDs in order. No text, no markdown. Example: ["id1","id2"]`;
+    const prompt =
+      `Arrange these Arabic learning units for Bengali speakers in optimal pedagogical order ` +
+      `(foundational first, advanced last). ` +
+      `Reply with ONLY a JSON array of IDs. No text. No markdown.\n\n` +
+      units.map((u: any, i: number) => `${i + 1}. ID:${u.id} Title:${u.title_bn}`).join('\n');
 
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim()
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    // Explicit 30s timeout — prevents ERR_CONNECTION_CLOSED on Supabase wall-clock limit
+    const geminiResult = await withTimeout(
+      model.generateContent(prompt),
+      30_000,
+      'Gemini generateContent',
+    );
+
+    const raw = geminiResult.response.text().trim()
       .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
     const sortedIds: string[] = JSON.parse(raw);
-    const knownIds = new Set(units.map((u: any) => u.id));
-    if (!sortedIds.every((id: string) => knownIds.has(id))) {
-      throw new Error('Gemini returned unknown unit IDs');
+    const knownIds = new Set(units.map((u: any) => u.id as string));
+    if (!Array.isArray(sortedIds) || !sortedIds.every((id) => knownIds.has(id))) {
+      throw new Error('Gemini returned invalid or unknown unit IDs');
     }
 
-    // Individual updates — do NOT upsert (avoids NOT NULL violations on other columns)
-    const updateErrors: string[] = [];
+    // Individual updates only — upsert causes NOT NULL violations on other columns
     await Promise.all(
-      sortedIds.map(async (id: string, i: number) => {
-        const { error } = await supabase
-          .from('units')
-          .update({ sort_order: i })
-          .eq('id', id);
-        if (error) updateErrors.push(error.message);
-      }),
+      sortedIds.map((id, i) =>
+        supabase.from('units').update({ sort_order: i }).eq('id', id),
+      ),
     );
-    if (updateErrors.length > 0) throw new Error(updateErrors.join('; '));
 
     return new Response(JSON.stringify({ sorted_ids: sortedIds }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : 'Unknown error';
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...cors, 'Content-Type': 'application/json' },
