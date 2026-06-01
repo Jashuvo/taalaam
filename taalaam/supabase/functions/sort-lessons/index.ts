@@ -1,5 +1,5 @@
 // supabase/functions/sort-lessons/index.ts
-// Analyses lessons in a unit and rewrites their sort_order in pedagogical sequence.
+// Reorders lessons within a unit in optimal pedagogical sequence.
 // Deploy: supabase functions deploy sort-lessons --no-verify-jwt
 
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
@@ -27,92 +27,55 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Fetch all lessons for this unit
+    // Fetch lessons — titles + level only, no extra DB calls (avoids timeout)
     const { data: lessons, error: lessonErr } = await supabase
       .from('lessons')
-      .select('id, title_bn, level, sort_order')
+      .select('id, title_bn, level')
       .eq('unit_id', unit_id)
       .order('sort_order');
 
     if (lessonErr) throw lessonErr;
-    if (!lessons || lessons.length === 0) {
-      return new Response(JSON.stringify({ error: 'No lessons found for unit' }), {
-        status: 400,
+    if (!lessons || lessons.length < 2) {
+      return new Response(JSON.stringify({ sorted_ids: lessons?.map((l) => l.id) ?? [] }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
     }
 
-    // Enrich each lesson with vocab sample + exercise types
-    const enriched = await Promise.all(
-      lessons.map(async (lesson) => {
-        const [{ data: vocab }, { data: exercises }] = await Promise.all([
-          supabase
-            .from('vocabulary')
-            .select('arabic, meaning_bn')
-            .eq('lesson_id', lesson.id)
-            .limit(5),
-          supabase
-            .from('exercises')
-            .select('type')
-            .eq('lesson_id', lesson.id),
-        ]);
+    const prompt = `You are a curriculum designer for Arabic learning for Bengali speakers.
 
-        const vocabStr = vocab?.map((v) => `${v.arabic} (${v.meaning_bn})`).join(', ') || '—';
-        const types = [...new Set(exercises?.map((e) => e.type) ?? [])].join(', ') || '—';
+Arrange these lessons in the optimal pedagogical sequence — foundational first, advanced last.
 
-        return { id: lesson.id, title: lesson.title_bn, level: lesson.level, vocab: vocabStr, types };
-      }),
-    );
+Principles (teach earlier = lower number):
+1. Alphabet / pronunciation
+2. Basic vocabulary
+3. Common words and phrases
+4. Simple sentences
+5. Grammar concepts
+6. Advanced grammar
 
-    const lessonList = enriched
-      .map(
-        (l, i) =>
-          `${i + 1}. ID: ${l.id}\n   শিরোনাম: ${l.title}\n   স্তর: ${l.level}\n   শব্দভাণ্ডার: ${l.vocab}\n   ধরন: ${l.types}`,
-      )
-      .join('\n\n');
+Lessons:
+${lessons.map((l, i) => `${i + 1}. ID:${l.id}  Title:${l.title_bn}  Level:${l.level}`).join('\n')}
 
-    const prompt = `You are a curriculum designer for Arabic language learning for Bengali speakers.
-
-Arrange the lessons below in the optimal pedagogical sequence — foundational first, advanced last.
-
-Ordering principles (earlier number = teach first):
-1. Alphabet and individual letter recognition
-2. Harakat / short vowels (fatha, kasra, damma, sukoon)
-3. Letter joining and basic syllables
-4. Common words, greetings, everyday vocabulary
-5. Basic sentence structures and simple phrases
-6. Numbers, colours, family terms
-7. Grammar concepts (gender, plural, verb forms)
-8. Quranic / religious vocabulary and phrases
-9. Advanced grammar and complex sentences
-
-Lessons to sort:
-${lessonList}
-
-Return ONLY a JSON array of lesson IDs in the correct learning order.
-No explanation. No markdown. Just the raw array, for example: ["id1","id2","id3"]`;
+Reply with ONLY a JSON array of IDs in order. No text, no markdown:`;
 
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
     const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim();
+    const raw = result.response.text().trim()
+      .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
-    // Strip markdown fences if Gemini adds them
-    const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-    const sortedIds: string[] = JSON.parse(jsonStr);
-
-    // Validate — every returned ID must belong to this unit
+    const sortedIds: string[] = JSON.parse(raw);
     const knownIds = new Set(lessons.map((l) => l.id));
     if (!sortedIds.every((id) => knownIds.has(id))) {
       throw new Error('Response contained unknown lesson IDs');
     }
 
-    // Write new sort_order values back
-    await Promise.all(
-      sortedIds.map((id, i) =>
-        supabase.from('lessons').update({ sort_order: i }).eq('id', id),
-      ),
-    );
+    // Batch upsert instead of N individual updates
+    const updates = sortedIds.map((id, i) => ({ id, sort_order: i }));
+    const { error: updateErr } = await supabase.from('lessons').upsert(updates, {
+      onConflict: 'id',
+    });
+    if (updateErr) throw updateErr;
 
     return new Response(JSON.stringify({ sorted_ids: sortedIds }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
