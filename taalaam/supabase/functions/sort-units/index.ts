@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
       units.map((u: any, i: number) => `${i + 1}. ID:${u.id} Title:${u.title_bn}`).join('\n');
 
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Explicit 30s timeout — prevents ERR_CONNECTION_CLOSED on Supabase wall-clock limit
     const geminiResult = await withTimeout(
