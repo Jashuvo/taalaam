@@ -2,13 +2,30 @@
 // Reorders units within a track in optimal pedagogical sequence.
 // Deploy: supabase functions deploy sort-units --no-verify-jwt
 
-import { GoogleGenAI } from 'npm:@google/genai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+async function callGemini(apiKey: string, prompt: string): Promise<string> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      signal: AbortSignal.timeout(25_000),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini ${res.status}: ${err}`);
+  }
+  const data = await res.json();
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -37,24 +54,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const prompt =
-      `Arrange these Arabic learning units for Bengali speakers in optimal pedagogical order ` +
-      `(foundational first, advanced last). ` +
-      `Reply with ONLY a JSON array of IDs. No text. No markdown.\n\n` +
+      'Arrange these Arabic learning units for Bengali speakers in optimal pedagogical order ' +
+      '(foundational first, advanced last). ' +
+      'Reply with ONLY a JSON array of IDs. No text. No markdown.\n\n' +
       units.map((u: any, i: number) => `${i + 1}. ID:${u.id} Title:${u.title_bn}`).join('\n');
 
-    const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')! });
-
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini timeout after 30s')), 30_000),
-    );
-
-    const result = await Promise.race([
-      ai.models.generateContent({ model: 'gemini-3.5-flash', contents: prompt }),
-      timeoutPromise,
-    ]);
-
-    const raw = (result.text ?? '').trim()
-      .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const raw = (await callGemini(Deno.env.get('GEMINI_API_KEY')!, prompt))
+      .trim()
+      .replace(/^```(?:json)?\n?/, '')
+      .replace(/\n?```$/, '')
+      .trim();
 
     const sortedIds: string[] = JSON.parse(raw);
     const knownIds = new Set(units.map((u: any) => u.id as string));
@@ -62,7 +71,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Gemini returned invalid or unknown unit IDs');
     }
 
-    // Individual updates — never upsert with partial data (NOT NULL violations)
     await Promise.all(
       sortedIds.map((id, i) =>
         supabase.from('units').update({ sort_order: i }).eq('id', id),
