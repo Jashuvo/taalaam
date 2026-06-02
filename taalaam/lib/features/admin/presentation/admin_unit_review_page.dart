@@ -307,10 +307,17 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
       );
     }
     try {
-      await Supabase.instance.client.functions
+      final res = await Supabase.instance.client.functions
           .invoke('sort-lessons', body: {'unit_id': widget.unitId});
       await _load();
-      if (mounted) {
+      if (!mounted) return;
+
+      final duplicates = (res.data?['duplicates'] as List?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
+      if (duplicates.isNotEmpty) {
+        _showDuplicateWarning(duplicates);
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('পাঠগুলো সফলভাবে সাজানো হয়েছে!'),
@@ -326,6 +333,72 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     } finally {
       if (mounted) setState(() => _sorting = false);
     }
+  }
+
+  void _showDuplicateWarning(List<Map<String, dynamic>> duplicates) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange),
+          SizedBox(width: 8),
+          Text('Duplicate Lessons Found'),
+        ]),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Sorted successfully, but these lessons teach the same content. '
+                  'Consider merging them into one lesson with more exercises:',
+                  style: Theme.of(ctx).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                ...duplicates.map((d) {
+                  final reason = d['reason'] as String? ?? '';
+                  final ids =
+                      (d['ids'] as List?)?.join(', ') ?? '';
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: Colors.orange.withValues(alpha: 0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(reason,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('IDs: $ids',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _deleteExercise(String exerciseId) async {

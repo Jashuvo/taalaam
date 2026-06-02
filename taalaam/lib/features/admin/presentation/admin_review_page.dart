@@ -59,12 +59,20 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
 
     setState(() => _sorting = true);
     try {
+      final allDuplicates = <Map<String, dynamic>>[];
       for (final trackId in trackIds) {
-        await Supabase.instance.client.functions
+        final res = await Supabase.instance.client.functions
             .invoke('sort-units', body: {'track_id': trackId});
+        final dupes = (res.data?['duplicates'] as List?)
+                ?.cast<Map<String, dynamic>>() ??
+            [];
+        allDuplicates.addAll(dupes);
       }
       _refresh();
-      if (mounted) {
+      if (!mounted) return;
+      if (allDuplicates.isNotEmpty) {
+        _showDuplicateWarning(allDuplicates, isUnits: true);
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Units sorted successfully!'),
@@ -79,6 +87,72 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     } finally {
       if (mounted) setState(() => _sorting = false);
     }
+  }
+
+  void _showDuplicateWarning(
+      List<Map<String, dynamic>> duplicates, {required bool isUnits}) {
+    final label = isUnits ? 'units' : 'lessons';
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+          const SizedBox(width: 8),
+          Text('Duplicate ${isUnits ? "Units" : "Lessons"} Found'),
+        ]),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Sorted successfully, but Gemini detected $label that teach '
+                  'the same content. Consider merging them in the editor:',
+                  style: Theme.of(ctx).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                ...duplicates.map((d) {
+                  final ids = (d['ids'] as List?)?.join(', ') ?? '';
+                  final reason = d['reason'] as String? ?? '';
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border:
+                          Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(reason,
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('IDs: $ids',
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontFamily: 'monospace',
+                                color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _onReorder(

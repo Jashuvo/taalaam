@@ -23,10 +23,18 @@ Arrange lessons strictly following these language-acquisition principles:
 4. Difficulty Levels: 'beginner' lessons must come before 'intermediate', which come before 'advanced'.
 5. Eliminate Redundancy: If two lessons cover the same mechanic, order them so simpler vocabulary context comes first.
 
-### OUTPUT RULE (CRITICAL)
-Return ONLY a raw JSON array of IDs in the correct pedagogical order.
-No markdown. No explanation. No extra text. Just the array.
-Example: ["id-1","id-2","id-3"]`;
+### CRITICAL CONSTRAINT — DUPLICATE DETECTION
+Do NOT allow sequential lessons with near-identical target structures (e.g., repeating "Bab Nasara" multiple times). If multiple lessons target the same Arabic verb pattern (باب), the same grammatical construction, or the same vocabulary theme, they MUST be flagged as duplicates that should be combined into a single lesson as sub-exercises rather than sitting as separate top-level lessons.
+
+### OUTPUT FORMAT (CRITICAL)
+Return a single JSON object — no markdown, no extra text:
+{
+  "sorted_ids": ["id-1","id-2","id-3"],
+  "duplicates": [
+    { "ids": ["id-2","id-5"], "reason": "Both lessons teach باب نصر with overlapping vocabulary" }
+  ]
+}
+If no duplicates are detected, return "duplicates": [].`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -63,12 +71,13 @@ Deno.serve(async (req: Request) => {
       }
 
       const userMessage =
-        'Sort these Arabic lessons into the optimal pedagogical sequence for Bengali-speaking learners.\n\n' +
+        'Sort these Arabic lessons into the optimal pedagogical sequence.\n' +
+        'Also flag any duplicates per the CRITICAL CONSTRAINT in your instructions.\n\n' +
         'Lessons to sort:\n' +
         lessons.map((l: any, i: number) =>
           `${i + 1}. ID: ${l.id}\n   Bengali Title: ${l.title_bn}\n   Arabic Title: ${l.title_ar ?? '—'}\n   Level: ${l.level}`
         ).join('\n\n') +
-        '\n\nReturn ONLY the JSON array of IDs in optimal order. Nothing else.';
+        '\n\nReturn the JSON object as specified in OUTPUT FORMAT. Nothing else.';
 
       const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
       const model = genAI.getGenerativeModel({
@@ -80,7 +89,10 @@ Deno.serve(async (req: Request) => {
       const rawText = result.response.text().trim()
         .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
-      const sortedIds: string[] = JSON.parse(rawText);
+      const parsed = JSON.parse(rawText);
+      const sortedIds: string[] = parsed.sorted_ids ?? parsed;
+      const duplicates: any[] = parsed.duplicates ?? [];
+
       const knownIds = new Set(lessons.map((l: any) => l.id as string));
       if (!Array.isArray(sortedIds) || !sortedIds.every((id) => knownIds.has(id))) {
         await respond({ error: `Invalid IDs from Gemini: ${rawText.slice(0, 200)}` });
@@ -93,7 +105,7 @@ Deno.serve(async (req: Request) => {
         ),
       );
 
-      await respond({ sorted_ids: sortedIds });
+      await respond({ sorted_ids: sortedIds, duplicates });
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);
       try { await respond({ error: msg }); } catch (_) { /* writer already closed */ }
