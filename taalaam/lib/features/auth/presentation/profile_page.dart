@@ -313,6 +313,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 );
                 if (confirmed && context.mounted) {
                   await ref.read(authServiceProvider).signOut();
+                  if (context.mounted) context.go('/login');
                 }
               },
             ),
@@ -342,6 +343,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   );
                   if (confirmed && context.mounted) {
                     await ref.read(authServiceProvider).deleteAccount();
+                    if (context.mounted) context.go('/login');
                   }
                 },
               ),
