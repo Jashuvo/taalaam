@@ -17,9 +17,16 @@ void main() async {
     ),
   );
 
+  // Use a separate storage key so the admin session never interferes
+  // with the learner app session (both run on the same origin).
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,
+    authOptions: FlutterAuthClientOptions(
+      localStorage: SharedPreferencesLocalStorage(
+        persistSessionKey: 'sb_taalaam_admin_session',
+      ),
+    ),
   );
 
   final analytics = await AnalyticsService.init();
