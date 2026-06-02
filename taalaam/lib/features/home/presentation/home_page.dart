@@ -72,16 +72,8 @@ class HomePage extends ConsumerWidget {
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () async {
-              final confirm = await showConfirmDialog(
-                context,
-                title: 'সাইন আউট',
-                body: 'আপনি কি সাইন আউট করতে চান?',
-              );
-              if (confirm == true && context.mounted) {
-                await ref.read(authServiceProvider).signOut();
-              }
-            },
+            tooltip: 'প্রোফাইল',
+            onPressed: () => context.go('/profile'),
           ),
         ],
       ),

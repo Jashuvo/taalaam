@@ -7,6 +7,7 @@ import '../../features/admin/presentation/admin_upload_page.dart';
 import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/onboarding_page.dart';
+import '../../features/auth/presentation/profile_page.dart';
 import '../../features/admin/presentation/admin_unit_review_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/home/presentation/leaderboard_page.dart';
@@ -84,6 +85,10 @@ final appRouterProvider =
       GoRoute(
         path: '/settings',
         builder: (_, __) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const ProfilePage(),
       ),
       GoRoute(
         path: '/conversation',
