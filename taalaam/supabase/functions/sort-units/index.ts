@@ -20,79 +20,89 @@ Arrange content strictly following these language-acquisition principles:
 2. Pointers Before Sentences: Demonstrative Pronouns/Pointers (أسماء الإشارة like هذا / هذه) and Personal Pronouns must be taught right after basic nouns, but BEFORE full sentence building.
 3. Gradual Cognitive Load: Progression must go from:
    Isolated Nouns -> Pointers + Nouns -> Short Nominal Sentences -> Verbal Sentences -> Advanced/Complex Expressions.
-4. Eliminate Redundancy: If two modules teach the same grammar mechanic, they should be ordered so Part 1 (simpler vocabulary) comes before Part 2 (complex vocabulary).
+4. Eliminate Redundancy: If two modules teach the same grammar mechanic, order them so Part 1 (simpler vocabulary) comes before Part 2 (complex vocabulary).
 5. Scannable Progression: Order must feel natural — a learner completing module N should be ready for module N+1 without gaps.
 
 ### OUTPUT RULE (CRITICAL)
-You must return ONLY a raw JSON array of IDs in the correct pedagogical order.
+Return ONLY a raw JSON array of IDs in the correct pedagogical order.
 No markdown. No explanation. No extra text. Just the array.
 Example: ["id-1","id-2","id-3"]`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
-  try {
-    const { track_id } = await req.json();
-    if (!track_id) throw new Error('track_id is required');
+  // Use TransformStream so the HTTP/2 connection header is sent immediately,
+  // preventing Cloudflare from closing the idle stream while Gemini processes.
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-    );
+  const respond = async (body: unknown, _status = 200) => {
+    await writer.write(enc.encode(JSON.stringify(body)));
+    await writer.close();
+  };
 
-    const { data: units, error: unitErr } = await supabase
-      .from('units')
-      .select('id, title_bn, title_ar')
-      .eq('track_id', track_id)
-      .order('sort_order');
+  (async () => {
+    try {
+      const { track_id } = await req.json();
+      if (!track_id) { await respond({ error: 'track_id is required' }); return; }
 
-    if (unitErr) throw new Error(unitErr.message);
-    if (!units || units.length < 2) {
-      return new Response(
-        JSON.stringify({ sorted_ids: units?.map((u: any) => u.id) ?? [] }),
-        { headers: { ...cors, 'Content-Type': 'application/json' } },
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       );
+
+      const { data: units, error: unitErr } = await supabase
+        .from('units')
+        .select('id, title_bn, title_ar')
+        .eq('track_id', track_id)
+        .order('sort_order');
+
+      if (unitErr) { await respond({ error: unitErr.message }); return; }
+      if (!units || units.length < 2) {
+        await respond({ sorted_ids: units?.map((u: any) => u.id) ?? [] });
+        return;
+      }
+
+      const userMessage =
+        'Sort these Arabic learning units into the optimal pedagogical sequence for Bengali-speaking learners.\n\n' +
+        'Units to sort:\n' +
+        units.map((u: any, i: number) =>
+          `${i + 1}. ID: ${u.id}\n   Bengali Title: ${u.title_bn}\n   Arabic Title: ${u.title_ar ?? '—'}`
+        ).join('\n\n') +
+        '\n\nReturn ONLY the JSON array of IDs in optimal order. Nothing else.';
+
+      const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        systemInstruction: SYSTEM_PROMPT,
+      });
+
+      const result = await model.generateContent(userMessage);
+      const rawText = result.response.text().trim()
+        .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+
+      const sortedIds: string[] = JSON.parse(rawText);
+      const knownIds = new Set(units.map((u: any) => u.id as string));
+      if (!Array.isArray(sortedIds) || !sortedIds.every((id) => knownIds.has(id))) {
+        await respond({ error: `Invalid IDs from Gemini: ${rawText.slice(0, 200)}` });
+        return;
+      }
+
+      await Promise.all(
+        sortedIds.map((id, i) =>
+          supabase.from('units').update({ sort_order: i }).eq('id', id),
+        ),
+      );
+
+      await respond({ sorted_ids: sortedIds });
+    } catch (e: any) {
+      const msg = e instanceof Error ? e.message : String(e);
+      try { await respond({ error: msg }); } catch (_) { /* writer already closed */ }
     }
+  })();
 
-    const userMessage =
-      'Sort these Arabic learning units into the optimal pedagogical sequence for Bengali-speaking learners. ' +
-      'Apply the curriculum architecture rules from your system instructions.\n\n' +
-      'Units to sort:\n' +
-      units.map((u: any, i: number) =>
-        `${i + 1}. ID: ${u.id}\n   Bengali Title: ${u.title_bn}\n   Arabic Title: ${u.title_ar ?? '—'}`
-      ).join('\n\n') +
-      '\n\nReturn ONLY the JSON array of IDs in optimal order. Nothing else.';
-
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
-    });
-
-    const result = await model.generateContent(userMessage);
-    const rawText = result.response.text().trim()
-      .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-
-    const sortedIds: string[] = JSON.parse(rawText);
-    const knownIds = new Set(units.map((u: any) => u.id as string));
-    if (!Array.isArray(sortedIds) || !sortedIds.every((id) => knownIds.has(id))) {
-      throw new Error(`Invalid IDs from Gemini: ${rawText.slice(0, 200)}`);
-    }
-
-    await Promise.all(
-      sortedIds.map((id, i) =>
-        supabase.from('units').update({ sort_order: i }).eq('id', id),
-      ),
-    );
-
-    return new Response(JSON.stringify({ sorted_ids: sortedIds }), {
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    });
-  } catch (e: any) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-    });
-  }
+  return new Response(readable, {
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  });
 });
