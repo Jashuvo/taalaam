@@ -59,23 +59,21 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
 
     setState(() => _sorting = true);
     try {
-      final allDuplicates = <Map<String, dynamic>>[];
+      final allMerged = <String>[];
       for (final trackId in trackIds) {
         final res = await Supabase.instance.client.functions
             .invoke('sort-units', body: {'track_id': trackId});
-        final dupes = (res.data?['duplicates'] as List?)
-                ?.cast<Map<String, dynamic>>() ??
-            [];
-        allDuplicates.addAll(dupes);
+        final merged = (res.data?['merged'] as List?)?.cast<String>() ?? [];
+        allMerged.addAll(merged);
       }
       _refresh();
       if (!mounted) return;
-      if (allDuplicates.isNotEmpty) {
-        _showDuplicateWarning(allDuplicates, isUnits: true);
+      if (allMerged.isNotEmpty) {
+        _showMergeSummary(allMerged);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Units sorted successfully!'),
+              content: Text('Units sorted — no duplicates found.'),
               backgroundColor: Colors.green),
         );
       }
@@ -89,16 +87,14 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     }
   }
 
-  void _showDuplicateWarning(
-      List<Map<String, dynamic>> duplicates, {required bool isUnits}) {
-    final label = isUnits ? 'units' : 'lessons';
+  void _showMergeSummary(List<String> merged) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-          const SizedBox(width: 8),
-          Text('Duplicate ${isUnits ? "Units" : "Lessons"} Found'),
+        title: const Row(children: [
+          Icon(Icons.auto_awesome, color: Colors.green),
+          SizedBox(width: 8),
+          Text('Sort & Merge Complete'),
         ]),
         content: SizedBox(
           width: 480,
@@ -108,38 +104,23 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Sorted successfully, but Gemini detected $label that teach '
-                  'the same content. Consider merging them in the editor:',
+                  '${merged.length} duplicate group(s) were merged. '
+                  'Their lessons have been moved into single parent modules:',
                   style: Theme.of(ctx).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
-                ...duplicates.map((d) {
-                  final ids = (d['ids'] as List?)?.join(', ') ?? '';
-                  final reason = d['reason'] as String? ?? '';
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border:
-                          Border.all(color: Colors.orange.withValues(alpha: 0.4)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(reason,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        Text('IDs: $ids',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                fontFamily: 'monospace',
-                                color: Colors.grey)),
-                      ],
-                    ),
-                  );
-                }),
+                ...merged.map((reason) => Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: Colors.green.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(reason,
+                          style: const TextStyle(fontSize: 13)),
+                    )),
               ],
             ),
           ),
@@ -148,7 +129,7 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
           FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Got it'),
+            child: const Text('Done'),
           ),
         ],
       ),
