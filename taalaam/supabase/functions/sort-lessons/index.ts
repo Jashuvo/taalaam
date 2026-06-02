@@ -2,6 +2,7 @@
 // Reorders lessons within a unit in optimal pedagogical sequence.
 // Deploy: supabase functions deploy sort-lessons --no-verify-jwt
 
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
 const cors = {
@@ -30,55 +31,29 @@ Deno.serve(async (req: Request) => {
     if (lessonErr) throw new Error(lessonErr.message);
     if (!lessons || lessons.length < 2) {
       return new Response(
-        JSON.stringify({ sorted_ids: lessons?.map((l: any) => l.id) ?? [], note: 'nothing to sort' }),
+        JSON.stringify({ sorted_ids: lessons?.map((l: any) => l.id) ?? [] }),
         { headers: { ...cors, 'Content-Type': 'application/json' } },
       );
     }
 
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
-    if (!apiKey) throw new Error('GEMINI_API_KEY secret not set');
-
     const prompt =
       'Arrange these Arabic learning lessons for Bengali speakers in optimal pedagogical order ' +
-      '(foundational first). Reply with ONLY a JSON array of IDs. No text. No markdown.\n\n' +
+      '(foundational first, advanced last). ' +
+      'Reply with ONLY a JSON array of IDs. No text, no markdown.\n\n' +
       lessons.map((l: any, i: number) =>
         `${i + 1}. ID:${l.id} Title:${l.title_bn} Level:${l.level}`
       ).join('\n');
 
-    let geminiRes: Response;
-    try {
-      const fetchPromise = fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        },
-      );
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini API timed out after 20s')), 20_000),
-      );
-      geminiRes = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-    } catch (geminiErr: any) {
-      throw new Error(`Gemini fetch failed: ${geminiErr?.message ?? String(geminiErr)}`);
-    }
-
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text().catch(() => 'unknown');
-      throw new Error(`Gemini HTTP ${geminiRes.status}: ${errText}`);
-    }
-
-    const geminiData = await geminiRes.json().catch(() => null);
-    const rawText: string = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    const jsonStr = rawText.trim()
+    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    const rawText = result.response.text().trim()
       .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
-    if (!jsonStr) throw new Error('Gemini returned empty response');
-
-    const sortedIds: string[] = JSON.parse(jsonStr);
+    const sortedIds: string[] = JSON.parse(rawText);
     const knownIds = new Set(lessons.map((l: any) => l.id as string));
     if (!Array.isArray(sortedIds) || !sortedIds.every((id) => knownIds.has(id))) {
-      throw new Error(`Gemini returned invalid IDs: ${jsonStr.slice(0, 200)}`);
+      throw new Error(`Invalid IDs from Gemini: ${rawText.slice(0, 200)}`);
     }
 
     await Promise.all(
@@ -90,10 +65,8 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ sorted_ids: sortedIds }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
-
   } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[sort-lessons error]', msg);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...cors, 'Content-Type': 'application/json' },
