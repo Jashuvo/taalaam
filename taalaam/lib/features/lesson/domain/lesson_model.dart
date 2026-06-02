@@ -13,6 +13,8 @@ class LessonModel with _$LessonModel {
     String? titleAr,
     required int sortOrder,
     @Default(10) int xpReward,
+    @Default(0) int gemReward,
+    @Default(false) bool isExam,
     @Default('draft') String status,
     @Default('beginner') String level,
     @Default([]) List<ExerciseModel> exercises,

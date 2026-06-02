@@ -93,6 +93,8 @@ class SyncService {
             titleAr: Value(r['title_ar'] as String?),
             sortOrder: Value(r['sort_order'] as int),
             xpReward: Value((r['xp_reward'] as int?) ?? 10),
+            gemReward: Value((r['gem_reward'] as int?) ?? 0),
+            isExam: Value((r['is_exam'] as bool?) ?? false),
             status: Value((r['status'] as String?) ?? 'draft'),
             level: Value((r['level'] as String?) ?? 'beginner'),
           ));

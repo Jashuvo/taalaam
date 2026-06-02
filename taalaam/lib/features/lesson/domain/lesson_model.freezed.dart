@@ -26,6 +26,8 @@ mixin _$LessonModel {
   String? get titleAr => throw _privateConstructorUsedError;
   int get sortOrder => throw _privateConstructorUsedError;
   int get xpReward => throw _privateConstructorUsedError;
+  int get gemReward => throw _privateConstructorUsedError;
+  bool get isExam => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   String get level => throw _privateConstructorUsedError;
   List<ExerciseModel> get exercises => throw _privateConstructorUsedError;
@@ -53,6 +55,8 @@ abstract class $LessonModelCopyWith<$Res> {
       String? titleAr,
       int sortOrder,
       int xpReward,
+      int gemReward,
+      bool isExam,
       String status,
       String level,
       List<ExerciseModel> exercises});
@@ -79,6 +83,8 @@ class _$LessonModelCopyWithImpl<$Res, $Val extends LessonModel>
     Object? titleAr = freezed,
     Object? sortOrder = null,
     Object? xpReward = null,
+    Object? gemReward = null,
+    Object? isExam = null,
     Object? status = null,
     Object? level = null,
     Object? exercises = null,
@@ -108,6 +114,14 @@ class _$LessonModelCopyWithImpl<$Res, $Val extends LessonModel>
           ? _value.xpReward
           : xpReward // ignore: cast_nullable_to_non_nullable
               as int,
+      gemReward: null == gemReward
+          ? _value.gemReward
+          : gemReward // ignore: cast_nullable_to_non_nullable
+              as int,
+      isExam: null == isExam
+          ? _value.isExam
+          : isExam // ignore: cast_nullable_to_non_nullable
+              as bool,
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
@@ -139,6 +153,8 @@ abstract class _$$LessonModelImplCopyWith<$Res>
       String? titleAr,
       int sortOrder,
       int xpReward,
+      int gemReward,
+      bool isExam,
       String status,
       String level,
       List<ExerciseModel> exercises});
@@ -163,6 +179,8 @@ class __$$LessonModelImplCopyWithImpl<$Res>
     Object? titleAr = freezed,
     Object? sortOrder = null,
     Object? xpReward = null,
+    Object? gemReward = null,
+    Object? isExam = null,
     Object? status = null,
     Object? level = null,
     Object? exercises = null,
@@ -192,6 +210,14 @@ class __$$LessonModelImplCopyWithImpl<$Res>
           ? _value.xpReward
           : xpReward // ignore: cast_nullable_to_non_nullable
               as int,
+      gemReward: null == gemReward
+          ? _value.gemReward
+          : gemReward // ignore: cast_nullable_to_non_nullable
+              as int,
+      isExam: null == isExam
+          ? _value.isExam
+          : isExam // ignore: cast_nullable_to_non_nullable
+              as bool,
       status: null == status
           ? _value.status
           : status // ignore: cast_nullable_to_non_nullable
@@ -218,6 +244,8 @@ class _$LessonModelImpl implements _LessonModel {
       this.titleAr,
       required this.sortOrder,
       this.xpReward = 10,
+      this.gemReward = 0,
+      this.isExam = false,
       this.status = 'draft',
       this.level = 'beginner',
       final List<ExerciseModel> exercises = const []})
@@ -241,6 +269,12 @@ class _$LessonModelImpl implements _LessonModel {
   final int xpReward;
   @override
   @JsonKey()
+  final int gemReward;
+  @override
+  @JsonKey()
+  final bool isExam;
+  @override
+  @JsonKey()
   final String status;
   @override
   @JsonKey()
@@ -256,7 +290,7 @@ class _$LessonModelImpl implements _LessonModel {
 
   @override
   String toString() {
-    return 'LessonModel(id: $id, unitId: $unitId, titleBn: $titleBn, titleAr: $titleAr, sortOrder: $sortOrder, xpReward: $xpReward, status: $status, level: $level, exercises: $exercises)';
+    return 'LessonModel(id: $id, unitId: $unitId, titleBn: $titleBn, titleAr: $titleAr, sortOrder: $sortOrder, xpReward: $xpReward, gemReward: $gemReward, isExam: $isExam, status: $status, level: $level, exercises: $exercises)';
   }
 
   @override
@@ -272,6 +306,9 @@ class _$LessonModelImpl implements _LessonModel {
                 other.sortOrder == sortOrder) &&
             (identical(other.xpReward, xpReward) ||
                 other.xpReward == xpReward) &&
+            (identical(other.gemReward, gemReward) ||
+                other.gemReward == gemReward) &&
+            (identical(other.isExam, isExam) || other.isExam == isExam) &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.level, level) || other.level == level) &&
             const DeepCollectionEquality()
@@ -288,6 +325,8 @@ class _$LessonModelImpl implements _LessonModel {
       titleAr,
       sortOrder,
       xpReward,
+      gemReward,
+      isExam,
       status,
       level,
       const DeepCollectionEquality().hash(_exercises));
@@ -316,6 +355,8 @@ abstract class _LessonModel implements LessonModel {
       final String? titleAr,
       required final int sortOrder,
       final int xpReward,
+      final int gemReward,
+      final bool isExam,
       final String status,
       final String level,
       final List<ExerciseModel> exercises}) = _$LessonModelImpl;
@@ -335,6 +376,10 @@ abstract class _LessonModel implements LessonModel {
   int get sortOrder;
   @override
   int get xpReward;
+  @override
+  int get gemReward;
+  @override
+  bool get isExam;
   @override
   String get status;
   @override

@@ -1,3 +1,4 @@
+import 'dart:math' show sin, pi;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -188,6 +189,7 @@ class _UnitSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lessonsAsync = ref.watch(lessonsForUnitProvider(unit.id));
+    final examAsync = ref.watch(examLessonForUnitProvider(unit.id));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -267,9 +269,21 @@ class _UnitSection extends ConsumerWidget {
           error: (_, __) => const SizedBox.shrink(),
           data: (lessons) {
             if (lessons.isEmpty) return const SizedBox.shrink();
-            return _LessonPath(
-              lessons: lessons,
-              completedIds: completedIds,
+            final allDone =
+                lessons.every((l) => completedIds.contains(l.id));
+            final examLesson = examAsync.valueOrNull;
+            final examDone = examLesson != null &&
+                completedIds.contains(examLesson.id);
+            return Column(
+              children: [
+                _LessonPath(lessons: lessons, completedIds: completedIds),
+                if (examLesson != null)
+                  _ExamNode(
+                    examLesson: examLesson,
+                    isUnlocked: allDone,
+                    isDone: examDone,
+                  ),
+              ],
             );
           },
         ),
@@ -600,6 +614,181 @@ class _LessonNode extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Exam node (end of each unit path) ─────────────────────────────────────────
+
+class _ExamNode extends StatefulWidget {
+  final Lesson examLesson;
+  final bool isUnlocked;
+  final bool isDone;
+
+  const _ExamNode({
+    required this.examLesson,
+    required this.isUnlocked,
+    required this.isDone,
+  });
+
+  @override
+  State<_ExamNode> createState() => _ExamNodeState();
+}
+
+class _ExamNodeState extends State<_ExamNode>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    if (widget.isUnlocked && !widget.isDone) _pulse.repeat();
+  }
+
+  @override
+  void didUpdateWidget(_ExamNode old) {
+    super.didUpdateWidget(old);
+    if (widget.isUnlocked && !widget.isDone) {
+      if (!_pulse.isAnimating) _pulse.repeat();
+    } else {
+      _pulse.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    const examSize = 80.0;
+    const gold = AppColors.gold;
+    const goldDark = Color(0xFFB8860B);
+
+    final Color bg;
+    final Color borderColor;
+    final Widget icon;
+    final String label;
+
+    if (widget.isDone) {
+      bg = gold;
+      borderColor = goldDark;
+      icon = const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 36);
+      label = 'সম্পন্ন!';
+    } else if (widget.isUnlocked) {
+      bg = gold;
+      borderColor = Colors.white.withValues(alpha: 0.8);
+      icon = const Icon(Icons.shield_rounded, color: Colors.white, size: 36);
+      label = 'পরীক্ষা দিন';
+    } else {
+      bg = theme.colorScheme.surfaceContainerHighest;
+      borderColor = theme.colorScheme.outline.withValues(alpha: 0.4);
+      icon = Icon(Icons.lock_outline_rounded,
+          color: theme.colorScheme.onSurfaceVariant, size: 28);
+      label = 'পাঠ শেষ করুন';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: GestureDetector(
+          onTap: widget.isUnlocked
+              ? () => context.go('/exam/${widget.examLesson.id}')
+              : null,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Pulsing glow ring (unlocked only)
+              AnimatedBuilder(
+                animation: _pulse,
+                builder: (_, child) {
+                  final glow = widget.isUnlocked && !widget.isDone
+                      ? 0.3 + 0.25 * sin(_pulse.value * 2 * pi)
+                      : 0.0;
+                  return Container(
+                    width: examSize + 24,
+                    height: examSize + 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        if (glow > 0)
+                          BoxShadow(
+                            color: gold.withValues(alpha: glow),
+                            blurRadius: 28,
+                            spreadRadius: 8,
+                          ),
+                      ],
+                    ),
+                    child: child,
+                  );
+                },
+                child: Center(
+                  child: Container(
+                    width: examSize,
+                    height: examSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: bg,
+                      border: Border.all(color: borderColor, width: 3),
+                      boxShadow: widget.isUnlocked
+                          ? [
+                              BoxShadow(
+                                color: gold.withValues(alpha: 0.4),
+                                blurRadius: 16,
+                                spreadRadius: 2,
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: icon,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // "পরীক্ষা" label
+              Text(
+                'মডিউল পরীক্ষা',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: widget.isUnlocked ? gold : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: widget.isUnlocked
+                      ? gold.withValues(alpha: 0.15)
+                      : theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                  border: widget.isUnlocked
+                      ? Border.all(color: gold.withValues(alpha: 0.4))
+                      : null,
+                ),
+                child: Text(
+                  widget.isUnlocked
+                      ? '${widget.examLesson.xpReward} XP • ${widget.examLesson.gemReward} 💎'
+                      : label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: widget.isUnlocked
+                        ? gold
+                        : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -63,10 +63,10 @@ final lessonsForUnitProvider =
   final db = ref.watch(appDatabaseProvider);
   ref.read(syncServiceProvider).syncLessons(unitId).ignore();
   // Level-first sort: beginner → intermediate → advanced, then sort_order.
-  // This ensures curriculum order regardless of upload sequence.
+  // Exam lessons are excluded — shown separately as the exam node.
   const levelTier = {'beginner': 0, 'intermediate': 1, 'advanced': 2};
   return (db.select(db.lessons)
-        ..where((t) => t.unitId.equals(unitId))
+        ..where((t) => t.unitId.equals(unitId) & t.isExam.equals(false))
         ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)]))
       .watch()
       .map((rows) {
@@ -79,6 +79,16 @@ final lessonsForUnitProvider =
     });
     return sorted;
   });
+});
+
+/// Returns the exam lesson for a unit (is_exam = true), or null if not created yet.
+final examLessonForUnitProvider =
+    StreamProvider.family<Lesson?, String>((ref, unitId) {
+  final db = ref.watch(appDatabaseProvider);
+  return (db.select(db.lessons)
+        ..where((t) => t.unitId.equals(unitId) & t.isExam.equals(true))
+        ..limit(1))
+      .watchSingleOrNull();
 });
 
 final completedLessonIdsProvider = StreamProvider<Set<String>>((ref) {

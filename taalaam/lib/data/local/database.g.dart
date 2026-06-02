@@ -1080,6 +1080,23 @@ class $LessonsTable extends Lessons with TableInfo<$LessonsTable, Lesson> {
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(10));
+  static const VerificationMeta _gemRewardMeta =
+      const VerificationMeta('gemReward');
+  @override
+  late final GeneratedColumn<int> gemReward = GeneratedColumn<int>(
+      'gem_reward', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _isExamMeta = const VerificationMeta('isExam');
+  @override
+  late final GeneratedColumn<bool> isExam = GeneratedColumn<bool>(
+      'is_exam', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_exam" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -1110,6 +1127,8 @@ class $LessonsTable extends Lessons with TableInfo<$LessonsTable, Lesson> {
         titleAr,
         sortOrder,
         xpReward,
+        gemReward,
+        isExam,
         status,
         level,
         createdAt
@@ -1155,6 +1174,14 @@ class $LessonsTable extends Lessons with TableInfo<$LessonsTable, Lesson> {
       context.handle(_xpRewardMeta,
           xpReward.isAcceptableOrUnknown(data['xp_reward']!, _xpRewardMeta));
     }
+    if (data.containsKey('gem_reward')) {
+      context.handle(_gemRewardMeta,
+          gemReward.isAcceptableOrUnknown(data['gem_reward']!, _gemRewardMeta));
+    }
+    if (data.containsKey('is_exam')) {
+      context.handle(_isExamMeta,
+          isExam.isAcceptableOrUnknown(data['is_exam']!, _isExamMeta));
+    }
     if (data.containsKey('status')) {
       context.handle(_statusMeta,
           status.isAcceptableOrUnknown(data['status']!, _statusMeta));
@@ -1188,6 +1215,10 @@ class $LessonsTable extends Lessons with TableInfo<$LessonsTable, Lesson> {
           .read(DriftSqlType.int, data['${effectivePrefix}sort_order'])!,
       xpReward: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}xp_reward'])!,
+      gemReward: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}gem_reward'])!,
+      isExam: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_exam'])!,
       status: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       level: attachedDatabase.typeMapping
@@ -1210,6 +1241,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
   final String? titleAr;
   final int sortOrder;
   final int xpReward;
+  final int gemReward;
+  final bool isExam;
   final String status;
   final String level;
   final DateTime createdAt;
@@ -1220,6 +1253,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
       this.titleAr,
       required this.sortOrder,
       required this.xpReward,
+      required this.gemReward,
+      required this.isExam,
       required this.status,
       required this.level,
       required this.createdAt});
@@ -1234,6 +1269,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
     }
     map['sort_order'] = Variable<int>(sortOrder);
     map['xp_reward'] = Variable<int>(xpReward);
+    map['gem_reward'] = Variable<int>(gemReward);
+    map['is_exam'] = Variable<bool>(isExam);
     map['status'] = Variable<String>(status);
     map['level'] = Variable<String>(level);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -1250,6 +1287,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
           : Value(titleAr),
       sortOrder: Value(sortOrder),
       xpReward: Value(xpReward),
+      gemReward: Value(gemReward),
+      isExam: Value(isExam),
       status: Value(status),
       level: Value(level),
       createdAt: Value(createdAt),
@@ -1266,6 +1305,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
       titleAr: serializer.fromJson<String?>(json['titleAr']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       xpReward: serializer.fromJson<int>(json['xpReward']),
+      gemReward: serializer.fromJson<int>(json['gemReward']),
+      isExam: serializer.fromJson<bool>(json['isExam']),
       status: serializer.fromJson<String>(json['status']),
       level: serializer.fromJson<String>(json['level']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -1281,6 +1322,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
       'titleAr': serializer.toJson<String?>(titleAr),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'xpReward': serializer.toJson<int>(xpReward),
+      'gemReward': serializer.toJson<int>(gemReward),
+      'isExam': serializer.toJson<bool>(isExam),
       'status': serializer.toJson<String>(status),
       'level': serializer.toJson<String>(level),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -1294,6 +1337,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
           Value<String?> titleAr = const Value.absent(),
           int? sortOrder,
           int? xpReward,
+          int? gemReward,
+          bool? isExam,
           String? status,
           String? level,
           DateTime? createdAt}) =>
@@ -1304,6 +1349,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
         titleAr: titleAr.present ? titleAr.value : this.titleAr,
         sortOrder: sortOrder ?? this.sortOrder,
         xpReward: xpReward ?? this.xpReward,
+        gemReward: gemReward ?? this.gemReward,
+        isExam: isExam ?? this.isExam,
         status: status ?? this.status,
         level: level ?? this.level,
         createdAt: createdAt ?? this.createdAt,
@@ -1316,6 +1363,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
       titleAr: data.titleAr.present ? data.titleAr.value : this.titleAr,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       xpReward: data.xpReward.present ? data.xpReward.value : this.xpReward,
+      gemReward: data.gemReward.present ? data.gemReward.value : this.gemReward,
+      isExam: data.isExam.present ? data.isExam.value : this.isExam,
       status: data.status.present ? data.status.value : this.status,
       level: data.level.present ? data.level.value : this.level,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -1331,6 +1380,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
           ..write('titleAr: $titleAr, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('xpReward: $xpReward, ')
+          ..write('gemReward: $gemReward, ')
+          ..write('isExam: $isExam, ')
           ..write('status: $status, ')
           ..write('level: $level, ')
           ..write('createdAt: $createdAt')
@@ -1340,7 +1391,7 @@ class Lesson extends DataClass implements Insertable<Lesson> {
 
   @override
   int get hashCode => Object.hash(id, unitId, titleBn, titleAr, sortOrder,
-      xpReward, status, level, createdAt);
+      xpReward, gemReward, isExam, status, level, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1351,6 +1402,8 @@ class Lesson extends DataClass implements Insertable<Lesson> {
           other.titleAr == this.titleAr &&
           other.sortOrder == this.sortOrder &&
           other.xpReward == this.xpReward &&
+          other.gemReward == this.gemReward &&
+          other.isExam == this.isExam &&
           other.status == this.status &&
           other.level == this.level &&
           other.createdAt == this.createdAt);
@@ -1363,6 +1416,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
   final Value<String?> titleAr;
   final Value<int> sortOrder;
   final Value<int> xpReward;
+  final Value<int> gemReward;
+  final Value<bool> isExam;
   final Value<String> status;
   final Value<String> level;
   final Value<DateTime> createdAt;
@@ -1374,6 +1429,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
     this.titleAr = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.xpReward = const Value.absent(),
+    this.gemReward = const Value.absent(),
+    this.isExam = const Value.absent(),
     this.status = const Value.absent(),
     this.level = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1386,6 +1443,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
     this.titleAr = const Value.absent(),
     required int sortOrder,
     this.xpReward = const Value.absent(),
+    this.gemReward = const Value.absent(),
+    this.isExam = const Value.absent(),
     this.status = const Value.absent(),
     this.level = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1401,6 +1460,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
     Expression<String>? titleAr,
     Expression<int>? sortOrder,
     Expression<int>? xpReward,
+    Expression<int>? gemReward,
+    Expression<bool>? isExam,
     Expression<String>? status,
     Expression<String>? level,
     Expression<DateTime>? createdAt,
@@ -1413,6 +1474,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
       if (titleAr != null) 'title_ar': titleAr,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (xpReward != null) 'xp_reward': xpReward,
+      if (gemReward != null) 'gem_reward': gemReward,
+      if (isExam != null) 'is_exam': isExam,
       if (status != null) 'status': status,
       if (level != null) 'level': level,
       if (createdAt != null) 'created_at': createdAt,
@@ -1427,6 +1490,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
       Value<String?>? titleAr,
       Value<int>? sortOrder,
       Value<int>? xpReward,
+      Value<int>? gemReward,
+      Value<bool>? isExam,
       Value<String>? status,
       Value<String>? level,
       Value<DateTime>? createdAt,
@@ -1438,6 +1503,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
       titleAr: titleAr ?? this.titleAr,
       sortOrder: sortOrder ?? this.sortOrder,
       xpReward: xpReward ?? this.xpReward,
+      gemReward: gemReward ?? this.gemReward,
+      isExam: isExam ?? this.isExam,
       status: status ?? this.status,
       level: level ?? this.level,
       createdAt: createdAt ?? this.createdAt,
@@ -1466,6 +1533,12 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
     if (xpReward.present) {
       map['xp_reward'] = Variable<int>(xpReward.value);
     }
+    if (gemReward.present) {
+      map['gem_reward'] = Variable<int>(gemReward.value);
+    }
+    if (isExam.present) {
+      map['is_exam'] = Variable<bool>(isExam.value);
+    }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
@@ -1490,6 +1563,8 @@ class LessonsCompanion extends UpdateCompanion<Lesson> {
           ..write('titleAr: $titleAr, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('xpReward: $xpReward, ')
+          ..write('gemReward: $gemReward, ')
+          ..write('isExam: $isExam, ')
           ..write('status: $status, ')
           ..write('level: $level, ')
           ..write('createdAt: $createdAt, ')
@@ -5689,6 +5764,8 @@ typedef $$LessonsTableCreateCompanionBuilder = LessonsCompanion Function({
   Value<String?> titleAr,
   required int sortOrder,
   Value<int> xpReward,
+  Value<int> gemReward,
+  Value<bool> isExam,
   Value<String> status,
   Value<String> level,
   Value<DateTime> createdAt,
@@ -5701,6 +5778,8 @@ typedef $$LessonsTableUpdateCompanionBuilder = LessonsCompanion Function({
   Value<String?> titleAr,
   Value<int> sortOrder,
   Value<int> xpReward,
+  Value<int> gemReward,
+  Value<bool> isExam,
   Value<String> status,
   Value<String> level,
   Value<DateTime> createdAt,
@@ -5809,6 +5888,12 @@ class $$LessonsTableFilterComposer
 
   ColumnFilters<int> get xpReward => $composableBuilder(
       column: $table.xpReward, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get gemReward => $composableBuilder(
+      column: $table.gemReward, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isExam => $composableBuilder(
+      column: $table.isExam, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnFilters(column));
@@ -5948,6 +6033,12 @@ class $$LessonsTableOrderingComposer
   ColumnOrderings<int> get xpReward => $composableBuilder(
       column: $table.xpReward, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get gemReward => $composableBuilder(
+      column: $table.gemReward, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isExam => $composableBuilder(
+      column: $table.isExam, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnOrderings(column));
 
@@ -6001,6 +6092,12 @@ class $$LessonsTableAnnotationComposer
 
   GeneratedColumn<int> get xpReward =>
       $composableBuilder(column: $table.xpReward, builder: (column) => column);
+
+  GeneratedColumn<int> get gemReward =>
+      $composableBuilder(column: $table.gemReward, builder: (column) => column);
+
+  GeneratedColumn<bool> get isExam =>
+      $composableBuilder(column: $table.isExam, builder: (column) => column);
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -6150,6 +6247,8 @@ class $$LessonsTableTableManager extends RootTableManager<
             Value<String?> titleAr = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
             Value<int> xpReward = const Value.absent(),
+            Value<int> gemReward = const Value.absent(),
+            Value<bool> isExam = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String> level = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -6162,6 +6261,8 @@ class $$LessonsTableTableManager extends RootTableManager<
             titleAr: titleAr,
             sortOrder: sortOrder,
             xpReward: xpReward,
+            gemReward: gemReward,
+            isExam: isExam,
             status: status,
             level: level,
             createdAt: createdAt,
@@ -6174,6 +6275,8 @@ class $$LessonsTableTableManager extends RootTableManager<
             Value<String?> titleAr = const Value.absent(),
             required int sortOrder,
             Value<int> xpReward = const Value.absent(),
+            Value<int> gemReward = const Value.absent(),
+            Value<bool> isExam = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String> level = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -6186,6 +6289,8 @@ class $$LessonsTableTableManager extends RootTableManager<
             titleAr: titleAr,
             sortOrder: sortOrder,
             xpReward: xpReward,
+            gemReward: gemReward,
+            isExam: isExam,
             status: status,
             level: level,
             createdAt: createdAt,

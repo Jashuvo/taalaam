@@ -24,6 +24,7 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
   String? _error;
   bool _publishing = false;
   bool _sorting = false;
+  bool _generatingExam = false;
 
   @override
   void initState() {
@@ -63,6 +64,49 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
         _error = '$e';
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _generateExam() async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'পরীক্ষা তৈরি করবেন?',
+      body: 'Gemini এই মডিউলের সমস্ত পাঠ বিশ্লেষণ করে একটি চূড়ান্ত পরীক্ষা তৈরি করবে। '
+          'প্রতিবার শিক্ষার্থী পরীক্ষা দিলে নতুন প্রশ্ন তৈরি হবে।',
+      confirmLabel: 'তৈরি করুন',
+      cancelLabel: 'বাতিল',
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _generatingExam = true);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI পরীক্ষা তৈরি করছে…')),
+      );
+    }
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'generate-exam',
+        body: {'unit_id': widget.unitId, 'admin_mode': true},
+      );
+      final data = res.data as Map<String, dynamic>?;
+      if (data?['error'] != null) throw Exception(data!['error']);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('পরীক্ষা সফলভাবে তৈরি হয়েছে! 🏆'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _generatingExam = false);
     }
   }
 
@@ -445,12 +489,24 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               onSelected: (v) {
+                if (v == 'exam') _generateExam();
                 if (v == 'sort') _aiSortLessons();
                 if (v == 'preview') _showPreview();
                 if (v == 'export') _exportJson();
                 if (v == 'publish') _publishUnit();
               },
               itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'exam',
+                  child: Row(children: [
+                    Icon(Icons.emoji_events_outlined,
+                        size: 18, color: Colors.amber.shade600),
+                    const SizedBox(width: 10),
+                    Text('Generate Exam 🏆',
+                        style: TextStyle(color: Colors.amber.shade700,
+                            fontWeight: FontWeight.bold)),
+                  ]),
+                ),
                 const PopupMenuItem(
                   value: 'sort',
                   child: Row(children: [

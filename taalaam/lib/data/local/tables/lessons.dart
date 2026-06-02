@@ -8,6 +8,8 @@ class Lessons extends Table {
   TextColumn get titleAr => text().nullable()();
   IntColumn get sortOrder => integer()();
   IntColumn get xpReward => integer().withDefault(const Constant(10))();
+  IntColumn get gemReward => integer().withDefault(const Constant(0))();
+  BoolColumn get isExam => boolean().withDefault(const Constant(false))();
   TextColumn get status =>
       text().withDefault(const Constant('draft'))();
   TextColumn get level =>

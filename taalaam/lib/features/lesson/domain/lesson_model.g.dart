@@ -14,6 +14,8 @@ _$LessonModelImpl _$$LessonModelImplFromJson(Map<String, dynamic> json) =>
       titleAr: json['titleAr'] as String?,
       sortOrder: (json['sortOrder'] as num).toInt(),
       xpReward: (json['xpReward'] as num?)?.toInt() ?? 10,
+      gemReward: (json['gemReward'] as num?)?.toInt() ?? 0,
+      isExam: json['isExam'] as bool? ?? false,
       status: json['status'] as String? ?? 'draft',
       level: json['level'] as String? ?? 'beginner',
       exercises: (json['exercises'] as List<dynamic>?)
@@ -30,6 +32,8 @@ Map<String, dynamic> _$$LessonModelImplToJson(_$LessonModelImpl instance) =>
       'titleAr': instance.titleAr,
       'sortOrder': instance.sortOrder,
       'xpReward': instance.xpReward,
+      'gemReward': instance.gemReward,
+      'isExam': instance.isExam,
       'status': instance.status,
       'level': instance.level,
       'exercises': instance.exercises,

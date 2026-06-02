@@ -8,6 +8,7 @@ import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/onboarding_page.dart';
 import '../../features/auth/presentation/profile_page.dart';
+import '../../features/lesson/presentation/exam_screen.dart';
 import '../../features/admin/presentation/admin_unit_review_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/home/presentation/leaderboard_page.dart';
@@ -89,6 +90,12 @@ final appRouterProvider =
       GoRoute(
         path: '/profile',
         builder: (_, __) => const ProfilePage(),
+      ),
+      GoRoute(
+        path: '/exam/:examLessonId',
+        builder: (_, state) => ExamScreen(
+          examLessonId: state.pathParameters['examLessonId']!,
+        ),
       ),
       GoRoute(
         path: '/conversation',
