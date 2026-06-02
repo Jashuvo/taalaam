@@ -4,6 +4,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app.dart';
 import 'core/constants/app_constants.dart';
+import 'features/auth/data/admin_local_storage.dart';
 import 'shared/services/analytics_service.dart';
 
 void main() async {
@@ -17,15 +18,14 @@ void main() async {
     ),
   );
 
-  // Use a separate storage key so the admin session never interferes
-  // with the learner app session (both run on the same origin).
+  // Separate storage so admin session never conflicts with learner.
+  // Learner uses GoTrueHiveLocalStorage (IndexedDB).
+  // Admin uses SharedPreferences (window.localStorage) with a unique key.
   await Supabase.initialize(
     url: AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,
-    authOptions: FlutterAuthClientOptions(
-      localStorage: SharedPreferencesLocalStorage(
-        persistSessionKey: 'sb_taalaam_admin_session',
-      ),
+    authOptions: const FlutterAuthClientOptions(
+      localStorage: AdminLocalStorage(),
     ),
   );
 

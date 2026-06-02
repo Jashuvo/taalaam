@@ -7,13 +7,38 @@ import '../../auth/presentation/auth_provider.dart';
 
 final leaderboardProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  // Join streaks with profiles to get display names
-  final data = await Supabase.instance.client
-      .from('streaks')
-      .select('user_id, total_xp, current_streak, profiles(display_name)')
-      .order('total_xp', ascending: false)
-      .limit(50);
-  return List<Map<String, dynamic>>.from(data as List);
+  final client = Supabase.instance.client;
+
+  // Fetch streaks (RLS allows SELECT for all after migration 0009)
+  final streaks = List<Map<String, dynamic>>.from(
+    await client
+        .from('streaks')
+        .select('user_id, total_xp, current_streak')
+        .order('total_xp', ascending: false)
+        .limit(50) as List,
+  );
+
+  if (streaks.isEmpty) return [];
+
+  // Fetch profiles for those user IDs in one query
+  final ids = streaks.map((s) => s['user_id'] as String).toList();
+  final profiles = List<Map<String, dynamic>>.from(
+    await client
+        .from('profiles')
+        .select('id, display_name')
+        .inFilter('id', ids) as List,
+  );
+
+  final nameMap = {
+    for (final p in profiles)
+      p['id'] as String: p['display_name'] as String? ?? '',
+  };
+
+  // Merge display_name into each streak row
+  return streaks.map((s) => {
+        ...s,
+        'display_name': nameMap[s['user_id'] as String] ?? '',
+      }).toList();
 });
 
 class LeaderboardPage extends ConsumerWidget {
@@ -329,8 +354,7 @@ class _RankRow extends StatelessWidget {
 
 String _displayName(Map<String, dynamic> entry, bool isSelf) {
   if (isSelf) return 'আপনি';
-  final profile = entry['profiles'] as Map<String, dynamic>?;
-  final name = profile?['display_name'] as String?;
+  final name = entry['display_name'] as String?;
   if (name != null && name.isNotEmpty) return name;
   // Reproducible anonymous name from uid
   final uid = entry['user_id'] as String? ?? '';
