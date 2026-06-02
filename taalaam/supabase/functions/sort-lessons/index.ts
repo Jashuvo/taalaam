@@ -10,6 +10,24 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const SYSTEM_PROMPT = `You are an expert Curriculum Architect and Arabic Linguist specializing in designing gamified, step-by-step language courses (Duolingo-style micro-learning). Your task is to logically sort and optimize a raw list of sub-lessons within a single learning unit.
+
+The target audience consists of Bengali speakers learning Classical/Fusha Arabic, with a special emphasis on Islamic/Salafi vocabulary contexts (combining essential everyday nouns with Quranic, Hadith, and scholarly terminology).
+
+### PEDAGOGICAL ORDERING RULES
+Arrange lessons strictly following these language-acquisition principles:
+1. Vocabulary Before Syntax: Independent nouns/vocabulary must be introduced before learners use them in structures.
+2. Pointers Before Sentences: Demonstrative Pronouns (هذا / هذه) and Personal Pronouns must come right after basic nouns, but BEFORE full sentence building.
+3. Gradual Cognitive Load:
+   Isolated Nouns -> Pointers + Nouns -> Short Nominal Sentences -> Verbal Sentences -> Advanced Expressions.
+4. Difficulty Levels: 'beginner' lessons must come before 'intermediate', which come before 'advanced'.
+5. Eliminate Redundancy: If two lessons cover the same mechanic, order them so simpler vocabulary context comes first.
+
+### OUTPUT RULE (CRITICAL)
+You must return ONLY a raw JSON array of IDs in the correct pedagogical order.
+No markdown. No explanation. No extra text. Just the array.
+Example: ["id-1","id-2","id-3"]`;
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
@@ -24,7 +42,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: lessons, error: lessonErr } = await supabase
       .from('lessons')
-      .select('id, title_bn, level')
+      .select('id, title_bn, title_ar, level')
       .eq('unit_id', unit_id)
       .order('sort_order');
 
@@ -36,17 +54,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const prompt =
-      'Arrange these Arabic learning lessons for Bengali speakers in optimal pedagogical order ' +
-      '(foundational first, advanced last). ' +
-      'Reply with ONLY a JSON array of IDs. No text, no markdown.\n\n' +
+    const userMessage =
+      'Sort these Arabic lessons into the optimal pedagogical sequence for Bengali-speaking learners. ' +
+      'Apply the curriculum architecture rules from your system instructions.\n\n' +
+      'Lessons to sort:\n' +
       lessons.map((l: any, i: number) =>
-        `${i + 1}. ID:${l.id} Title:${l.title_bn} Level:${l.level}`
-      ).join('\n');
+        `${i + 1}. ID: ${l.id}\n   Bengali Title: ${l.title_bn}\n   Arabic Title: ${l.title_ar ?? '—'}\n   Level: ${l.level}`
+      ).join('\n\n') +
+      '\n\nReturn ONLY the JSON array of IDs in optimal order. Nothing else.';
 
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const result = await model.generateContent(prompt);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: SYSTEM_PROMPT,
+    });
+
+    const result = await model.generateContent(userMessage);
     const rawText = result.response.text().trim()
       .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
