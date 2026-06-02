@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../home/presentation/home_provider.dart';
@@ -133,6 +134,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Navigate to login the instant the user signs out — catches all sign-out paths
+    ref.listen<User?>(currentUserProvider, (_, user) {
+      if (user == null && context.mounted) context.go('/login');
+    });
+
     final theme = Theme.of(context);
     final user = ref.watch(currentUserProvider);
     final streak = ref.watch(streakProvider).valueOrNull;
