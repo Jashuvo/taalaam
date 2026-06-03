@@ -28,6 +28,7 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
   bool _publishing = false;
   bool _sorting = false;
   bool _generatingExam = false;
+  final _regenVocabLoading = <String>{};
 
   @override
   void initState() {
@@ -248,6 +249,40 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
       }
+    }
+  }
+
+  Future<void> _regenVocab(String lessonId) async {
+    setState(() => _regenVocabLoading.add(lessonId));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI শব্দভাণ্ডার তৈরি করছে…')),
+      );
+    }
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'regenerate-vocab',
+        body: {'lesson_id': lessonId},
+      );
+      final data = res.data as Map<String, dynamic>?;
+      if (data?['error'] != null) throw Exception(data!['error']);
+      final count = data?['vocab_count'] as int? ?? 0;
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$count টি শব্দ তৈরি হয়েছে! ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _regenVocabLoading.remove(lessonId));
     }
   }
 
@@ -634,6 +669,9 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
                             onRegenExercise: (id) => _regenExercise(id),
                             onEditVocab: _editVocab,
                             onUploadVocabAudio: (id) => _uploadVocabAudio(id),
+                            onRegenVocab: (id) => _regenVocab(id),
+                            regenVocabLoading: _regenVocabLoading
+                                .contains(e.value['id'] as String),
                           )),
                       const SizedBox(height: 16),
                       _ExamSection(
@@ -730,6 +768,8 @@ class _LessonSection extends StatefulWidget {
   final Future<void> Function(String) onRegenExercise;
   final Future<void> Function(Map<String, dynamic>) onEditVocab;
   final Future<void> Function(String) onUploadVocabAudio;
+  final Future<void> Function(String) onRegenVocab;
+  final bool regenVocabLoading;
 
   const _LessonSection({
     required this.lesson,
@@ -741,6 +781,8 @@ class _LessonSection extends StatefulWidget {
     required this.onRegenExercise,
     required this.onEditVocab,
     required this.onUploadVocabAudio,
+    required this.onRegenVocab,
+    this.regenVocabLoading = false,
   });
 
   @override
@@ -839,20 +881,66 @@ class _LessonSectionState extends State<_LessonSection> {
                         )),
                     const SizedBox(height: 12),
                   ],
-                  if (widget.vocabulary.isNotEmpty) ...[
-                    Text('Vocabulary',
+                  // Vocab header + regen button (always shown when expanded)
+                  Row(
+                    children: [
+                      Text(
+                        'Vocabulary (${widget.vocabulary.length})',
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
-                        )),
-                    const SizedBox(height: 6),
+                        ),
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        height: 28,
+                        child: widget.regenVocabLoading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 0),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                icon: Icon(
+                                  widget.vocabulary.isEmpty
+                                      ? Icons.auto_awesome
+                                      : Icons.refresh_rounded,
+                                  size: 14,
+                                ),
+                                label: Text(
+                                  widget.vocabulary.isEmpty
+                                      ? 'AI তৈরি করুন'
+                                      : 'পুনরায়',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                onPressed: () => widget.onRegenVocab(
+                                    widget.lesson['id'] as String),
+                              ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  if (widget.vocabulary.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'এই পাঠে কোনো শব্দভাণ্ডার নেই। "AI তৈরি করুন" দিয়ে স্বয়ংক্রিয়ভাবে তৈরি করুন।',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    )
+                  else
                     ...widget.vocabulary.map((v) => _VocabRow(
                           vocab: v,
                           onEdit: () => widget.onEditVocab(v),
                           onUploadAudio: () =>
                               widget.onUploadVocabAudio(v['id'] as String),
                         )),
-                  ],
                 ],
               ),
             ),

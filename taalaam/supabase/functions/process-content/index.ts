@@ -242,7 +242,9 @@ const OUTPUT_SCHEMA = `Return ONLY a valid JSON object matching this exact schem
           "meaning_en": "string — English meaning",
           "word_type": "noun | verb | particle | adjective | proper_noun",
           "gender": "masculine | feminine | null",
-          "grammar_note_bn": "string — grammar explanation in Bangla"
+          "grammar_note_bn": "string — grammar explanation in Bangla",
+          "context_snippet_ar": "string | null — short authentic Quranic Ayah, Hadith, or classical Arabic sentence that contains this exact word (with full harakat). Must be a real, verifiable example.",
+          "context_snippet_bn": "string | null — Bengali translation of context_snippet_ar"
         }
       ],
       "exercises": [
@@ -480,6 +482,8 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
             word_type: v.word_type,
             gender: v.gender ?? null,
             grammar_note_bn: v.grammar_note_bn ?? null,
+            context_snippet_ar: v.context_snippet_ar ?? null,
+            context_snippet_bn: v.context_snippet_bn ?? null,
           }))
         );
       }
