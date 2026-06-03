@@ -181,6 +181,53 @@ exercises:
 ]
 
 ════════════════════════════════════════════
+🚨 STICK POLICY: ABSOLUTE ZERO EXCLUSION
+════════════════════════════════════════════
+This rule OVERRIDES any length or density concerns:
+1. You MUST audit the specified pages row-by-row, column-by-column.
+2. EVERY SINGLE verb or vocabulary item listed in the source text tables MUST
+   become a vocabulary entry in the output. Zero exceptions.
+3. Do NOT truncate, summarise, or skip any item.
+   - If a page contains 11 verbs → your vocabulary list must contain exactly 11 items.
+   - If a page contains 15 verbs → exactly 15 items.
+4. Before finalising output, run this internal self-audit:
+   - Count the total number of table rows on the source pages.
+   - Count the total vocabulary entries in your generated JSON.
+   - If (Generated Count ≠ Source Row Count) → re-process the missing items FIRST,
+     then output.
+
+════════════════════════════════════════════
+VERB TABLE (ABWAB) EXTRACTION
+════════════════════════════════════════════
+When the source material contains Arabic verb conjugation tables (أبواب / Abwab),
+extract the following fields for every single row:
+
+  • الماضي  (Past Tense)  → store in "arabic" field (standard dictionary form)
+  • المضارع (Present Tense) → store as "يَفْعَلُ: <present>" inside grammar_note_bn
+  • المصدر  (Verbal Noun) → append "| مصدر: <masdar>" to grammar_note_bn if present
+  • Bengali meaning (অর্থ) → store in "meaning_bn"
+  • word_type → always "verb" for verb rows
+  • transliteration → phonetic of the past tense form
+
+Example mapping for one Abwab row:
+  Source row: كَتَبَ / يَكْتُبُ / كِتَابَةٌ / লিখা
+  JSON output:
+  {
+    "arabic": "كَتَبَ",
+    "transliteration": "kataba",
+    "meaning_bn": "লিখা",
+    "meaning_en": "to write",
+    "word_type": "verb",
+    "gender": null,
+    "grammar_note_bn": "مضارع: يَكْتُبُ (সে লেখে) | مصدر: كِتَابَةٌ — বাব ফাতহা-যম্মা রূপ।",
+    "context_snippet_ar": null,
+    "context_snippet_bn": null
+  }
+
+Chapter/Bab headings from the source (e.g., "باب فَعَلَ يَفْعُلُ") should be
+reflected in the lesson title_bn for that cluster of verbs.
+
+════════════════════════════════════════════
 CONTENT EXTRACTION & DENSITY RULES
 ════════════════════════════════════════════
 When processing textbook or PDF material:
