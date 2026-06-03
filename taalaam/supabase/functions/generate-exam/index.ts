@@ -1,7 +1,6 @@
 // supabase/functions/generate-exam/index.ts
-// Generates fresh exam questions for a unit using Gemini.
-// Called each time a learner starts the exam (dynamic content, never repeated).
-// Also called by admin to create/register the exam lesson record.
+// Admin: generates a 30-question pool for a unit and stores it in exam_questions.
+//        Also creates/updates the exam lesson record for completion tracking.
 // Deploy: supabase functions deploy generate-exam --no-verify-jwt
 
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
@@ -12,26 +11,33 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SYSTEM_PROMPT = `You are an expert Gamification Architect and Arabic Linguist creating End-of-Module Exams for a Duolingo-style Arabic learning app targeting Bengali speakers (Classical/Fusha Arabic, Islamic/Salafi context).
+const SYSTEM_PROMPT = `You are an expert Gamification Architect and Arabic Linguist creating an Exam Question Pool for a Duolingo-style Arabic learning app targeting Bengali speakers (Classical/Fusha Arabic, Islamic/Salafi context).
 
-Your exam must be a cumulative review of ALL vocabulary and grammar introduced in the provided module.
+Your pool must be a cumulative review of ALL vocabulary and grammar introduced in the provided module.
 
-### EXAM DESIGN RULES
-1. Generate exactly 10-12 questions covering all exercise types the app supports.
-2. Mix types: at least 2 multiple_choice, 2 drag_drop, 2 true_false, 2 fill_in_blank, 1 tap_to_build, 1 word_scramble.
-3. Higher difficulty than regular lessons: use slightly longer or combined sentences.
-4. Always include full harakat on every Arabic word.
-5. Distractors must be plausible — other vocabulary from THIS MODULE.
-6. Islamic/Salafi context maintained throughout.
-7. The exam should feel like a proper final test, not a repeat of any single lesson.
+### POOL COMPOSITION (exactly 30 questions)
+- 10 x tap_to_build  (sentence building — Arabic word tiles put in correct order)
+- 8  x multiple_choice (definition/meaning matching with 4 options)
+- 6  x fill_in_blank  (complete Arabic sentence — one blank)
+- 6  x true_false     (is the translation correct? true/false)
+
+### DESIGN RULES
+1. Every question must be distinct — no two questions test the same word or concept.
+2. Higher difficulty than regular lessons: use slightly longer or combined sentences.
+3. Always include full harakat (short vowel marks) on every Arabic word.
+4. Distractors must be plausible — other vocabulary from THIS MODULE only.
+5. Islamic/Salafi context maintained throughout.
+6. tap_to_build: provide the Arabic sentence as individual word tiles in correct_answer.words_ar[], and the Bengali translation in correct_answer.translation_bn.
+7. fill_in_blank: correct_answer.answer is the missing Arabic word (with harakat). prompt_ar contains the full sentence with «___» marking the blank.
+8. true_false: prompt_ar is the Arabic phrase, prompt_bn is a Bengali translation (some wrong). correct_answer.is_true is boolean.
+9. multiple_choice: correct_answer.options[] has 4 Bengali options, correct_answer.correct_index is 0-based index of correct option.
 
 ### OUTPUT FORMAT (STRICT JSON — NO MARKDOWN)
 Return ONLY this JSON object:
 {
-  "title_bn": "মডিউল পরীক্ষা",
   "xp_reward": 50,
   "gem_reward": 10,
-  "exercises": [
+  "questions": [
     {
       "type": "multiple_choice",
       "sort_order": 1,
@@ -58,7 +64,7 @@ Deno.serve(async (req: Request) => {
 
   (async () => {
     try {
-      const { unit_id, admin_mode } = await req.json();
+      const { unit_id } = await req.json();
       if (!unit_id) { await respond({ error: 'unit_id is required' }); return; }
 
       const supabase = createClient(
@@ -83,9 +89,9 @@ Deno.serve(async (req: Request) => {
         return;
       }
 
-      // Fetch exercises from all lessons (sample up to 5 per lesson for context)
+      // Build context from lessons (exercises + vocab)
       const examContext: string[] = [];
-      for (const lesson of lessons.slice(0, 8)) {
+      for (const lesson of lessons.slice(0, 10)) {
         const { data: exs } = await supabase
           .from('exercises')
           .select('type, prompt_bn, prompt_ar, correct_answer')
@@ -96,76 +102,89 @@ Deno.serve(async (req: Request) => {
           .from('vocabulary')
           .select('arabic, meaning_bn, word_type')
           .eq('lesson_id', lesson.id)
-          .limit(6);
+          .limit(8);
 
-        let lessonCtx = `LESSON: ${lesson.title_bn} (${lesson.level})\n`;
+        let ctx = `LESSON: ${lesson.title_bn} (${lesson.level})\n`;
         if (vocab && vocab.length > 0) {
-          lessonCtx += `Vocabulary: ${vocab.map((v: any) => `${v.arabic} = ${v.meaning_bn}`).join(', ')}\n`;
+          ctx += `Vocabulary: ${vocab.map((v: any) => `${v.arabic} = ${v.meaning_bn}`).join(', ')}\n`;
         }
         if (exs && exs.length > 0) {
-          lessonCtx += `Sample exercises: ${exs.map((e: any) => e.prompt_bn ?? e.prompt_ar ?? '').filter(Boolean).join(' | ')}\n`;
+          ctx += `Sample exercises: ${exs.map((e: any) => e.prompt_bn ?? e.prompt_ar ?? '').filter(Boolean).join(' | ')}\n`;
         }
-        examContext.push(lessonCtx);
+        examContext.push(ctx);
       }
 
       const userMessage =
-        `Generate an End-of-Module Exam for: "${unit?.title_bn ?? ''}" (${unit?.title_ar ?? ''})\n\n` +
-        `MODULE CONTENT TO REVIEW:\n${examContext.join('\n')}\n\n` +
-        `Return the strict JSON object as specified. No markdown. Exactly 10-12 exercises.`;
+        `Generate a 30-question Exam Pool for module: "${unit?.title_bn ?? ''}" (${unit?.title_ar ?? ''})\n\n` +
+        `MODULE CONTENT:\n${examContext.join('\n')}\n\n` +
+        `Return the strict JSON object as specified. Exactly 30 questions. No markdown.`;
 
       const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash', systemInstruction: SYSTEM_PROMPT });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction: SYSTEM_PROMPT });
       const result = await model.generateContent(userMessage);
       const rawText = result.response.text().trim()
         .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
-      const examData = JSON.parse(rawText);
-      const exercises: any[] = examData.exercises ?? [];
-      const xpReward: number = examData.xp_reward ?? 50;
-      const gemReward: number = examData.gem_reward ?? 10;
+      const poolData = JSON.parse(rawText);
+      const questions: any[] = poolData.questions ?? [];
+      const xpReward: number = poolData.xp_reward ?? 50;
+      const gemReward: number = poolData.gem_reward ?? 10;
 
-      if (exercises.length === 0) {
-        await respond({ error: 'Gemini returned no exercises' });
+      if (questions.length === 0) {
+        await respond({ error: 'Gemini returned no questions' });
         return;
       }
 
-      // In admin_mode: create/update the exam lesson record in DB
-      if (admin_mode) {
-        // Check if exam lesson already exists
-        const { data: existing } = await supabase
-          .from('lessons')
-          .select('id')
-          .eq('unit_id', unit_id)
-          .eq('is_exam', true)
-          .maybeSingle();
+      // Replace existing question pool for this unit
+      await supabase.from('exam_questions').delete().eq('unit_id', unit_id);
 
-        const examLessonId = existing?.id ?? crypto.randomUUID();
+      const rows = questions.map((q: any, i: number) => ({
+        unit_id,
+        type: q.type,
+        sort_order: i + 1,
+        prompt_bn: q.prompt_bn ?? null,
+        prompt_ar: q.prompt_ar ?? null,
+        correct_answer: q.correct_answer ?? {},
+        distractors: q.distractors ?? null,
+        grammar_note_bn: q.grammar_note_bn ?? null,
+        difficulty: q.difficulty ?? 1,
+      }));
 
-        await supabase.from('lessons').upsert({
-          id: examLessonId,
-          unit_id,
-          title_bn: `${unit?.title_bn ?? 'মডিউল'} — পরীক্ষা`,
-          title_ar: unit?.title_ar ?? null,
-          sort_order: 9999,
-          xp_reward: xpReward,
-          gem_reward: gemReward,
-          is_exam: true,
-          status: 'published',
-          level: 'advanced',
-        }, { onConflict: 'id' });
-
-        await respond({
-          exam_lesson_id: examLessonId,
-          exercises,
-          xp_reward: xpReward,
-          gem_reward: gemReward,
-          message: 'Exam lesson created/updated successfully',
-        });
+      const { error: insertErr } = await supabase.from('exam_questions').insert(rows);
+      if (insertErr) {
+        await respond({ error: `Failed to store questions: ${insertErr.message}` });
         return;
       }
 
-      // Learner mode: just return fresh exercises (don't write to DB)
-      await respond({ exercises, xp_reward: xpReward, gem_reward: gemReward });
+      // Create or update the exam lesson record (for progress tracking)
+      const { data: existing } = await supabase
+        .from('lessons')
+        .select('id')
+        .eq('unit_id', unit_id)
+        .eq('is_exam', true)
+        .maybeSingle();
+
+      const examLessonId = existing?.id ?? crypto.randomUUID();
+      await supabase.from('lessons').upsert({
+        id: examLessonId,
+        unit_id,
+        title_bn: `${unit?.title_bn ?? 'মডিউল'} — পরীক্ষা`,
+        title_ar: unit?.title_ar ?? null,
+        sort_order: 9999,
+        xp_reward: xpReward,
+        gem_reward: gemReward,
+        is_exam: true,
+        status: 'published',
+        level: 'advanced',
+      }, { onConflict: 'id' });
+
+      await respond({
+        exam_lesson_id: examLessonId,
+        question_count: questions.length,
+        xp_reward: xpReward,
+        gem_reward: gemReward,
+        message: `Exam pool created: ${questions.length} questions stored.`,
+      });
 
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);

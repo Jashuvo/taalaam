@@ -14,22 +14,32 @@ import '../domain/exercise_model.dart';
 import 'lesson_provider.dart';
 import 'widgets/exercise_engine.dart';
 
-// ── Exam question loader ───────────────────────────────────────────────────────
+// ── Exam question loader (queries pool, shuffles, picks 10-12) ────────────────
 
 final _examQuestionsProvider =
     FutureProvider.family<List<ExerciseModel>, String>((ref, unitId) async {
-  final res = await Supabase.instance.client.functions.invoke(
-    'generate-exam',
-    body: {'unit_id': unitId},
-  );
-  final data = res.data as Map<String, dynamic>?;
-  if (data == null || data['error'] != null) {
-    throw Exception(data?['error'] ?? 'Failed to generate exam');
+  final rows = await Supabase.instance.client
+      .from('exam_questions')
+      .select()
+      .eq('unit_id', unitId);
+
+  final list = List<Map<String, dynamic>>.from(rows as List);
+  if (list.isEmpty) {
+    throw Exception('এই মডিউলের পরীক্ষা এখনও তৈরি হয়নি। অ্যাডমিন "Generate Exam" চালু করুন।');
   }
-  final rawExercises = data['exercises'] as List;
-  return rawExercises
-      .map((e) => ExerciseModel.fromJson(Map<String, dynamic>.from(e as Map)))
-      .toList();
+
+  list.shuffle();
+  final count = list.length.clamp(1, 12);
+  final selected = list.take(count).toList();
+
+  return selected.asMap().entries.map((entry) {
+    final i = entry.key;
+    final raw = Map<String, dynamic>.from(entry.value as Map);
+    // ExerciseModel requires id + lesson_id; map from exam_questions fields
+    raw['lesson_id'] = raw['unit_id'];
+    raw['sort_order'] = i + 1;
+    return ExerciseModel.fromJson(raw);
+  }).toList();
 });
 
 // ── Entry widget ─────────────────────────────────────────────────────────────
@@ -64,7 +74,7 @@ class ExamScreen extends ConsumerWidget {
         final questionsAsync =
             ref.watch(_examQuestionsProvider(examLesson.unitId));
         return questionsAsync.when(
-          loading: () => _loadingScaffold(theme, 'AI প্রশ্ন তৈরি করছে…'),
+          loading: () => _loadingScaffold(theme, 'পরীক্ষার প্রশ্ন লোড হচ্ছে…'),
           error: (e, _) => _errorScaffold(context, theme, '$e'),
           data: (exercises) => _ExamBody(
             examLesson: examLesson,

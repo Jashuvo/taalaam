@@ -18,6 +18,8 @@ class AdminUnitReviewPage extends StatefulWidget {
 class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
   Map<String, dynamic>? _unit;
   List<Map<String, dynamic>> _lessons = [];
+  Map<String, dynamic>? _examLesson;
+  int _examQuestionCount = 0;
   final _exercisesMap = <String, List<Map<String, dynamic>>>{};
   final _vocabularyMap = <String, List<Map<String, dynamic>>>{};
   bool _loading = true;
@@ -40,12 +42,33 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     try {
       final c = Supabase.instance.client;
       final unit = await c.from('units').select().eq('id', widget.unitId).single();
-      final lessons = List<Map<String, dynamic>>.from(
+
+      final allLessons = List<Map<String, dynamic>>.from(
         await c.from('lessons').select().eq('unit_id', widget.unitId).order('sort_order'),
       );
+
+      // Separate regular lessons from the exam lesson
+      final regularLessons = allLessons
+          .where((l) => !(l['is_exam'] as bool? ?? false))
+          .toList();
+      final examCandidates = allLessons
+          .where((l) => l['is_exam'] as bool? ?? false)
+          .toList();
+      final examLesson = examCandidates.isNotEmpty ? examCandidates.first : null;
+
+      // Count stored exam questions for this unit
+      int examQuestionCount = 0;
+      if (examLesson != null) {
+        final qRes = await c
+            .from('exam_questions')
+            .select('id')
+            .eq('unit_id', widget.unitId);
+        examQuestionCount = (qRes as List).length;
+      }
+
       _exercisesMap.clear();
       _vocabularyMap.clear();
-      for (final lesson in lessons) {
+      for (final lesson in regularLessons) {
         final lid = lesson['id'] as String;
         _exercisesMap[lid] = List<Map<String, dynamic>>.from(
           await c.from('exercises').select().eq('lesson_id', lid).order('sort_order'),
@@ -56,7 +79,9 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
       }
       setState(() {
         _unit = unit;
-        _lessons = lessons;
+        _lessons = regularLessons;
+        _examLesson = examLesson;
+        _examQuestionCount = examQuestionCount;
         _loading = false;
       });
     } catch (e) {
@@ -91,11 +116,12 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
       );
       final data = res.data as Map<String, dynamic>?;
       if (data?['error'] != null) throw Exception(data!['error']);
+      final qCount = data?['question_count'] as int? ?? 0;
       await _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('পরীক্ষা সফলভাবে তৈরি হয়েছে! 🏆'),
+          SnackBar(
+            content: Text('পরীক্ষার প্রশ্ন ব্যাংক তৈরি হয়েছে! 🏆 ($qCount প্রশ্ন)'),
             backgroundColor: Colors.green,
           ),
         );
@@ -478,7 +504,7 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
         ),
         actions: [
           if (!_loading && _error == null) ...[
-            if (_sorting || _publishing)
+            if (_sorting || _publishing || _generatingExam)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12),
                 child: SizedBox(
@@ -585,6 +611,13 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
                             onEditVocab: _editVocab,
                             onUploadVocabAudio: (id) => _uploadVocabAudio(id),
                           )),
+                      const SizedBox(height: 16),
+                      _ExamSection(
+                        examLesson: _examLesson,
+                        questionCount: _examQuestionCount,
+                        generating: _generatingExam,
+                        onGenerate: _generateExam,
+                      ),
                     ],
                   ),
                 ),
@@ -1234,6 +1267,95 @@ class _PreviewLessonCard extends StatelessWidget {
             }),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Exam section (shown below regular lessons) ────────────────────────────────
+
+class _ExamSection extends StatelessWidget {
+  final Map<String, dynamic>? examLesson;
+  final int questionCount;
+  final bool generating;
+  final VoidCallback onGenerate;
+
+  const _ExamSection({
+    required this.examLesson,
+    required this.questionCount,
+    required this.generating,
+    required this.onGenerate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final gold = Colors.amber.shade600;
+    final hasExam = examLesson != null;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: hasExam
+            ? Colors.amber.withValues(alpha: 0.08)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasExam
+              ? Colors.amber.withValues(alpha: 0.4)
+              : theme.colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasExam ? Icons.emoji_events_rounded : Icons.emoji_events_outlined,
+            color: hasExam ? gold : theme.colorScheme.onSurfaceVariant,
+            size: 28,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'মডিউল পরীক্ষা',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: hasExam ? gold : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasExam
+                      ? '$questionCount টি প্রশ্ন সংরক্ষিত • প্রতি পরীক্ষায় ১০-১২টি র‍্যান্ডম'
+                      : 'এখনও তৈরি হয়নি — "Generate Exam 🏆" চালু করুন',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: hasExam
+                        ? theme.colorScheme.onSurfaceVariant
+                        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (generating)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            TextButton.icon(
+              icon: Icon(Icons.refresh_rounded, size: 16, color: gold),
+              label: Text(
+                hasExam ? 'পুনরায়' : 'তৈরি করুন',
+                style: TextStyle(color: gold, fontSize: 13),
+              ),
+              onPressed: onGenerate,
+            ),
+        ],
       ),
     );
   }
