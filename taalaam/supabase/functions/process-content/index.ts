@@ -286,20 +286,18 @@ type Part = { text: string } | { inlineData: { mimeType: string; data: string } 
 
 async function geminiGenerateMultimodal(apiKey: string, parts: Part[]): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
+  let lastErr: unknown;
   for (const modelName of GEMINI_MODELS) {
     try {
       const m = genAI.getGenerativeModel({ model: modelName, systemInstruction: SYSTEM_PROMPT });
       const result = await m.generateContent({ contents: [{ role: 'user', parts }] });
       return result.response.text();
     } catch (err) {
-      const msg = String(err);
-      if ((msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('unavailable')) && modelName !== GEMINI_MODELS[GEMINI_MODELS.length - 1]) {
-        continue;
-      }
-      throw err;
+      lastErr = err;
     }
   }
-  throw new Error('All Gemini models exhausted');
+  const msg = lastErr instanceof Error ? lastErr.message : JSON.stringify(lastErr);
+  throw new Error(`All Gemini models failed: ${msg}`);
 }
 
 Deno.serve(async (req: Request) => {

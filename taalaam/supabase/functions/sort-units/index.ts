@@ -25,20 +25,18 @@ const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1
 
 async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
+  let lastErr: unknown;
   for (const modelName of GEMINI_MODELS) {
     try {
       const m = genAI.getGenerativeModel({ model: modelName, systemInstruction });
       const result = await m.generateContent(prompt);
       return result.response.text();
     } catch (err) {
-      const msg = String(err);
-      if ((msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('unavailable')) && modelName !== GEMINI_MODELS[GEMINI_MODELS.length - 1]) {
-        continue;
-      }
-      throw err;
+      lastErr = err;
     }
   }
-  throw new Error('All Gemini models exhausted');
+  const msg = lastErr instanceof Error ? lastErr.message : JSON.stringify(lastErr);
+  throw new Error(`All Gemini models failed: ${msg}`);
 }
 
 const SYSTEM_PROMPT = `You are an expert Curriculum Architect and Arabic Linguist specializing in designing gamified, step-by-step language courses (Duolingo-style micro-learning).
