@@ -38,7 +38,6 @@ jobs:
         run: |
           flutter build web \
             -t lib/main.dart \
-            --web-renderer html \
             --base-href /taalaam/ \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
@@ -54,7 +53,6 @@ jobs:
         run: |
           flutter build web \
             -t lib/main_admin.dart \
-            --web-renderer html \
             --base-href /taalaam/admin/ \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
