@@ -14,6 +14,15 @@ import '../domain/exercise_model.dart';
 import 'lesson_provider.dart';
 import 'widgets/exercise_engine.dart';
 
+// ── Exam lesson loader (looks up lesson record from local DB) ────────────────
+
+final _examLessonByIdProvider =
+    StreamProvider.autoDispose.family<Lesson?, String>((ref, id) {
+  final db = ref.watch(appDatabaseProvider);
+  return (db.select(db.lessons)..where((t) => t.id.equals(id)))
+      .watchSingleOrNull();
+});
+
 // ── Exam question loader (queries pool, shuffles, picks 10-12) ────────────────
 
 final _examQuestionsProvider =
@@ -54,15 +63,7 @@ class ExamScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    // Fetch the exam lesson to get unit_id and rewards
-    final examLessonAsync = ref.watch(
-      StreamProvider.autoDispose
-          .family<Lesson?, String>((ref, id) {
-        final db = ref.watch(appDatabaseProvider);
-        return (db.select(db.lessons)..where((t) => t.id.equals(id)))
-            .watchSingleOrNull();
-      })(examLessonId),
-    );
+    final examLessonAsync = ref.watch(_examLessonByIdProvider(examLessonId));
 
     return examLessonAsync.when(
       loading: () => _loadingScaffold(theme, 'পরীক্ষা প্রস্তুত হচ্ছে…'),
