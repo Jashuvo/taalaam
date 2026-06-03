@@ -280,6 +280,10 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
             const SizedBox(height: 14),
             if (entry?.grammarNoteBn != null)
               _GrammarNote(note: entry!.grammarNoteBn!),
+            if (entry?.rootLetters != null) ...[
+              const SizedBox(height: 8),
+              _RootLettersBanner(rootLetters: entry!.rootLetters!),
+            ],
             // Feature 3: context snippet revealed on answer
             if (entry?.contextSnippetAr != null ||
                 entry?.contextSnippetBn != null) ...[
@@ -521,6 +525,53 @@ class _GrammarNote extends StatelessWidget {
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSecondaryContainer,
                 fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Root letters banner ───────────────────────────────────────────────────────
+
+class _RootLettersBanner extends StatelessWidget {
+  final String rootLetters;
+  const _RootLettersBanner({required this.rootLetters});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: theme.colorScheme.tertiary.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.account_tree_outlined,
+              size: 14, color: theme.colorScheme.tertiary),
+          const SizedBox(width: 6),
+          Text(
+            'মূল ধাতু (جذر): ',
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: theme.colorScheme.onTertiaryContainer),
+          ),
+          Directionality(
+            textDirection: TextDirection.rtl,
+            child: Text(
+              rootLetters,
+              style: TextStyle(
+                fontFamily: 'NotoNaskhArabic',
+                fontSize: 20,
+                height: 1.8,
+                color: theme.colorScheme.tertiary,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),

@@ -61,6 +61,11 @@ class SyncService {
             tierLevel: Value((r['tier_level'] as int?) ?? 1),
             sequenceOrder: Value((r['sequence_order'] as int?) ?? r['sort_order'] as int),
             status: Value((r['status'] as String?) ?? 'draft'),
+            unlockMetadata: Value(
+              r['unlock_metadata'] != null
+                  ? r['unlock_metadata'].toString()
+                  : null,
+            ),
           ));
     }
   }

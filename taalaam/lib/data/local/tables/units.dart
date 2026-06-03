@@ -15,6 +15,7 @@ class Units extends Table {
   TextColumn get status =>
       text().withDefault(const Constant('draft'))();
   TextColumn get sourceMaterialId => text().nullable()();
+  TextColumn get unlockMetadata => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get downloadedAt => dateTime().nullable()();

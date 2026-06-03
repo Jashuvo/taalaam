@@ -31,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -73,6 +73,10 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE units ADD COLUMN tier_level INTEGER NOT NULL DEFAULT 1');
         await customStatement(
             'ALTER TABLE units ADD COLUMN sequence_order INTEGER NOT NULL DEFAULT 1');
+      }
+      if (from < 7) {
+        await customStatement(
+            'ALTER TABLE units ADD COLUMN unlock_metadata TEXT');
       }
     },
   );

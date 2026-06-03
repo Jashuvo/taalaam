@@ -508,6 +508,12 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
   late final GeneratedColumn<String> sourceMaterialId = GeneratedColumn<String>(
       'source_material_id', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _unlockMetadataMeta =
+      const VerificationMeta('unlockMetadata');
+  @override
+  late final GeneratedColumn<String> unlockMetadata = GeneratedColumn<String>(
+      'unlock_metadata', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -536,6 +542,7 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
         sequenceOrder,
         status,
         sourceMaterialId,
+        unlockMetadata,
         createdAt,
         downloadedAt
       ];
@@ -612,6 +619,12 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
           sourceMaterialId.isAcceptableOrUnknown(
               data['source_material_id']!, _sourceMaterialIdMeta));
     }
+    if (data.containsKey('unlock_metadata')) {
+      context.handle(
+          _unlockMetadataMeta,
+          unlockMetadata.isAcceptableOrUnknown(
+              data['unlock_metadata']!, _unlockMetadataMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -655,6 +668,8 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       sourceMaterialId: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}source_material_id']),
+      unlockMetadata: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}unlock_metadata']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       downloadedAt: attachedDatabase.typeMapping
@@ -681,6 +696,7 @@ class Unit extends DataClass implements Insertable<Unit> {
   final int sequenceOrder;
   final String status;
   final String? sourceMaterialId;
+  final String? unlockMetadata;
   final DateTime createdAt;
   final DateTime? downloadedAt;
   const Unit(
@@ -696,6 +712,7 @@ class Unit extends DataClass implements Insertable<Unit> {
       required this.sequenceOrder,
       required this.status,
       this.sourceMaterialId,
+      this.unlockMetadata,
       required this.createdAt,
       this.downloadedAt});
   @override
@@ -720,6 +737,9 @@ class Unit extends DataClass implements Insertable<Unit> {
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || sourceMaterialId != null) {
       map['source_material_id'] = Variable<String>(sourceMaterialId);
+    }
+    if (!nullToAbsent || unlockMetadata != null) {
+      map['unlock_metadata'] = Variable<String>(unlockMetadata);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || downloadedAt != null) {
@@ -750,6 +770,9 @@ class Unit extends DataClass implements Insertable<Unit> {
       sourceMaterialId: sourceMaterialId == null && nullToAbsent
           ? const Value.absent()
           : Value(sourceMaterialId),
+      unlockMetadata: unlockMetadata == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unlockMetadata),
       createdAt: Value(createdAt),
       downloadedAt: downloadedAt == null && nullToAbsent
           ? const Value.absent()
@@ -773,6 +796,7 @@ class Unit extends DataClass implements Insertable<Unit> {
       sequenceOrder: serializer.fromJson<int>(json['sequenceOrder']),
       status: serializer.fromJson<String>(json['status']),
       sourceMaterialId: serializer.fromJson<String?>(json['sourceMaterialId']),
+      unlockMetadata: serializer.fromJson<String?>(json['unlockMetadata']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       downloadedAt: serializer.fromJson<DateTime?>(json['downloadedAt']),
     );
@@ -793,6 +817,7 @@ class Unit extends DataClass implements Insertable<Unit> {
       'sequenceOrder': serializer.toJson<int>(sequenceOrder),
       'status': serializer.toJson<String>(status),
       'sourceMaterialId': serializer.toJson<String?>(sourceMaterialId),
+      'unlockMetadata': serializer.toJson<String?>(unlockMetadata),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'downloadedAt': serializer.toJson<DateTime?>(downloadedAt),
     };
@@ -811,6 +836,7 @@ class Unit extends DataClass implements Insertable<Unit> {
           int? sequenceOrder,
           String? status,
           Value<String?> sourceMaterialId = const Value.absent(),
+          Value<String?> unlockMetadata = const Value.absent(),
           DateTime? createdAt,
           Value<DateTime?> downloadedAt = const Value.absent()}) =>
       Unit(
@@ -829,6 +855,8 @@ class Unit extends DataClass implements Insertable<Unit> {
         sourceMaterialId: sourceMaterialId.present
             ? sourceMaterialId.value
             : this.sourceMaterialId,
+        unlockMetadata:
+            unlockMetadata.present ? unlockMetadata.value : this.unlockMetadata,
         createdAt: createdAt ?? this.createdAt,
         downloadedAt:
             downloadedAt.present ? downloadedAt.value : this.downloadedAt,
@@ -853,6 +881,9 @@ class Unit extends DataClass implements Insertable<Unit> {
       sourceMaterialId: data.sourceMaterialId.present
           ? data.sourceMaterialId.value
           : this.sourceMaterialId,
+      unlockMetadata: data.unlockMetadata.present
+          ? data.unlockMetadata.value
+          : this.unlockMetadata,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       downloadedAt: data.downloadedAt.present
           ? data.downloadedAt.value
@@ -875,6 +906,7 @@ class Unit extends DataClass implements Insertable<Unit> {
           ..write('sequenceOrder: $sequenceOrder, ')
           ..write('status: $status, ')
           ..write('sourceMaterialId: $sourceMaterialId, ')
+          ..write('unlockMetadata: $unlockMetadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('downloadedAt: $downloadedAt')
           ..write(')'))
@@ -895,6 +927,7 @@ class Unit extends DataClass implements Insertable<Unit> {
       sequenceOrder,
       status,
       sourceMaterialId,
+      unlockMetadata,
       createdAt,
       downloadedAt);
   @override
@@ -913,6 +946,7 @@ class Unit extends DataClass implements Insertable<Unit> {
           other.sequenceOrder == this.sequenceOrder &&
           other.status == this.status &&
           other.sourceMaterialId == this.sourceMaterialId &&
+          other.unlockMetadata == this.unlockMetadata &&
           other.createdAt == this.createdAt &&
           other.downloadedAt == this.downloadedAt);
 }
@@ -930,6 +964,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
   final Value<int> sequenceOrder;
   final Value<String> status;
   final Value<String?> sourceMaterialId;
+  final Value<String?> unlockMetadata;
   final Value<DateTime> createdAt;
   final Value<DateTime?> downloadedAt;
   final Value<int> rowid;
@@ -946,6 +981,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     this.sequenceOrder = const Value.absent(),
     this.status = const Value.absent(),
     this.sourceMaterialId = const Value.absent(),
+    this.unlockMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.downloadedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -963,6 +999,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     this.sequenceOrder = const Value.absent(),
     this.status = const Value.absent(),
     this.sourceMaterialId = const Value.absent(),
+    this.unlockMetadata = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.downloadedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -984,6 +1021,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     Expression<int>? sequenceOrder,
     Expression<String>? status,
     Expression<String>? sourceMaterialId,
+    Expression<String>? unlockMetadata,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? downloadedAt,
     Expression<int>? rowid,
@@ -1001,6 +1039,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
       if (sequenceOrder != null) 'sequence_order': sequenceOrder,
       if (status != null) 'status': status,
       if (sourceMaterialId != null) 'source_material_id': sourceMaterialId,
+      if (unlockMetadata != null) 'unlock_metadata': unlockMetadata,
       if (createdAt != null) 'created_at': createdAt,
       if (downloadedAt != null) 'downloaded_at': downloadedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1020,6 +1059,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
       Value<int>? sequenceOrder,
       Value<String>? status,
       Value<String?>? sourceMaterialId,
+      Value<String?>? unlockMetadata,
       Value<DateTime>? createdAt,
       Value<DateTime?>? downloadedAt,
       Value<int>? rowid}) {
@@ -1036,6 +1076,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
       sequenceOrder: sequenceOrder ?? this.sequenceOrder,
       status: status ?? this.status,
       sourceMaterialId: sourceMaterialId ?? this.sourceMaterialId,
+      unlockMetadata: unlockMetadata ?? this.unlockMetadata,
       createdAt: createdAt ?? this.createdAt,
       downloadedAt: downloadedAt ?? this.downloadedAt,
       rowid: rowid ?? this.rowid,
@@ -1081,6 +1122,9 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     if (sourceMaterialId.present) {
       map['source_material_id'] = Variable<String>(sourceMaterialId.value);
     }
+    if (unlockMetadata.present) {
+      map['unlock_metadata'] = Variable<String>(unlockMetadata.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1108,6 +1152,7 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
           ..write('sequenceOrder: $sequenceOrder, ')
           ..write('status: $status, ')
           ..write('sourceMaterialId: $sourceMaterialId, ')
+          ..write('unlockMetadata: $unlockMetadata, ')
           ..write('createdAt: $createdAt, ')
           ..write('downloadedAt: $downloadedAt, ')
           ..write('rowid: $rowid')
@@ -5578,6 +5623,7 @@ typedef $$UnitsTableCreateCompanionBuilder = UnitsCompanion Function({
   Value<int> sequenceOrder,
   Value<String> status,
   Value<String?> sourceMaterialId,
+  Value<String?> unlockMetadata,
   Value<DateTime> createdAt,
   Value<DateTime?> downloadedAt,
   Value<int> rowid,
@@ -5595,6 +5641,7 @@ typedef $$UnitsTableUpdateCompanionBuilder = UnitsCompanion Function({
   Value<int> sequenceOrder,
   Value<String> status,
   Value<String?> sourceMaterialId,
+  Value<String?> unlockMetadata,
   Value<DateTime> createdAt,
   Value<DateTime?> downloadedAt,
   Value<int> rowid,
@@ -5673,6 +5720,10 @@ class $$UnitsTableFilterComposer extends Composer<_$AppDatabase, $UnitsTable> {
 
   ColumnFilters<String> get sourceMaterialId => $composableBuilder(
       column: $table.sourceMaterialId,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get unlockMetadata => $composableBuilder(
+      column: $table.unlockMetadata,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
@@ -5768,6 +5819,10 @@ class $$UnitsTableOrderingComposer
       column: $table.sourceMaterialId,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get unlockMetadata => $composableBuilder(
+      column: $table.unlockMetadata,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -5837,6 +5892,9 @@ class $$UnitsTableAnnotationComposer
 
   GeneratedColumn<String> get sourceMaterialId => $composableBuilder(
       column: $table.sourceMaterialId, builder: (column) => column);
+
+  GeneratedColumn<String> get unlockMetadata => $composableBuilder(
+      column: $table.unlockMetadata, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -5921,6 +5979,7 @@ class $$UnitsTableTableManager extends RootTableManager<
             Value<int> sequenceOrder = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String?> sourceMaterialId = const Value.absent(),
+            Value<String?> unlockMetadata = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime?> downloadedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -5938,6 +5997,7 @@ class $$UnitsTableTableManager extends RootTableManager<
             sequenceOrder: sequenceOrder,
             status: status,
             sourceMaterialId: sourceMaterialId,
+            unlockMetadata: unlockMetadata,
             createdAt: createdAt,
             downloadedAt: downloadedAt,
             rowid: rowid,
@@ -5955,6 +6015,7 @@ class $$UnitsTableTableManager extends RootTableManager<
             Value<int> sequenceOrder = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String?> sourceMaterialId = const Value.absent(),
+            Value<String?> unlockMetadata = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime?> downloadedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -5972,6 +6033,7 @@ class $$UnitsTableTableManager extends RootTableManager<
             sequenceOrder: sequenceOrder,
             status: status,
             sourceMaterialId: sourceMaterialId,
+            unlockMetadata: unlockMetadata,
             createdAt: createdAt,
             downloadedAt: downloadedAt,
             rowid: rowid,

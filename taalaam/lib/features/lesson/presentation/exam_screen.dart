@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:confetti/confetti.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
@@ -13,6 +14,24 @@ import '../../auth/presentation/auth_provider.dart';
 import '../domain/exercise_model.dart';
 import 'lesson_provider.dart';
 import 'widgets/exercise_engine.dart';
+
+// ── Unit unlock-metadata loader ───────────────────────────────────────────────
+// Reads the unit's unlock_metadata JSON from local Drift DB.
+// Returns null when the field is absent or unparseable.
+final _unitUnlockMetadataProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>?, String>(
+        (ref, unitId) async {
+  final db = ref.watch(appDatabaseProvider);
+  final unit = await (db.select(db.units)..where((t) => t.id.equals(unitId)))
+      .getSingleOrNull();
+  final raw = unit?.unlockMetadata;
+  if (raw == null || raw.isEmpty) return null;
+  try {
+    return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+  } catch (_) {
+    return null;
+  }
+});
 
 // ── Exam lesson loader (looks up lesson record from local DB) ────────────────
 
@@ -640,6 +659,11 @@ class _ExamCompleteScreenState extends ConsumerState<ExamCompleteScreen>
                       ),
                       const SizedBox(height: 28),
 
+                      // Milestone text-unlock card (shown when unit has unlock_metadata)
+                      _UnlockMetadataCard(unitId: widget.examLesson.unitId),
+
+                      const SizedBox(height: 28),
+
                       FilledButton.icon(
                         icon: const Icon(Icons.home_rounded),
                         label: const Text('হোমে ফিরুন'),
@@ -710,4 +734,52 @@ class _RewardRow extends StatelessWidget {
           ),
         ],
       );
+}
+
+// ── Milestone text-unlock card ────────────────────────────────────────────────
+// Shown after exam completion when the unit's unlock_metadata is populated.
+// unlock_metadata shape: {"text_name": "...", "section": "...", "percentage": 75}
+class _UnlockMetadataCard extends ConsumerWidget {
+  final String unitId;
+  const _UnlockMetadataCard({required this.unitId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metaAsync = ref.watch(_unitUnlockMetadataProvider(unitId));
+    return metaAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (meta) {
+        if (meta == null) return const SizedBox.shrink();
+        final textName = meta['text_name'] as String?;
+        final section = meta['section'] as String?;
+        final pct = meta['percentage'];
+        if (textName == null || section == null || pct == null) {
+          return const SizedBox.shrink();
+        }
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColors.brightGreen.withValues(alpha: 0.1),
+            borderRadius: AppRadius.lgBorder,
+            border: Border.all(
+                color: AppColors.brightGreen.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.menu_book_rounded,
+                  color: AppColors.brightGreen, size: 28),
+              const SizedBox(height: 10),
+              Text(
+                'মাশাআল্লাহ! এই মডিউলটি সম্পন্ন করার মাধ্যমে আপনি $textName এর $section বোঝার জন্য প্রয়োজনীয় শব্দভাণ্ডারের $pct% আয়ত্ত করেছেন!',
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 13, height: 1.7),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

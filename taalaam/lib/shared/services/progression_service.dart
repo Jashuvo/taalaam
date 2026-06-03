@@ -36,12 +36,68 @@ class ProgressionService {
     final streak = await (_db.select(_db.streaks)
           ..where((t) => t.userId.equals(userId)))
         .getSingleOrNull();
+    // Fire-and-forget: check if the whole Halaqah circle is active today
+    checkAndUpdateGroupStreak(userId).then((_) {}).catchError((_) {});
     return SrsReward(
       xp: srsXpReward,
       newHearts: newHearts,
       heartBefore: heartBefore,
       streakDays: streak?.currentStreak ?? 1,
     );
+  }
+
+  /// Increments group_streak by 1 when every member of the user's Halaqah
+  /// circle has logged streak activity today. Safe to call fire-and-forget.
+  Future<void> checkAndUpdateGroupStreak(String userId) async {
+    try {
+      final client = Supabase.instance.client;
+
+      // Resolve user's group
+      final memberRows = await client
+          .from('group_memberships')
+          .select('group_id')
+          .eq('user_id', userId)
+          .limit(1);
+      if ((memberRows as List).isEmpty) return;
+      final groupId = memberRows.first['group_id'] as String;
+
+      // Prevent double-incrementing on the same day
+      final groupRow = await client
+          .from('groups')
+          .select('group_streak, last_streak_update')
+          .eq('id', groupId)
+          .single();
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final lastUpdate = groupRow['last_streak_update'] as String?;
+      if (lastUpdate != null && lastUpdate.startsWith(today)) return;
+
+      // Collect all member IDs
+      final allMemberRows = await client
+          .from('group_memberships')
+          .select('user_id')
+          .eq('group_id', groupId);
+      final memberIds = (allMemberRows as List)
+          .map((r) => r['user_id'] as String)
+          .toList();
+      if (memberIds.isEmpty) return;
+
+      // Check how many members have streak activity today
+      final activeRows = await client
+          .from('streaks')
+          .select('user_id')
+          .inFilter('user_id', memberIds)
+          .gte('last_activity_date', today);
+      if ((activeRows as List).length < memberIds.length) return;
+
+      // All members active today → increment group streak
+      final newStreak = (groupRow['group_streak'] as int? ?? 0) + 1;
+      await client.from('groups').update({
+        'group_streak': newStreak,
+        'last_streak_update': DateTime.now().toIso8601String(),
+      }).eq('id', groupId);
+    } catch (_) {
+      // Non-fatal — group feature is optional
+    }
   }
 
   Future<int> _currentHearts(String userId) async {
