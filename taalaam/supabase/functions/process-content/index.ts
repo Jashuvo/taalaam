@@ -15,28 +15,32 @@ MISSION: Take raw Arabic learning material — including textbook PDFs whose Ara
 Do NOT just extract or label text. Every exercise must be something a learner DOES: taps tiles, matches pairs, fills blanks, chooses answers.
 
 ════════════════════════════════════════════
-🔍 CRITICAL: AUTOMATED LEVEL PROFILING
+🚨 CRITICAL: AUTOMATED LEVEL PROFILING
 ════════════════════════════════════════════
-Before designing any content, analyse the raw source material to determine its
-structural difficulty tier. Set the root "evaluated_tier" property to one of:
+Before designing the content arrays, parse the structural limits of the source
+material text to evaluate its true difficulty score. You must assign a root
+property named "evaluated_tier" using these strict boundaries:
 
-  Tier 1 — Foundations
-    • Only basic nouns (objects, locations, roles), detached pronouns, or basic
-      demonstratives (هذا / هذه).
-    • ABSOLUTELY NO VERBS present.
+- Assign "evaluated_tier": 1 (মৌলিক শব্দ ও পরিচিতি | المُفْرَدَاتُ وَالتَّعَارُفُ)
+  * Content contains only absolute basic nouns (objects, locations, roles),
+    detached independent pronouns, or basic demonstrative pointers (هذا/هذه).
+  * ABSOLUTELY NO VERBS are present on the raw text page.
 
-  Tier 2 — Syntactic Phrases
-    • Introduces Possessive Constructs (إضافة), Adjective-Noun agreement
-      (صفة وموصوف), or directional prepositional modifiers.
-    • ABSOLUTELY NO VERBS present.
+- Assign "evaluated_tier": 2 (বাক্যরীতি ও যৌগিক পদ | التَّرَاكِيبُ وَالنَّحْوُ)
+  * Content introduces structured grammar configurations like the Possessive
+    Construct (إضافة), Adjective-Noun agreement pairs (صفة وموصوف), or
+    directional prepositional modifiers (حروف الجر).
+  * ABSOLUTELY NO VERBS are present on the raw text page.
 
-  Tier 3 — Verbal Transitions
-    • Basic 3-letter active verb past/present tense patterns (الماضي / المضارع),
-      or short, straightforward verbal phrases.
+- Assign "evaluated_tier": 3 (ক্রিয়াপদ ও রূপান্তর | الأَفْعَالُ وَالصَّرْفُ)
+  * Content transitions into basic 3-letter active/passive verb past or present
+    tense patterns (الماضي / المضارع basics), commands (الأمر), or prohibitions
+    (النهي).
 
-  Tier 4 — Advanced Morpho-Syntax
-    • Complex morphological tables, derived verb groups (الأبواب المزيدة),
-      command modes, or dense classical Islamic text fragments.
+- Assign "evaluated_tier": 4 (উচ্চতর শাস্ত্র ও তাফসির | عُلُومُ اللُّغَةِ وَالتَّفْسِيرُ)
+  * Content features highly complex morphological tables, derived verb groups
+    (الأبواب المزيدة), word root derivation dynamics (الإشتقاق), or dense
+    classical Islamic/Salafi text and Tafsir fragments.
 
 ════════════════════════════════════════════
 HARAKAT CORRECTION (CRITICAL):
