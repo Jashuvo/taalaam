@@ -52,17 +52,52 @@ final _examQuestionsProvider =
   return selected.asMap().entries.map((entry) {
     final i = entry.key;
     final src = Map<String, dynamic>.from(entry.value as Map);
+    final rawType = src['type'] as String? ?? '';
+    final ca = (src['correct_answer'] as Map?)?.cast<String, dynamic>() ?? {};
+    final promptAr = src['prompt_ar'] as String?;
+    final promptBn = src['prompt_bn'] as String?;
+
+    // Normalise correctAnswer fields to match what each exercise widget reads.
+    // The edge-function schema and the widget contract differ per type.
+    final Map<String, dynamic> correctAnswer;
+    switch (rawType) {
+      case 'tap_to_build':
+        // Widget: words (List), distractor_words (List), order_matters (bool)
+        // Edge fn: words_ar (List), translation_bn (String)
+        correctAnswer = {
+          'words': List<dynamic>.from(ca['words_ar'] as List? ?? []),
+          'distractor_words': <dynamic>[],
+          'order_matters': true,
+        };
+      case 'fill_in_blank':
+        // Widget: sentence (String with ___), answer (String)
+        // Edge fn: answer in ca; full sentence with «___» is prompt_ar
+        correctAnswer = {
+          'sentence': (promptAr ?? '').replaceAll('«___»', '___'),
+          'answer': ca['answer'] as String? ?? '',
+        };
+      case 'true_false':
+        // Widget: is_true (bool), statement_ar (String), statement_bn (String)
+        // Edge fn: is_true in ca; statements are prompt_ar / prompt_bn
+        correctAnswer = {
+          'is_true': ca['is_true'] as bool? ?? true,
+          'statement_ar': promptAr ?? '',
+          'statement_bn': promptBn ?? '',
+        };
+      default: // multiple_choice — options + correct_index already match
+        correctAnswer = ca;
+    }
+
     // ExerciseModel.fromJson uses camelCase keys (no fieldRename annotation).
-    // Supabase returns snake_case column names — remap everything manually.
     return ExerciseModel.fromJson({
       'id': src['id'],
       'lessonId': src['unit_id'],
-      'type': _examTypeMap[src['type']] ?? src['type'],
+      'type': _examTypeMap[rawType] ?? rawType,
       'sortOrder': i + 1,
-      'promptAr': src['prompt_ar'],
-      'promptBn': src['prompt_bn'],
-      'correctAnswer': src['correct_answer'] as Map<String, dynamic>? ?? {},
-      'distractors': src['distractors'] as Map<String, dynamic>?,
+      'promptAr': promptAr,
+      'promptBn': promptBn,
+      'correctAnswer': correctAnswer,
+      'distractors': (src['distractors'] as Map?)?.cast<String, dynamic>(),
       'grammarNoteBn': src['grammar_note_bn'],
       'difficulty': src['difficulty'] ?? 1,
     });
