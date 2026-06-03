@@ -49,6 +49,21 @@ final _examQuestionsProvider =
   final count = list.length.clamp(1, 12);
   final selected = list.take(count).toList();
 
+  // Build a cross-question Arabic word pool for fill_in_blank distractors.
+  // Collect tap_to_build words + fill_in_blank answers from the full pool.
+  final wordPool = <String>{};
+  for (final row in list) {
+    final ca = (row['correct_answer'] as Map?)?.cast<String, dynamic>() ?? {};
+    final t = row['type'] as String? ?? '';
+    if (t == 'fill_in_blank') {
+      final a = ca['answer'] as String?;
+      if (a != null && a.isNotEmpty) wordPool.add(a);
+    } else if (t == 'tap_to_build') {
+      final words = ca['words_ar'] as List?;
+      if (words != null) wordPool.addAll(words.map((w) => w.toString()));
+    }
+  }
+
   return selected.asMap().entries.map((entry) {
     final i = entry.key;
     final src = Map<String, dynamic>.from(entry.value as Map);
@@ -60,22 +75,42 @@ final _examQuestionsProvider =
     // Normalise correctAnswer fields to match what each exercise widget reads.
     // The edge-function schema and the widget contract differ per type.
     final Map<String, dynamic> correctAnswer;
+    Map<String, dynamic>? distractors;
+
     switch (rawType) {
       case 'tap_to_build':
         // Widget: words (List), distractor_words (List), order_matters (bool)
         // Edge fn: words_ar (List), translation_bn (String)
+        final words =
+            List<String>.from(ca['words_ar'] as List? ?? []);
+        // Pull distractor words from other tap_to_build questions
+        final distractorWords = (wordPool
+                .where((w) => !words.contains(w))
+                .toList()
+              ..shuffle())
+            .take(3)
+            .toList();
         correctAnswer = {
-          'words': List<dynamic>.from(ca['words_ar'] as List? ?? []),
-          'distractor_words': <dynamic>[],
+          'words': words,
+          'distractor_words': distractorWords,
           'order_matters': true,
         };
       case 'fill_in_blank':
         // Widget: sentence (String with ___), answer (String)
         // Edge fn: answer in ca; full sentence with «___» is prompt_ar
+        final answer = ca['answer'] as String? ?? '';
+        // Inject 3 cross-question distractors so the widget shows 4 choices
+        final fillDistractors = (wordPool
+                .where((w) => w != answer)
+                .toList()
+              ..shuffle())
+            .take(3)
+            .toList();
         correctAnswer = {
           'sentence': (promptAr ?? '').replaceAll('«___»', '___'),
-          'answer': ca['answer'] as String? ?? '',
+          'answer': answer,
         };
+        distractors = {'options': fillDistractors};
       case 'true_false':
         // Widget: is_true (bool), statement_ar (String), statement_bn (String)
         // Edge fn: is_true in ca; statements are prompt_ar / prompt_bn
@@ -97,7 +132,8 @@ final _examQuestionsProvider =
       'promptAr': promptAr,
       'promptBn': promptBn,
       'correctAnswer': correctAnswer,
-      'distractors': (src['distractors'] as Map?)?.cast<String, dynamic>(),
+      'distractors': distractors ??
+          (src['distractors'] as Map?)?.cast<String, dynamic>(),
       'grammarNoteBn': src['grammar_note_bn'],
       'difficulty': src['difficulty'] ?? 1,
     });
