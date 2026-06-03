@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 
 class AdminUnitReviewPage extends StatefulWidget {
@@ -92,12 +93,35 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     }
   }
 
+  Future<void> _viewExamQuestions() async {
+    final rows = await Supabase.instance.client
+        .from('exam_questions')
+        .select()
+        .eq('unit_id', widget.unitId)
+        .order('sort_order');
+    if (!mounted) return;
+    final questions = List<Map<String, dynamic>>.from(rows as List);
+    if (questions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('কোনো প্রশ্ন সংরক্ষিত নেই')),
+      );
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (_) => _ExamQuestionsPreviewDialog(
+        unitTitle: _unit?['title_bn'] as String? ?? 'মডিউল',
+        questions: questions,
+      ),
+    );
+  }
+
   Future<void> _generateExam() async {
     final confirmed = await showConfirmDialog(
       context,
       title: 'পরীক্ষা তৈরি করবেন?',
-      body: 'Gemini এই মডিউলের সমস্ত পাঠ বিশ্লেষণ করে একটি চূড়ান্ত পরীক্ষা তৈরি করবে। '
-          'প্রতিবার শিক্ষার্থী পরীক্ষা দিলে নতুন প্রশ্ন তৈরি হবে।',
+      body: 'Gemini এই মডিউলের সমস্ত পাঠ বিশ্লেষণ করে ৩০টি প্রশ্নের একটি প্রশ্ন ব্যাংক তৈরি করবে। '
+          'প্রতিবার শিক্ষার্থী পরীক্ষা দিলে ১০-১২টি র‍্যান্ডম প্রশ্ন দেওয়া হবে।',
       confirmLabel: 'তৈরি করুন',
       cancelLabel: 'বাতিল',
     );
@@ -106,13 +130,13 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     setState(() => _generatingExam = true);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('AI পরীক্ষা তৈরি করছে…')),
+        const SnackBar(content: Text('AI ৩০টি পরীক্ষার প্রশ্ন তৈরি করছে…')),
       );
     }
     try {
       final res = await Supabase.instance.client.functions.invoke(
         'generate-exam',
-        body: {'unit_id': widget.unitId, 'admin_mode': true},
+        body: {'unit_id': widget.unitId},
       );
       final data = res.data as Map<String, dynamic>?;
       if (data?['error'] != null) throw Exception(data!['error']);
@@ -617,6 +641,9 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
                         questionCount: _examQuestionCount,
                         generating: _generatingExam,
                         onGenerate: _generateExam,
+                        onViewQuestions: _examQuestionCount > 0
+                            ? _viewExamQuestions
+                            : null,
                       ),
                     ],
                   ),
@@ -1279,12 +1306,14 @@ class _ExamSection extends StatelessWidget {
   final int questionCount;
   final bool generating;
   final VoidCallback onGenerate;
+  final VoidCallback? onViewQuestions;
 
   const _ExamSection({
     required this.examLesson,
     required this.questionCount,
     required this.generating,
     required this.onGenerate,
+    this.onViewQuestions,
   });
 
   @override
@@ -1306,57 +1335,291 @@ class _ExamSection extends StatelessWidget {
               : theme.colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            hasExam ? Icons.emoji_events_rounded : Icons.emoji_events_outlined,
-            color: hasExam ? gold : theme.colorScheme.onSurfaceVariant,
-            size: 28,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'মডিউল পরীক্ষা',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: hasExam ? gold : theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  hasExam
-                      ? '$questionCount টি প্রশ্ন সংরক্ষিত • প্রতি পরীক্ষায় ১০-১২টি র‍্যান্ডম'
-                      : 'এখনও তৈরি হয়নি — "Generate Exam 🏆" চালু করুন',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: hasExam
-                        ? theme.colorScheme.onSurfaceVariant
-                        : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (generating)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            TextButton.icon(
-              icon: Icon(Icons.refresh_rounded, size: 16, color: gold),
-              label: Text(
-                hasExam ? 'পুনরায়' : 'তৈরি করুন',
-                style: TextStyle(color: gold, fontSize: 13),
+          Row(
+            children: [
+              Icon(
+                hasExam ? Icons.emoji_events_rounded : Icons.emoji_events_outlined,
+                color: hasExam ? gold : theme.colorScheme.onSurfaceVariant,
+                size: 28,
               ),
-              onPressed: onGenerate,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'মডিউল পরীক্ষা',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: hasExam ? gold : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hasExam
+                          ? '$questionCount টি প্রশ্ন সংরক্ষিত • প্রতি পরীক্ষায় ১০-১২টি র‍্যান্ডম'
+                          : 'এখনও তৈরি হয়নি — "Generate Exam 🏆" চালু করুন',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: hasExam
+                            ? theme.colorScheme.onSurfaceVariant
+                            : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (generating)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton.icon(
+                  icon: Icon(Icons.refresh_rounded, size: 16, color: gold),
+                  label: Text(
+                    hasExam ? 'পুনরায়' : 'তৈরি করুন',
+                    style: TextStyle(color: gold, fontSize: 13),
+                  ),
+                  onPressed: onGenerate,
+                ),
+            ],
+          ),
+          if (onViewQuestions != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: Icon(Icons.list_alt_rounded, size: 16, color: gold),
+                label: Text(
+                  'প্রশ্নগুলো দেখুন ($questionCount টি)',
+                  style: TextStyle(color: gold, fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: gold.withValues(alpha: 0.5)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                onPressed: onViewQuestions,
+              ),
             ),
+          ],
         ],
       ),
     );
+  }
+}
+
+// ── Exam questions preview dialog ─────────────────────────────────────────────
+
+class _ExamQuestionsPreviewDialog extends StatelessWidget {
+  final String unitTitle;
+  final List<Map<String, dynamic>> questions;
+
+  const _ExamQuestionsPreviewDialog({
+    required this.unitTitle,
+    required this.questions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // Group by type for summary
+    final typeCounts = <String, int>{};
+    for (final q in questions) {
+      final t = q['type'] as String? ?? 'unknown';
+      typeCounts[t] = (typeCounts[t] ?? 0) + 1;
+    }
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
+              child: Row(
+                children: [
+                  const Icon(Icons.emoji_events_rounded,
+                      color: AppColors.gold, size: 22),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('পরীক্ষার প্রশ্ন ব্যাংক',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        Text(unitTitle,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // Type summary chips
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: typeCounts.entries.map((e) {
+                  return Chip(
+                    label: Text('${e.key.replaceAll('_', ' ')}: ${e.value}',
+                        style: const TextStyle(fontSize: 11)),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    backgroundColor:
+                        theme.colorScheme.secondaryContainer,
+                  );
+                }).toList(),
+              ),
+            ),
+            const Divider(height: 16),
+            // Question list
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount: questions.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (_, i) {
+                  final q = questions[i];
+                  final type = q['type'] as String? ?? '';
+                  final promptBn = q['prompt_bn'] as String? ?? '';
+                  final promptAr = q['prompt_ar'] as String? ?? '';
+                  final grammarNote = q['grammar_note_bn'] as String? ?? '';
+                  final difficulty = q['difficulty'] as int? ?? 1;
+                  final answer = q['correct_answer'];
+
+                  return Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.secondaryContainer,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${i + 1}. ${type.replaceAll('_', ' ')}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSecondaryContainer,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Row(
+                              children: List.generate(
+                                3,
+                                (s) => Icon(
+                                  Icons.star_rounded,
+                                  size: 12,
+                                  color: s < difficulty
+                                      ? AppColors.gold
+                                      : theme.colorScheme.outline
+                                          .withValues(alpha: 0.4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (promptBn.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(promptBn,
+                              style: theme.textTheme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.w500)),
+                        ],
+                        if (promptAr.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: Text(
+                              promptAr,
+                              style: const TextStyle(
+                                fontFamily: 'NotoNaskhArabic',
+                                fontSize: 16,
+                                height: 1.6,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (answer != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _summariseAnswer(type, answer),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                        if (grammarNote.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            grammarNote,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _summariseAnswer(String type, dynamic answer) {
+    if (answer is! Map) return '';
+    try {
+      switch (type) {
+        case 'multiple_choice':
+          final opts = answer['options'] as List?;
+          final idx = answer['correct_index'] as int? ?? 0;
+          if (opts != null && idx < opts.length) {
+            return '✓ ${opts[idx]}';
+          }
+          return '';
+        case 'true_false':
+          return '✓ ${answer['is_true'] == true ? 'সত্য' : 'মিথ্যা'}';
+        case 'fill_in_blank':
+          return '✓ ${answer['answer'] ?? ''}';
+        case 'tap_to_build':
+          final words = answer['words_ar'] as List?;
+          return words != null ? '✓ ${words.join(' ')}' : '';
+        default:
+          return '';
+      }
+    } catch (_) {
+      return '';
+    }
   }
 }
