@@ -326,8 +326,6 @@ Deno.serve(async (req: Request) => {
       .update({ processing_status: 'processing' })
       .eq('id', material_id);
 
-    const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')! });
-
     const INLINE_LIMIT = 19 * 1024 * 1024; // 19 MB
 
     function toBase64(bytes: Uint8Array): string {
