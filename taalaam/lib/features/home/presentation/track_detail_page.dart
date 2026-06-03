@@ -723,7 +723,7 @@ class _UnitSection extends ConsumerWidget {
                                   ),
                                 ),
                                 const Spacer(),
-                                // Completion badge
+                                // Lesson count / completion badge
                                 if (unitDone)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
@@ -749,11 +749,22 @@ class _UnitSection extends ConsumerWidget {
                                       ],
                                     ),
                                   )
-                                else if (unitStarted)
-                                  Text(
-                                    '$doneCount/$totalCount',
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
+                                else if (totalCount > 0)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: tierColors[0].withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      unitStarted
+                                          ? '$doneCount/$totalCount পাঠ'
+                                          : '$totalCount পাঠ',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: tierColors[0],
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                               ],
@@ -791,9 +802,9 @@ class _UnitSection extends ConsumerWidget {
                                   value: totalCount > 0
                                       ? doneCount / totalCount
                                       : 0,
-                                  minHeight: 4,
+                                  minHeight: 5,
                                   backgroundColor:
-                                      tierColors[0].withValues(alpha: 0.12),
+                                      tierColors[0].withValues(alpha: 0.18),
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                       unitDone
                                           ? AppColors.brightGreen
