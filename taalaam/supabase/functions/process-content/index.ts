@@ -43,6 +43,28 @@ property named "evaluated_tier" using these strict boundaries:
     classical Islamic/Salafi text and Tafsir fragments.
 
 ════════════════════════════════════════════
+🚨 CRITICAL: AUTOMATED TRACK CLASSIFICATION
+════════════════════════════════════════════
+After tier profiling, classify the content into exactly one learning track.
+Set the root "evaluated_track" property to one of:
+
+- "conversational": Content teaches modern everyday spoken Arabic for daily
+  life situations — greetings, shopping, directions, food, family, work,
+  emotions, common Saudi/Gulf phrases. Primary purpose is spoken fluency
+  for real-world conversations.
+
+- "quranic": Content teaches Quranic vocabulary, Islamic religious terminology,
+  classical Arabic grammar (نحو / صرف), morphological conjugation tables (أبواب),
+  Hadith phrasing, root-letter analysis, tafsir vocabulary, or any material
+  whose primary framing is understanding the Quran, Sunnah, or classical texts.
+  Even if individual words appear in daily speech, classify as "quranic" when
+  the instructional context is religious or classical.
+
+TIEBREAKER: When content spans both tracks (e.g. basic nouns illustrated with
+Quranic examples), default to "quranic" — the app's primary mission is
+Quranic and Salafi Arabic comprehension.
+
+════════════════════════════════════════════
 HARAKAT CORRECTION (CRITICAL):
 Raw PDF text often corrupts or strips Arabic vowel marks. You MUST use your Arabic linguistic knowledge to reconstruct and apply the correct full harakat on every Arabic word you output. Never output Arabic without harakat.
 
@@ -312,6 +334,7 @@ const OUTPUT_SCHEMA = `Return ONLY a valid JSON object matching this exact schem
 
 {
   "evaluated_tier": "number — 1 | 2 | 3 | 4 based on profiling rules above",
+  "evaluated_track": "conversational | quranic — auto-classified learning track",
   "unit_title_bn": "string — descriptive curriculum title in Bangla (e.g., 'সর্বনাম ও পরিচয়')",
   "unit_title_ar": "string — Arabic title with harakat (e.g., 'الضَّمَائِرُ وَالتَّعَارُف')",
   "lessons": [
@@ -391,14 +414,16 @@ Deno.serve(async (req: Request) => {
   const denied = await checkAdmin(req); if (denied) return denied;
 
   try {
+    // track: 'conversational' | 'quranic' | 'auto' | omitted → auto-detect via Gemini
     const { material_id, text_content, track, notes } = await req.json();
 
-    if (!material_id || !track) {
+    if (!material_id) {
       return new Response(
-        JSON.stringify({ error: 'material_id and track are required' }),
+        JSON.stringify({ error: 'material_id is required' }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
+    const autoDetect = !track || track === 'auto';
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -450,7 +475,11 @@ Deno.serve(async (req: Request) => {
       ? `\n\nAdmin context note: ${notes.trim()}`
       : '';
 
-    const userPrompt = `Track: ${track} (conversational = daily Arabic life; quranic = Quranic/classical Arabic)${contextNote}
+    const trackInstruction = autoDetect
+      ? 'Track: auto-detect — use your AUTOMATED TRACK CLASSIFICATION rules to set "evaluated_track".'
+      : `Track: ${track} (conversational = daily Arabic life; quranic = Quranic/classical Arabic) — also set "evaluated_track" to match.`;
+
+    const userPrompt = `${trackInstruction}${contextNote}
 
 Output schema:
 ${OUTPUT_SCHEMA}
@@ -522,16 +551,21 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
 
     const parsed = JSON.parse(responseText);
 
+    // Resolve final track: Gemini's classification wins when auto-detect is on
+    const finalTrack: string = autoDetect
+      ? (parsed.evaluated_track === 'conversational' ? 'conversational' : 'quranic')
+      : track;
+
     // Look up track ID
     const { data: trackRow } = await supabase
       .from('tracks')
       .select('id')
-      .eq('slug', track)
+      .eq('slug', finalTrack)
       .single();
 
     // Smart tier-based insertion: slots the unit at the correct position
     // and shifts higher-tier units forward automatically.
-    const unitSlug = `${track}-${Date.now()}`;
+    const unitSlug = `${finalTrack}-${Date.now()}`;
     const { data: newUnitId, error: unitErr } = await supabase.rpc('insert_and_shift_unit', {
       p_track_id: trackRow?.id,
       p_title_bn: parsed.unit_title_bn,

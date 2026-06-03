@@ -36,7 +36,7 @@ class UploadPageState {
 
   const UploadPageState({
     this.files = const [],
-    this.track = 'conversational',
+    this.track = 'auto',
     this.processingAll = false,
     this.anySuccess = false,
   });
@@ -210,11 +210,15 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Track selector
+                // Track selector — 'auto' lets Gemini decide based on content
                 Text('কোর্স:', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(
                   segments: const [
+                    ButtonSegment(
+                        value: 'auto',
+                        label: Text('স্বয়ংক্রিয়'),
+                        icon: Icon(Icons.auto_awesome)),
                     ButtonSegment(
                         value: 'conversational',
                         label: Text('কথোপকথন'),
@@ -229,6 +233,14 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                       ? null
                       : (s) => notifier.setTrack(s.first),
                 ),
+                if (upload.track == 'auto') ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'AI বিষয়বস্তু পড়ে স্বয়ংক্রিয়ভাবে কুরআন বা কথোপকথন কোর্স নির্বাচন করবে।',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
                 const SizedBox(height: 24),
 
                 // File drop zone
