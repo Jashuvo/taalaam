@@ -2,7 +2,7 @@
 // Triggered by admin upload. Calls Gemini API → inserts draft content into DB.
 // Deploy: supabase functions deploy process-content --no-verify-jwt
 
-import { GoogleGenAI } from 'npm:@google/genai';
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -280,6 +280,28 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+
+type Part = { text: string } | { inlineData: { mimeType: string; data: string } } | { fileData: { mimeType: string; fileUri: string } };
+
+async function geminiGenerateMultimodal(apiKey: string, parts: Part[]): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const m = genAI.getGenerativeModel({ model: modelName, systemInstruction: SYSTEM_PROMPT });
+      const result = await m.generateContent({ contents: [{ role: 'user', parts }] });
+      return result.response.text();
+    } catch (err) {
+      const msg = String(err);
+      if ((msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('unavailable')) && modelName !== GEMINI_MODELS[GEMINI_MODELS.length - 1]) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('All Gemini models exhausted');
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -355,7 +377,6 @@ ${OUTPUT_SCHEMA}
 
 Now CREATE interactive lessons from this Arabic learning material. Follow the pedagogical rules exactly. Return only valid JSON.`;
 
-    type Part = { text: string } | { inlineData: { mimeType: string; data: string } } | { fileData: { mimeType: string; fileUri: string } };
     let parts: Part[];
 
     if (text_content) {
@@ -406,20 +427,13 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
       }
     }
 
-    // Race against a 110-second timeout so we return a proper error instead
-    // of being killed by Supabase's 150s wall-clock limit.
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Gemini API timeout after 110 seconds')), 110_000)
     );
-    const result = await Promise.race([
-      ai.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: [{ role: 'user', parts }],
-        config: { systemInstruction: SYSTEM_PROMPT },
-      }),
+    let responseText = (await Promise.race([
+      geminiGenerateMultimodal(Deno.env.get('GEMINI_API_KEY')!, parts),
       timeoutPromise,
-    ]);
-    let responseText = (result.text ?? '').trim();
+    ])).trim();
 
     // Strip any accidental markdown fences Gemini sometimes adds
     if (responseText.startsWith('```')) {

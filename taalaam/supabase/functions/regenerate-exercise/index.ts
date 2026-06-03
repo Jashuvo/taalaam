@@ -21,6 +21,26 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+
+async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const m = genAI.getGenerativeModel({ model: modelName, systemInstruction });
+      const result = await m.generateContent(prompt);
+      return result.response.text();
+    } catch (err) {
+      const msg = String(err);
+      if ((msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('unavailable')) && modelName !== GEMINI_MODELS[GEMINI_MODELS.length - 1]) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('All Gemini models exhausted');
+}
+
 const SYSTEM_PROMPT = `You are an expert Arabic language curriculum designer.
 Given an existing Arabic exercise and its lesson context, generate a NEW improved version
 of the same exercise type. Keep the same exercise type but make the content better.
@@ -104,14 +124,7 @@ Return JSON matching this schema exactly:
   "difficulty": 1 | 2 | 3 | 4 | 5
 }`;
 
-    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
-    });
-
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+    const responseText = await geminiGenerate(Deno.env.get('GEMINI_API_KEY')!, SYSTEM_PROMPT, prompt);
     const newExercise = JSON.parse(responseText);
 
     // Update the exercise in DB

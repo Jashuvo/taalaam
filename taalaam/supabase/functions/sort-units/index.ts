@@ -21,6 +21,26 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+
+async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const m = genAI.getGenerativeModel({ model: modelName, systemInstruction });
+      const result = await m.generateContent(prompt);
+      return result.response.text();
+    } catch (err) {
+      const msg = String(err);
+      if ((msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('unavailable')) && modelName !== GEMINI_MODELS[GEMINI_MODELS.length - 1]) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('All Gemini models exhausted');
+}
+
 const SYSTEM_PROMPT = `You are an expert Curriculum Architect and Arabic Linguist specializing in designing gamified, step-by-step language courses (Duolingo-style micro-learning).
 
 The target audience consists of Bengali speakers learning Classical/Fusha Arabic, with emphasis on Islamic/Salafi vocabulary contexts.
@@ -105,11 +125,7 @@ Deno.serve(async (req: Request) => {
         ).join('\n\n') +
         '\n\nReturn the strict JSON object as specified. No markdown.';
 
-      const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction: SYSTEM_PROMPT });
-
-      const result = await model.generateContent(userMessage);
-      const rawText = result.response.text().trim()
+      const rawText = (await geminiGenerate(Deno.env.get('GEMINI_API_KEY')!, SYSTEM_PROMPT, userMessage)).trim()
         .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
       const parsed = JSON.parse(rawText);

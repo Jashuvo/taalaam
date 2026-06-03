@@ -22,6 +22,26 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+
+async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<string> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const m = genAI.getGenerativeModel({ model: modelName, systemInstruction });
+      const result = await m.generateContent(prompt);
+      return result.response.text();
+    } catch (err) {
+      const msg = String(err);
+      if ((msg.includes('503') || msg.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('unavailable')) && modelName !== GEMINI_MODELS[GEMINI_MODELS.length - 1]) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('All Gemini models exhausted');
+}
+
 const SYSTEM_PROMPT = `You are an expert Gamification Architect and Arabic Linguist creating an Exam Question Pool for a Duolingo-style Arabic learning app targeting Bengali speakers (Classical/Fusha Arabic, Islamic/Salafi context).
 
 Your pool must be a cumulative review of ALL vocabulary and grammar introduced in the provided module.
@@ -131,11 +151,8 @@ Deno.serve(async (req: Request) => {
         `MODULE CONTENT:\n${examContext.join('\n')}\n\n` +
         `Return the strict JSON object as specified. Exactly 30 questions. No markdown.`;
 
-      const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction: SYSTEM_PROMPT });
-      const result = await model.generateContent(userMessage);
-      const rawText = result.response.text().trim()
-        .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+      const rawText = (await geminiGenerate(Deno.env.get('GEMINI_API_KEY')!, SYSTEM_PROMPT, userMessage))
+        .trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
       const poolData = JSON.parse(rawText);
       const questions: any[] = poolData.questions ?? [];
