@@ -186,15 +186,17 @@ exercises:
 This rule OVERRIDES any length or density concerns:
 1. You MUST audit the specified pages row-by-row, column-by-column.
 2. EVERY SINGLE verb or vocabulary item listed in the source text tables MUST
-   become a vocabulary entry in the output. Zero exceptions.
-3. Do NOT truncate, summarise, or skip any item.
-   - If a page contains 11 verbs → your vocabulary list must contain exactly 11 items.
-   - If a page contains 15 verbs → exactly 15 items.
+   appear as a vocabulary entry somewhere in the output. Zero omissions.
+3. If a page has more items than the 8-word lesson limit, SPLIT across multiple
+   lessons — do NOT drop items to fit the limit.
+   - 15 verbs → 2 lessons (e.g. 8 + 7), each with their own exercises.
+   - 11 verbs → 2 lessons (e.g. 6 + 5).
+   - Each lesson still follows the MAX 8 words rule.
 4. Before finalising output, run this internal self-audit:
    - Count the total number of table rows on the source pages.
-   - Count the total vocabulary entries in your generated JSON.
-   - If (Generated Count ≠ Source Row Count) → re-process the missing items FIRST,
-     then output.
+   - Count the total vocabulary entries across ALL lessons in your output.
+   - If (Total Generated Entries ≠ Source Row Count) → find the missing items
+     and add them before outputting.
 
 ════════════════════════════════════════════
 VERB TABLE (ABWAB) EXTRACTION
