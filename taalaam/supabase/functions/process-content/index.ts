@@ -229,6 +229,11 @@ Example mapping for one Abwab row:
 Chapter/Bab headings from the source (e.g., "باب فَعَلَ يَفْعُلُ") should be
 reflected in the lesson title_bn for that cluster of verbs.
 
+After extracting all verb table rows, also process any surrounding grammar
+explanations, example sentences, or non-table vocabulary on the same pages
+per the standard content extraction rules. Do not let the verb-counting
+self-audit cause you to ignore non-table content.
+
 ════════════════════════════════════════════
 CONTENT EXTRACTION & DENSITY RULES
 ════════════════════════════════════════════
