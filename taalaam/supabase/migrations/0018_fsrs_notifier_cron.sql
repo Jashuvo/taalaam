@@ -1,24 +1,25 @@
--- Schedule fsrs-notifier edge function to run daily at 08:00 UTC.
--- Requires pg_cron and pg_net extensions (both enabled by default on Supabase).
+-- MANUAL STEP — do not execute via db push.
+-- pg_cron requires the extension to be enabled first in the Supabase Dashboard.
 --
--- Run this once in the Supabase SQL Editor.
--- Replace <YOUR_SERVICE_ROLE_KEY> with the value from:
---   Supabase Dashboard → Project Settings → API → service_role (secret)
+-- To schedule the daily FSRS notifier:
+--   1. Dashboard → Extensions → enable pg_cron and pg_net
+--   2. Run in SQL Editor (replace <YOUR_SERVICE_ROLE_KEY>):
 --
--- Alternatively, set it up in the Dashboard UI:
---   Edge Functions → fsrs-notifier → Schedules → Add schedule → 0 8 * * *
+-- select cron.schedule(
+--   'daily-fsrs-reminder',
+--   '0 8 * * *',
+--   $$
+--   select net.http_post(
+--     url     := 'https://xborpnxbdvstiabtevix.supabase.co/functions/v1/fsrs-notifier',
+--     headers := jsonb_build_object(
+--       'Content-Type',  'application/json',
+--       'Authorization', 'Bearer <YOUR_SERVICE_ROLE_KEY>'
+--     ),
+--     body    := '{}'::jsonb
+--   ) as request_id;
+--   $$
+-- );
+--
+-- Alternatively: Edge Functions → fsrs-notifier → Schedules → Add → 0 8 * * *
 
-select cron.schedule(
-  'daily-fsrs-reminder',
-  '0 8 * * *',
-  $$
-  select net.http_post(
-    url     := 'https://xborpnxbdvstiabtevix.supabase.co/functions/v1/fsrs-notifier',
-    headers := jsonb_build_object(
-      'Content-Type',  'application/json',
-      'Authorization', 'Bearer <YOUR_SERVICE_ROLE_KEY>'
-    ),
-    body    := '{}'::jsonb
-  ) as request_id;
-  $$
-);
+SELECT 1; -- no-op placeholder so db push records this migration as applied
