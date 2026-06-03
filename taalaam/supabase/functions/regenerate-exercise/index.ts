@@ -5,12 +5,30 @@
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const ADMIN_EMAIL = 'jubayedsr@gmail.com';
+async function checkAdmin(req: Request): Promise<Response | null> {
+  const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
+  if (!token) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...cors } });
+  const { data: { user }, error } = await createClient(
+    Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!
+  ).auth.getUser(token);
+  if (error || user?.email !== ADMIN_EMAIL) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json', ...cors } });
+  return null;
+}
+
 const SYSTEM_PROMPT = `You are an expert Arabic language curriculum designer.
 Given an existing Arabic exercise and its lesson context, generate a NEW improved version
 of the same exercise type. Keep the same exercise type but make the content better.
 Return ONLY valid JSON matching the exact schema below. No explanation. No markdown fences.`;
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  const denied = await checkAdmin(req); if (denied) return denied;
   try {
     const { exercise_id } = await req.json();
 

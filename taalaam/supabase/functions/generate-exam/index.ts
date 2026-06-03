@@ -11,6 +11,17 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const ADMIN_EMAIL = 'jubayedsr@gmail.com';
+async function checkAdmin(req: Request): Promise<Response | null> {
+  const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
+  if (!token) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...cors } });
+  const { data: { user }, error } = await createClient(
+    Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!
+  ).auth.getUser(token);
+  if (error || user?.email !== ADMIN_EMAIL) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json', ...cors } });
+  return null;
+}
+
 const SYSTEM_PROMPT = `You are an expert Gamification Architect and Arabic Linguist creating an Exam Question Pool for a Duolingo-style Arabic learning app targeting Bengali speakers (Classical/Fusha Arabic, Islamic/Salafi context).
 
 Your pool must be a cumulative review of ALL vocabulary and grammar introduced in the provided module.
@@ -53,6 +64,7 @@ Return ONLY this JSON object:
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  const denied = await checkAdmin(req); if (denied) return denied;
 
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();

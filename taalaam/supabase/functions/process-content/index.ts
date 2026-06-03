@@ -269,10 +269,22 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const ADMIN_EMAIL = 'jubayedsr@gmail.com';
+async function checkAdmin(req: Request): Promise<Response | null> {
+  const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
+  if (!token) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  const { data: { user }, error } = await createClient(
+    Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!
+  ).auth.getUser(token);
+  if (error || user?.email !== ADMIN_EMAIL) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  const denied = await checkAdmin(req); if (denied) return denied;
 
   try {
     const { material_id, text_content, track, notes } = await req.json();
