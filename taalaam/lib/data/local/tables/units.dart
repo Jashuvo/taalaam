@@ -10,6 +10,8 @@ class Units extends Table {
   TextColumn get titleEn => text().nullable()();
   TextColumn get descriptionBn => text().nullable()();
   IntColumn get sortOrder => integer()();
+  IntColumn get tierLevel => integer().withDefault(const Constant(1))();
+  IntColumn get sequenceOrder => integer().withDefault(const Constant(1))();
   TextColumn get status =>
       text().withDefault(const Constant('draft'))();
   TextColumn get sourceMaterialId => text().nullable()();

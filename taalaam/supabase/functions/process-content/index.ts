@@ -14,6 +14,31 @@ You create Duolingo-style interactive micro-lessons for Bangladeshi Muslim learn
 MISSION: Take raw Arabic learning material — including textbook PDFs whose Arabic text may have corrupted or missing harakat — and CREATE highly interactive, micro-learning exercises.
 Do NOT just extract or label text. Every exercise must be something a learner DOES: taps tiles, matches pairs, fills blanks, chooses answers.
 
+════════════════════════════════════════════
+🔍 CRITICAL: AUTOMATED LEVEL PROFILING
+════════════════════════════════════════════
+Before designing any content, analyse the raw source material to determine its
+structural difficulty tier. Set the root "evaluated_tier" property to one of:
+
+  Tier 1 — Foundations
+    • Only basic nouns (objects, locations, roles), detached pronouns, or basic
+      demonstratives (هذا / هذه).
+    • ABSOLUTELY NO VERBS present.
+
+  Tier 2 — Syntactic Phrases
+    • Introduces Possessive Constructs (إضافة), Adjective-Noun agreement
+      (صفة وموصوف), or directional prepositional modifiers.
+    • ABSOLUTELY NO VERBS present.
+
+  Tier 3 — Verbal Transitions
+    • Basic 3-letter active verb past/present tense patterns (الماضي / المضارع),
+      or short, straightforward verbal phrases.
+
+  Tier 4 — Advanced Morpho-Syntax
+    • Complex morphological tables, derived verb groups (الأبواب المزيدة),
+      command modes, or dense classical Islamic text fragments.
+
+════════════════════════════════════════════
 HARAKAT CORRECTION (CRITICAL):
 Raw PDF text often corrupts or strips Arabic vowel marks. You MUST use your Arabic linguistic knowledge to reconstruct and apply the correct full harakat on every Arabic word you output. Never output Arabic without harakat.
 
@@ -282,6 +307,7 @@ NON-NEGOTIABLE RULES
 const OUTPUT_SCHEMA = `Return ONLY a valid JSON object matching this exact schema. No markdown, no explanation.
 
 {
+  "evaluated_tier": "number — 1 | 2 | 3 | 4 based on profiling rules above",
   "unit_title_bn": "string — descriptive curriculum title in Bangla (e.g., 'সর্বনাম ও পরিচয়')",
   "unit_title_ar": "string — Arabic title with harakat (e.g., 'الضَّمَائِرُ وَالتَّعَارُف')",
   "lessons": [
@@ -499,21 +525,23 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
       .eq('slug', track)
       .single();
 
-    const { data: unit, error: unitErr } = await supabase
-      .from('units')
-      .insert({
-        track_id: trackRow?.id,
-        slug: `${track}-${Date.now()}`,
-        title_bn: parsed.unit_title_bn,
-        title_ar: parsed.unit_title_ar,
-        sort_order: 999,
-        status: 'draft',
-        source_material_id: material_id,
-      })
-      .select()
-      .single();
-
+    // Smart tier-based insertion: slots the unit at the correct position
+    // and shifts higher-tier units forward automatically.
+    const { data: newUnitId, error: unitErr } = await supabase.rpc('insert_and_shift_unit', {
+      p_track_id: trackRow?.id,
+      p_title_bn: parsed.unit_title_bn,
+      p_title_ar: parsed.unit_title_ar,
+      p_tier_level: parsed.evaluated_tier ?? 1,
+    });
     if (unitErr) throw unitErr;
+
+    // Set slug + source_material_id (not in plpgsql function)
+    await supabase
+      .from('units')
+      .update({ slug: `${track}-${Date.now()}`, source_material_id: material_id })
+      .eq('id', newUnitId);
+
+    const unit = { id: newUnitId as string };
 
     for (let li = 0; li < parsed.lessons.length; li++) {
       const lesson = parsed.lessons[li];
@@ -573,6 +601,14 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
         processed_at: new Date().toISOString(),
       })
       .eq('id', material_id);
+
+    // Fire-and-forget: auto-run sort-units to deduplicate and reorder the track
+    const adminToken = req.headers.get('Authorization') ?? '';
+    fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/sort-units`, {
+      method: 'POST',
+      headers: { 'Authorization': adminToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ track_id: trackRow?.id }),
+    }).catch(() => { /* non-fatal: admin can trigger sort-units manually */ });
 
     return new Response(
       JSON.stringify({ success: true, unit_id: unit.id, lesson_count: parsed.lessons.length }),

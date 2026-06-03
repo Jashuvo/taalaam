@@ -58,6 +58,8 @@ class SyncService {
             titleEn: Value(r['title_en'] as String?),
             descriptionBn: Value(r['description_bn'] as String?),
             sortOrder: Value(r['sort_order'] as int),
+            tierLevel: Value((r['tier_level'] as int?) ?? 1),
+            sequenceOrder: Value((r['sequence_order'] as int?) ?? r['sort_order'] as int),
             status: Value((r['status'] as String?) ?? 'draft'),
           ));
     }

@@ -479,6 +479,22 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
   late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
       'sort_order', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _tierLevelMeta =
+      const VerificationMeta('tierLevel');
+  @override
+  late final GeneratedColumn<int> tierLevel = GeneratedColumn<int>(
+      'tier_level', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
+  static const VerificationMeta _sequenceOrderMeta =
+      const VerificationMeta('sequenceOrder');
+  @override
+  late final GeneratedColumn<int> sequenceOrder = GeneratedColumn<int>(
+      'sequence_order', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -516,6 +532,8 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
         titleEn,
         descriptionBn,
         sortOrder,
+        tierLevel,
+        sequenceOrder,
         status,
         sourceMaterialId,
         createdAt,
@@ -574,6 +592,16 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
     } else if (isInserting) {
       context.missing(_sortOrderMeta);
     }
+    if (data.containsKey('tier_level')) {
+      context.handle(_tierLevelMeta,
+          tierLevel.isAcceptableOrUnknown(data['tier_level']!, _tierLevelMeta));
+    }
+    if (data.containsKey('sequence_order')) {
+      context.handle(
+          _sequenceOrderMeta,
+          sequenceOrder.isAcceptableOrUnknown(
+              data['sequence_order']!, _sequenceOrderMeta));
+    }
     if (data.containsKey('status')) {
       context.handle(_statusMeta,
           status.isAcceptableOrUnknown(data['status']!, _statusMeta));
@@ -619,6 +647,10 @@ class $UnitsTable extends Units with TableInfo<$UnitsTable, Unit> {
           .read(DriftSqlType.string, data['${effectivePrefix}description_bn']),
       sortOrder: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}sort_order'])!,
+      tierLevel: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}tier_level'])!,
+      sequenceOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sequence_order'])!,
       status: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       sourceMaterialId: attachedDatabase.typeMapping.read(
@@ -645,6 +677,8 @@ class Unit extends DataClass implements Insertable<Unit> {
   final String? titleEn;
   final String? descriptionBn;
   final int sortOrder;
+  final int tierLevel;
+  final int sequenceOrder;
   final String status;
   final String? sourceMaterialId;
   final DateTime createdAt;
@@ -658,6 +692,8 @@ class Unit extends DataClass implements Insertable<Unit> {
       this.titleEn,
       this.descriptionBn,
       required this.sortOrder,
+      required this.tierLevel,
+      required this.sequenceOrder,
       required this.status,
       this.sourceMaterialId,
       required this.createdAt,
@@ -679,6 +715,8 @@ class Unit extends DataClass implements Insertable<Unit> {
       map['description_bn'] = Variable<String>(descriptionBn);
     }
     map['sort_order'] = Variable<int>(sortOrder);
+    map['tier_level'] = Variable<int>(tierLevel);
+    map['sequence_order'] = Variable<int>(sequenceOrder);
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || sourceMaterialId != null) {
       map['source_material_id'] = Variable<String>(sourceMaterialId);
@@ -706,6 +744,8 @@ class Unit extends DataClass implements Insertable<Unit> {
           ? const Value.absent()
           : Value(descriptionBn),
       sortOrder: Value(sortOrder),
+      tierLevel: Value(tierLevel),
+      sequenceOrder: Value(sequenceOrder),
       status: Value(status),
       sourceMaterialId: sourceMaterialId == null && nullToAbsent
           ? const Value.absent()
@@ -729,6 +769,8 @@ class Unit extends DataClass implements Insertable<Unit> {
       titleEn: serializer.fromJson<String?>(json['titleEn']),
       descriptionBn: serializer.fromJson<String?>(json['descriptionBn']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      tierLevel: serializer.fromJson<int>(json['tierLevel']),
+      sequenceOrder: serializer.fromJson<int>(json['sequenceOrder']),
       status: serializer.fromJson<String>(json['status']),
       sourceMaterialId: serializer.fromJson<String?>(json['sourceMaterialId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -747,6 +789,8 @@ class Unit extends DataClass implements Insertable<Unit> {
       'titleEn': serializer.toJson<String?>(titleEn),
       'descriptionBn': serializer.toJson<String?>(descriptionBn),
       'sortOrder': serializer.toJson<int>(sortOrder),
+      'tierLevel': serializer.toJson<int>(tierLevel),
+      'sequenceOrder': serializer.toJson<int>(sequenceOrder),
       'status': serializer.toJson<String>(status),
       'sourceMaterialId': serializer.toJson<String?>(sourceMaterialId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -763,6 +807,8 @@ class Unit extends DataClass implements Insertable<Unit> {
           Value<String?> titleEn = const Value.absent(),
           Value<String?> descriptionBn = const Value.absent(),
           int? sortOrder,
+          int? tierLevel,
+          int? sequenceOrder,
           String? status,
           Value<String?> sourceMaterialId = const Value.absent(),
           DateTime? createdAt,
@@ -777,6 +823,8 @@ class Unit extends DataClass implements Insertable<Unit> {
         descriptionBn:
             descriptionBn.present ? descriptionBn.value : this.descriptionBn,
         sortOrder: sortOrder ?? this.sortOrder,
+        tierLevel: tierLevel ?? this.tierLevel,
+        sequenceOrder: sequenceOrder ?? this.sequenceOrder,
         status: status ?? this.status,
         sourceMaterialId: sourceMaterialId.present
             ? sourceMaterialId.value
@@ -797,6 +845,10 @@ class Unit extends DataClass implements Insertable<Unit> {
           ? data.descriptionBn.value
           : this.descriptionBn,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      tierLevel: data.tierLevel.present ? data.tierLevel.value : this.tierLevel,
+      sequenceOrder: data.sequenceOrder.present
+          ? data.sequenceOrder.value
+          : this.sequenceOrder,
       status: data.status.present ? data.status.value : this.status,
       sourceMaterialId: data.sourceMaterialId.present
           ? data.sourceMaterialId.value
@@ -819,6 +871,8 @@ class Unit extends DataClass implements Insertable<Unit> {
           ..write('titleEn: $titleEn, ')
           ..write('descriptionBn: $descriptionBn, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('tierLevel: $tierLevel, ')
+          ..write('sequenceOrder: $sequenceOrder, ')
           ..write('status: $status, ')
           ..write('sourceMaterialId: $sourceMaterialId, ')
           ..write('createdAt: $createdAt, ')
@@ -837,6 +891,8 @@ class Unit extends DataClass implements Insertable<Unit> {
       titleEn,
       descriptionBn,
       sortOrder,
+      tierLevel,
+      sequenceOrder,
       status,
       sourceMaterialId,
       createdAt,
@@ -853,6 +909,8 @@ class Unit extends DataClass implements Insertable<Unit> {
           other.titleEn == this.titleEn &&
           other.descriptionBn == this.descriptionBn &&
           other.sortOrder == this.sortOrder &&
+          other.tierLevel == this.tierLevel &&
+          other.sequenceOrder == this.sequenceOrder &&
           other.status == this.status &&
           other.sourceMaterialId == this.sourceMaterialId &&
           other.createdAt == this.createdAt &&
@@ -868,6 +926,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
   final Value<String?> titleEn;
   final Value<String?> descriptionBn;
   final Value<int> sortOrder;
+  final Value<int> tierLevel;
+  final Value<int> sequenceOrder;
   final Value<String> status;
   final Value<String?> sourceMaterialId;
   final Value<DateTime> createdAt;
@@ -882,6 +942,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     this.titleEn = const Value.absent(),
     this.descriptionBn = const Value.absent(),
     this.sortOrder = const Value.absent(),
+    this.tierLevel = const Value.absent(),
+    this.sequenceOrder = const Value.absent(),
     this.status = const Value.absent(),
     this.sourceMaterialId = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -897,6 +959,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     this.titleEn = const Value.absent(),
     this.descriptionBn = const Value.absent(),
     required int sortOrder,
+    this.tierLevel = const Value.absent(),
+    this.sequenceOrder = const Value.absent(),
     this.status = const Value.absent(),
     this.sourceMaterialId = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -916,6 +980,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     Expression<String>? titleEn,
     Expression<String>? descriptionBn,
     Expression<int>? sortOrder,
+    Expression<int>? tierLevel,
+    Expression<int>? sequenceOrder,
     Expression<String>? status,
     Expression<String>? sourceMaterialId,
     Expression<DateTime>? createdAt,
@@ -931,6 +997,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
       if (titleEn != null) 'title_en': titleEn,
       if (descriptionBn != null) 'description_bn': descriptionBn,
       if (sortOrder != null) 'sort_order': sortOrder,
+      if (tierLevel != null) 'tier_level': tierLevel,
+      if (sequenceOrder != null) 'sequence_order': sequenceOrder,
       if (status != null) 'status': status,
       if (sourceMaterialId != null) 'source_material_id': sourceMaterialId,
       if (createdAt != null) 'created_at': createdAt,
@@ -948,6 +1016,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
       Value<String?>? titleEn,
       Value<String?>? descriptionBn,
       Value<int>? sortOrder,
+      Value<int>? tierLevel,
+      Value<int>? sequenceOrder,
       Value<String>? status,
       Value<String?>? sourceMaterialId,
       Value<DateTime>? createdAt,
@@ -962,6 +1032,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
       titleEn: titleEn ?? this.titleEn,
       descriptionBn: descriptionBn ?? this.descriptionBn,
       sortOrder: sortOrder ?? this.sortOrder,
+      tierLevel: tierLevel ?? this.tierLevel,
+      sequenceOrder: sequenceOrder ?? this.sequenceOrder,
       status: status ?? this.status,
       sourceMaterialId: sourceMaterialId ?? this.sourceMaterialId,
       createdAt: createdAt ?? this.createdAt,
@@ -997,6 +1069,12 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
+    if (tierLevel.present) {
+      map['tier_level'] = Variable<int>(tierLevel.value);
+    }
+    if (sequenceOrder.present) {
+      map['sequence_order'] = Variable<int>(sequenceOrder.value);
+    }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
@@ -1026,6 +1104,8 @@ class UnitsCompanion extends UpdateCompanion<Unit> {
           ..write('titleEn: $titleEn, ')
           ..write('descriptionBn: $descriptionBn, ')
           ..write('sortOrder: $sortOrder, ')
+          ..write('tierLevel: $tierLevel, ')
+          ..write('sequenceOrder: $sequenceOrder, ')
           ..write('status: $status, ')
           ..write('sourceMaterialId: $sourceMaterialId, ')
           ..write('createdAt: $createdAt, ')
@@ -5494,6 +5574,8 @@ typedef $$UnitsTableCreateCompanionBuilder = UnitsCompanion Function({
   Value<String?> titleEn,
   Value<String?> descriptionBn,
   required int sortOrder,
+  Value<int> tierLevel,
+  Value<int> sequenceOrder,
   Value<String> status,
   Value<String?> sourceMaterialId,
   Value<DateTime> createdAt,
@@ -5509,6 +5591,8 @@ typedef $$UnitsTableUpdateCompanionBuilder = UnitsCompanion Function({
   Value<String?> titleEn,
   Value<String?> descriptionBn,
   Value<int> sortOrder,
+  Value<int> tierLevel,
+  Value<int> sequenceOrder,
   Value<String> status,
   Value<String?> sourceMaterialId,
   Value<DateTime> createdAt,
@@ -5577,6 +5661,12 @@ class $$UnitsTableFilterComposer extends Composer<_$AppDatabase, $UnitsTable> {
 
   ColumnFilters<int> get sortOrder => $composableBuilder(
       column: $table.sortOrder, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get tierLevel => $composableBuilder(
+      column: $table.tierLevel, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sequenceOrder => $composableBuilder(
+      column: $table.sequenceOrder, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnFilters(column));
@@ -5664,6 +5754,13 @@ class $$UnitsTableOrderingComposer
   ColumnOrderings<int> get sortOrder => $composableBuilder(
       column: $table.sortOrder, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get tierLevel => $composableBuilder(
+      column: $table.tierLevel, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sequenceOrder => $composableBuilder(
+      column: $table.sequenceOrder,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnOrderings(column));
 
@@ -5728,6 +5825,12 @@ class $$UnitsTableAnnotationComposer
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<int> get tierLevel =>
+      $composableBuilder(column: $table.tierLevel, builder: (column) => column);
+
+  GeneratedColumn<int> get sequenceOrder => $composableBuilder(
+      column: $table.sequenceOrder, builder: (column) => column);
 
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -5814,6 +5917,8 @@ class $$UnitsTableTableManager extends RootTableManager<
             Value<String?> titleEn = const Value.absent(),
             Value<String?> descriptionBn = const Value.absent(),
             Value<int> sortOrder = const Value.absent(),
+            Value<int> tierLevel = const Value.absent(),
+            Value<int> sequenceOrder = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String?> sourceMaterialId = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -5829,6 +5934,8 @@ class $$UnitsTableTableManager extends RootTableManager<
             titleEn: titleEn,
             descriptionBn: descriptionBn,
             sortOrder: sortOrder,
+            tierLevel: tierLevel,
+            sequenceOrder: sequenceOrder,
             status: status,
             sourceMaterialId: sourceMaterialId,
             createdAt: createdAt,
@@ -5844,6 +5951,8 @@ class $$UnitsTableTableManager extends RootTableManager<
             Value<String?> titleEn = const Value.absent(),
             Value<String?> descriptionBn = const Value.absent(),
             required int sortOrder,
+            Value<int> tierLevel = const Value.absent(),
+            Value<int> sequenceOrder = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String?> sourceMaterialId = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -5859,6 +5968,8 @@ class $$UnitsTableTableManager extends RootTableManager<
             titleEn: titleEn,
             descriptionBn: descriptionBn,
             sortOrder: sortOrder,
+            tierLevel: tierLevel,
+            sequenceOrder: sequenceOrder,
             status: status,
             sourceMaterialId: sourceMaterialId,
             createdAt: createdAt,
