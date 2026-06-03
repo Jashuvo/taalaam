@@ -2343,6 +2343,18 @@ class $VocabularyTable extends Vocabulary
   late final GeneratedColumn<int> frequencyRank = GeneratedColumn<int>(
       'frequency_rank', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _contextSnippetArMeta =
+      const VerificationMeta('contextSnippetAr');
+  @override
+  late final GeneratedColumn<String> contextSnippetAr = GeneratedColumn<String>(
+      'context_snippet_ar', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _contextSnippetBnMeta =
+      const VerificationMeta('contextSnippetBn');
+  @override
+  late final GeneratedColumn<String> contextSnippetBn = GeneratedColumn<String>(
+      'context_snippet_bn', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -2364,6 +2376,8 @@ class $VocabularyTable extends Vocabulary
         audioUrl,
         lessonId,
         frequencyRank,
+        contextSnippetAr,
+        contextSnippetBn,
         createdAt
       ];
   @override
@@ -2431,6 +2445,18 @@ class $VocabularyTable extends Vocabulary
           frequencyRank.isAcceptableOrUnknown(
               data['frequency_rank']!, _frequencyRankMeta));
     }
+    if (data.containsKey('context_snippet_ar')) {
+      context.handle(
+          _contextSnippetArMeta,
+          contextSnippetAr.isAcceptableOrUnknown(
+              data['context_snippet_ar']!, _contextSnippetArMeta));
+    }
+    if (data.containsKey('context_snippet_bn')) {
+      context.handle(
+          _contextSnippetBnMeta,
+          contextSnippetBn.isAcceptableOrUnknown(
+              data['context_snippet_bn']!, _contextSnippetBnMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -2466,6 +2492,10 @@ class $VocabularyTable extends Vocabulary
           .read(DriftSqlType.string, data['${effectivePrefix}lesson_id']),
       frequencyRank: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}frequency_rank']),
+      contextSnippetAr: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}context_snippet_ar']),
+      contextSnippetBn: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}context_snippet_bn']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -2489,6 +2519,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
   final String? audioUrl;
   final String? lessonId;
   final int? frequencyRank;
+  final String? contextSnippetAr;
+  final String? contextSnippetBn;
   final DateTime createdAt;
   const VocabEntry(
       {required this.id,
@@ -2502,6 +2534,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       this.audioUrl,
       this.lessonId,
       this.frequencyRank,
+      this.contextSnippetAr,
+      this.contextSnippetBn,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2532,6 +2566,12 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
     }
     if (!nullToAbsent || frequencyRank != null) {
       map['frequency_rank'] = Variable<int>(frequencyRank);
+    }
+    if (!nullToAbsent || contextSnippetAr != null) {
+      map['context_snippet_ar'] = Variable<String>(contextSnippetAr);
+    }
+    if (!nullToAbsent || contextSnippetBn != null) {
+      map['context_snippet_bn'] = Variable<String>(contextSnippetBn);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -2565,6 +2605,12 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       frequencyRank: frequencyRank == null && nullToAbsent
           ? const Value.absent()
           : Value(frequencyRank),
+      contextSnippetAr: contextSnippetAr == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contextSnippetAr),
+      contextSnippetBn: contextSnippetBn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contextSnippetBn),
       createdAt: Value(createdAt),
     );
   }
@@ -2584,6 +2630,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       audioUrl: serializer.fromJson<String?>(json['audioUrl']),
       lessonId: serializer.fromJson<String?>(json['lessonId']),
       frequencyRank: serializer.fromJson<int?>(json['frequencyRank']),
+      contextSnippetAr: serializer.fromJson<String?>(json['contextSnippetAr']),
+      contextSnippetBn: serializer.fromJson<String?>(json['contextSnippetBn']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -2602,6 +2650,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       'audioUrl': serializer.toJson<String?>(audioUrl),
       'lessonId': serializer.toJson<String?>(lessonId),
       'frequencyRank': serializer.toJson<int?>(frequencyRank),
+      'contextSnippetAr': serializer.toJson<String?>(contextSnippetAr),
+      'contextSnippetBn': serializer.toJson<String?>(contextSnippetBn),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -2618,6 +2668,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
           Value<String?> audioUrl = const Value.absent(),
           Value<String?> lessonId = const Value.absent(),
           Value<int?> frequencyRank = const Value.absent(),
+          Value<String?> contextSnippetAr = const Value.absent(),
+          Value<String?> contextSnippetBn = const Value.absent(),
           DateTime? createdAt}) =>
       VocabEntry(
         id: id ?? this.id,
@@ -2634,6 +2686,12 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
         lessonId: lessonId.present ? lessonId.value : this.lessonId,
         frequencyRank:
             frequencyRank.present ? frequencyRank.value : this.frequencyRank,
+        contextSnippetAr: contextSnippetAr.present
+            ? contextSnippetAr.value
+            : this.contextSnippetAr,
+        contextSnippetBn: contextSnippetBn.present
+            ? contextSnippetBn.value
+            : this.contextSnippetBn,
         createdAt: createdAt ?? this.createdAt,
       );
   VocabEntry copyWithCompanion(VocabularyCompanion data) {
@@ -2654,6 +2712,12 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       frequencyRank: data.frequencyRank.present
           ? data.frequencyRank.value
           : this.frequencyRank,
+      contextSnippetAr: data.contextSnippetAr.present
+          ? data.contextSnippetAr.value
+          : this.contextSnippetAr,
+      contextSnippetBn: data.contextSnippetBn.present
+          ? data.contextSnippetBn.value
+          : this.contextSnippetBn,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -2672,6 +2736,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
           ..write('audioUrl: $audioUrl, ')
           ..write('lessonId: $lessonId, ')
           ..write('frequencyRank: $frequencyRank, ')
+          ..write('contextSnippetAr: $contextSnippetAr, ')
+          ..write('contextSnippetBn: $contextSnippetBn, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -2690,6 +2756,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       audioUrl,
       lessonId,
       frequencyRank,
+      contextSnippetAr,
+      contextSnippetBn,
       createdAt);
   @override
   bool operator ==(Object other) =>
@@ -2706,6 +2774,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
           other.audioUrl == this.audioUrl &&
           other.lessonId == this.lessonId &&
           other.frequencyRank == this.frequencyRank &&
+          other.contextSnippetAr == this.contextSnippetAr &&
+          other.contextSnippetBn == this.contextSnippetBn &&
           other.createdAt == this.createdAt);
 }
 
@@ -2721,6 +2791,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
   final Value<String?> audioUrl;
   final Value<String?> lessonId;
   final Value<int?> frequencyRank;
+  final Value<String?> contextSnippetAr;
+  final Value<String?> contextSnippetBn;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const VocabularyCompanion({
@@ -2735,6 +2807,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     this.audioUrl = const Value.absent(),
     this.lessonId = const Value.absent(),
     this.frequencyRank = const Value.absent(),
+    this.contextSnippetAr = const Value.absent(),
+    this.contextSnippetBn = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2750,6 +2824,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     this.audioUrl = const Value.absent(),
     this.lessonId = const Value.absent(),
     this.frequencyRank = const Value.absent(),
+    this.contextSnippetAr = const Value.absent(),
+    this.contextSnippetBn = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
@@ -2767,6 +2843,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     Expression<String>? audioUrl,
     Expression<String>? lessonId,
     Expression<int>? frequencyRank,
+    Expression<String>? contextSnippetAr,
+    Expression<String>? contextSnippetBn,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -2782,6 +2860,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
       if (audioUrl != null) 'audio_url': audioUrl,
       if (lessonId != null) 'lesson_id': lessonId,
       if (frequencyRank != null) 'frequency_rank': frequencyRank,
+      if (contextSnippetAr != null) 'context_snippet_ar': contextSnippetAr,
+      if (contextSnippetBn != null) 'context_snippet_bn': contextSnippetBn,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2799,6 +2879,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
       Value<String?>? audioUrl,
       Value<String?>? lessonId,
       Value<int?>? frequencyRank,
+      Value<String?>? contextSnippetAr,
+      Value<String?>? contextSnippetBn,
       Value<DateTime>? createdAt,
       Value<int>? rowid}) {
     return VocabularyCompanion(
@@ -2813,6 +2895,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
       audioUrl: audioUrl ?? this.audioUrl,
       lessonId: lessonId ?? this.lessonId,
       frequencyRank: frequencyRank ?? this.frequencyRank,
+      contextSnippetAr: contextSnippetAr ?? this.contextSnippetAr,
+      contextSnippetBn: contextSnippetBn ?? this.contextSnippetBn,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2854,6 +2938,12 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     if (frequencyRank.present) {
       map['frequency_rank'] = Variable<int>(frequencyRank.value);
     }
+    if (contextSnippetAr.present) {
+      map['context_snippet_ar'] = Variable<String>(contextSnippetAr.value);
+    }
+    if (contextSnippetBn.present) {
+      map['context_snippet_bn'] = Variable<String>(contextSnippetBn.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -2877,6 +2967,8 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
           ..write('audioUrl: $audioUrl, ')
           ..write('lessonId: $lessonId, ')
           ..write('frequencyRank: $frequencyRank, ')
+          ..write('contextSnippetAr: $contextSnippetAr, ')
+          ..write('contextSnippetBn: $contextSnippetBn, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -4017,6 +4109,13 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
   late final GeneratedColumn<DateTime> lastFreezedAt =
       GeneratedColumn<DateTime>('last_freezed_at', aliasedName, true,
           type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _heartsMeta = const VerificationMeta('hearts');
+  @override
+  late final GeneratedColumn<int> hearts = GeneratedColumn<int>(
+      'hearts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(5));
   static const VerificationMeta _updatedAtMeta =
       const VerificationMeta('updatedAt');
   @override
@@ -4034,6 +4133,7 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
         totalXp,
         freezeCount,
         lastFreezedAt,
+        hearts,
         updatedAt
       ];
   @override
@@ -4086,6 +4186,10 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
           lastFreezedAt.isAcceptableOrUnknown(
               data['last_freezed_at']!, _lastFreezedAtMeta));
     }
+    if (data.containsKey('hearts')) {
+      context.handle(_heartsMeta,
+          hearts.isAcceptableOrUnknown(data['hearts']!, _heartsMeta));
+    }
     if (data.containsKey('updated_at')) {
       context.handle(_updatedAtMeta,
           updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
@@ -4113,6 +4217,8 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
           .read(DriftSqlType.int, data['${effectivePrefix}freeze_count'])!,
       lastFreezedAt: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}last_freezed_at']),
+      hearts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}hearts'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
@@ -4132,6 +4238,7 @@ class Streak extends DataClass implements Insertable<Streak> {
   final int totalXp;
   final int freezeCount;
   final DateTime? lastFreezedAt;
+  final int hearts;
   final DateTime updatedAt;
   const Streak(
       {required this.userId,
@@ -4141,6 +4248,7 @@ class Streak extends DataClass implements Insertable<Streak> {
       required this.totalXp,
       required this.freezeCount,
       this.lastFreezedAt,
+      required this.hearts,
       required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4156,6 +4264,7 @@ class Streak extends DataClass implements Insertable<Streak> {
     if (!nullToAbsent || lastFreezedAt != null) {
       map['last_freezed_at'] = Variable<DateTime>(lastFreezedAt);
     }
+    map['hearts'] = Variable<int>(hearts);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -4173,6 +4282,7 @@ class Streak extends DataClass implements Insertable<Streak> {
       lastFreezedAt: lastFreezedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastFreezedAt),
+      hearts: Value(hearts),
       updatedAt: Value(updatedAt),
     );
   }
@@ -4189,6 +4299,7 @@ class Streak extends DataClass implements Insertable<Streak> {
       totalXp: serializer.fromJson<int>(json['totalXp']),
       freezeCount: serializer.fromJson<int>(json['freezeCount']),
       lastFreezedAt: serializer.fromJson<DateTime?>(json['lastFreezedAt']),
+      hearts: serializer.fromJson<int>(json['hearts']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -4203,6 +4314,7 @@ class Streak extends DataClass implements Insertable<Streak> {
       'totalXp': serializer.toJson<int>(totalXp),
       'freezeCount': serializer.toJson<int>(freezeCount),
       'lastFreezedAt': serializer.toJson<DateTime?>(lastFreezedAt),
+      'hearts': serializer.toJson<int>(hearts),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -4215,6 +4327,7 @@ class Streak extends DataClass implements Insertable<Streak> {
           int? totalXp,
           int? freezeCount,
           Value<DateTime?> lastFreezedAt = const Value.absent(),
+          int? hearts,
           DateTime? updatedAt}) =>
       Streak(
         userId: userId ?? this.userId,
@@ -4227,6 +4340,7 @@ class Streak extends DataClass implements Insertable<Streak> {
         freezeCount: freezeCount ?? this.freezeCount,
         lastFreezedAt:
             lastFreezedAt.present ? lastFreezedAt.value : this.lastFreezedAt,
+        hearts: hearts ?? this.hearts,
         updatedAt: updatedAt ?? this.updatedAt,
       );
   Streak copyWithCompanion(StreaksCompanion data) {
@@ -4247,6 +4361,7 @@ class Streak extends DataClass implements Insertable<Streak> {
       lastFreezedAt: data.lastFreezedAt.present
           ? data.lastFreezedAt.value
           : this.lastFreezedAt,
+      hearts: data.hearts.present ? data.hearts.value : this.hearts,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -4261,6 +4376,7 @@ class Streak extends DataClass implements Insertable<Streak> {
           ..write('totalXp: $totalXp, ')
           ..write('freezeCount: $freezeCount, ')
           ..write('lastFreezedAt: $lastFreezedAt, ')
+          ..write('hearts: $hearts, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -4268,7 +4384,7 @@ class Streak extends DataClass implements Insertable<Streak> {
 
   @override
   int get hashCode => Object.hash(userId, currentStreak, longestStreak,
-      lastActivityDate, totalXp, freezeCount, lastFreezedAt, updatedAt);
+      lastActivityDate, totalXp, freezeCount, lastFreezedAt, hearts, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4280,6 +4396,7 @@ class Streak extends DataClass implements Insertable<Streak> {
           other.totalXp == this.totalXp &&
           other.freezeCount == this.freezeCount &&
           other.lastFreezedAt == this.lastFreezedAt &&
+          other.hearts == this.hearts &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -4291,6 +4408,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
   final Value<int> totalXp;
   final Value<int> freezeCount;
   final Value<DateTime?> lastFreezedAt;
+  final Value<int> hearts;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const StreaksCompanion({
@@ -4301,6 +4419,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     this.totalXp = const Value.absent(),
     this.freezeCount = const Value.absent(),
     this.lastFreezedAt = const Value.absent(),
+    this.hearts = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4312,6 +4431,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     this.totalXp = const Value.absent(),
     this.freezeCount = const Value.absent(),
     this.lastFreezedAt = const Value.absent(),
+    this.hearts = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : userId = Value(userId);
@@ -4323,6 +4443,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     Expression<int>? totalXp,
     Expression<int>? freezeCount,
     Expression<DateTime>? lastFreezedAt,
+    Expression<int>? hearts,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -4334,6 +4455,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
       if (totalXp != null) 'total_xp': totalXp,
       if (freezeCount != null) 'freeze_count': freezeCount,
       if (lastFreezedAt != null) 'last_freezed_at': lastFreezedAt,
+      if (hearts != null) 'hearts': hearts,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4347,6 +4469,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
       Value<int>? totalXp,
       Value<int>? freezeCount,
       Value<DateTime?>? lastFreezedAt,
+      Value<int>? hearts,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
     return StreaksCompanion(
@@ -4357,6 +4480,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
       totalXp: totalXp ?? this.totalXp,
       freezeCount: freezeCount ?? this.freezeCount,
       lastFreezedAt: lastFreezedAt ?? this.lastFreezedAt,
+      hearts: hearts ?? this.hearts,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4386,6 +4510,9 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     if (lastFreezedAt.present) {
       map['last_freezed_at'] = Variable<DateTime>(lastFreezedAt.value);
     }
+    if (hearts.present) {
+      map['hearts'] = Variable<int>(hearts.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -4405,6 +4532,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
           ..write('totalXp: $totalXp, ')
           ..write('freezeCount: $freezeCount, ')
           ..write('lastFreezedAt: $lastFreezedAt, ')
+          ..write('hearts: $hearts, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6837,6 +6965,8 @@ typedef $$VocabularyTableCreateCompanionBuilder = VocabularyCompanion Function({
   Value<String?> audioUrl,
   Value<String?> lessonId,
   Value<int?> frequencyRank,
+  Value<String?> contextSnippetAr,
+  Value<String?> contextSnippetBn,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -6852,6 +6982,8 @@ typedef $$VocabularyTableUpdateCompanionBuilder = VocabularyCompanion Function({
   Value<String?> audioUrl,
   Value<String?> lessonId,
   Value<int?> frequencyRank,
+  Value<String?> contextSnippetAr,
+  Value<String?> contextSnippetBn,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -6929,6 +7061,14 @@ class $$VocabularyTableFilterComposer
 
   ColumnFilters<int> get frequencyRank => $composableBuilder(
       column: $table.frequencyRank, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get contextSnippetAr => $composableBuilder(
+      column: $table.contextSnippetAr,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get contextSnippetBn => $composableBuilder(
+      column: $table.contextSnippetBn,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -7016,6 +7156,14 @@ class $$VocabularyTableOrderingComposer
       column: $table.frequencyRank,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get contextSnippetAr => $composableBuilder(
+      column: $table.contextSnippetAr,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get contextSnippetBn => $composableBuilder(
+      column: $table.contextSnippetBn,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -7078,6 +7226,12 @@ class $$VocabularyTableAnnotationComposer
 
   GeneratedColumn<int> get frequencyRank => $composableBuilder(
       column: $table.frequencyRank, builder: (column) => column);
+
+  GeneratedColumn<String> get contextSnippetAr => $composableBuilder(
+      column: $table.contextSnippetAr, builder: (column) => column);
+
+  GeneratedColumn<String> get contextSnippetBn => $composableBuilder(
+      column: $table.contextSnippetBn, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7158,6 +7312,8 @@ class $$VocabularyTableTableManager extends RootTableManager<
             Value<String?> audioUrl = const Value.absent(),
             Value<String?> lessonId = const Value.absent(),
             Value<int?> frequencyRank = const Value.absent(),
+            Value<String?> contextSnippetAr = const Value.absent(),
+            Value<String?> contextSnippetBn = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -7173,6 +7329,8 @@ class $$VocabularyTableTableManager extends RootTableManager<
             audioUrl: audioUrl,
             lessonId: lessonId,
             frequencyRank: frequencyRank,
+            contextSnippetAr: contextSnippetAr,
+            contextSnippetBn: contextSnippetBn,
             createdAt: createdAt,
             rowid: rowid,
           ),
@@ -7188,6 +7346,8 @@ class $$VocabularyTableTableManager extends RootTableManager<
             Value<String?> audioUrl = const Value.absent(),
             Value<String?> lessonId = const Value.absent(),
             Value<int?> frequencyRank = const Value.absent(),
+            Value<String?> contextSnippetAr = const Value.absent(),
+            Value<String?> contextSnippetBn = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -7203,6 +7363,8 @@ class $$VocabularyTableTableManager extends RootTableManager<
             audioUrl: audioUrl,
             lessonId: lessonId,
             frequencyRank: frequencyRank,
+            contextSnippetAr: contextSnippetAr,
+            contextSnippetBn: contextSnippetBn,
             createdAt: createdAt,
             rowid: rowid,
           ),
@@ -7998,6 +8160,7 @@ typedef $$StreaksTableCreateCompanionBuilder = StreaksCompanion Function({
   Value<int> totalXp,
   Value<int> freezeCount,
   Value<DateTime?> lastFreezedAt,
+  Value<int> hearts,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -8009,6 +8172,7 @@ typedef $$StreaksTableUpdateCompanionBuilder = StreaksCompanion Function({
   Value<int> totalXp,
   Value<int> freezeCount,
   Value<DateTime?> lastFreezedAt,
+  Value<int> hearts,
   Value<DateTime> updatedAt,
   Value<int> rowid,
 });
@@ -8043,6 +8207,9 @@ class $$StreaksTableFilterComposer
 
   ColumnFilters<DateTime> get lastFreezedAt => $composableBuilder(
       column: $table.lastFreezedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get hearts => $composableBuilder(
+      column: $table.hearts, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
@@ -8082,6 +8249,9 @@ class $$StreaksTableOrderingComposer
       column: $table.lastFreezedAt,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get hearts => $composableBuilder(
+      column: $table.hearts, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
@@ -8115,6 +8285,9 @@ class $$StreaksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastFreezedAt => $composableBuilder(
       column: $table.lastFreezedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get hearts =>
+      $composableBuilder(column: $table.hearts, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -8150,6 +8323,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             Value<int> totalXp = const Value.absent(),
             Value<int> freezeCount = const Value.absent(),
             Value<DateTime?> lastFreezedAt = const Value.absent(),
+            Value<int> hearts = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -8161,6 +8335,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             totalXp: totalXp,
             freezeCount: freezeCount,
             lastFreezedAt: lastFreezedAt,
+            hearts: hearts,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
@@ -8172,6 +8347,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             Value<int> totalXp = const Value.absent(),
             Value<int> freezeCount = const Value.absent(),
             Value<DateTime?> lastFreezedAt = const Value.absent(),
+            Value<int> hearts = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
@@ -8183,6 +8359,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             totalXp: totalXp,
             freezeCount: freezeCount,
             lastFreezedAt: lastFreezedAt,
+            hearts: hearts,
             updatedAt: updatedAt,
             rowid: rowid,
           ),
