@@ -25,6 +25,14 @@ final _examLessonByIdProvider =
 
 // ── Exam question loader (queries pool, shuffles, picks 10-12) ────────────────
 
+// DB stores snake_case type names; ExerciseModel enum expects camelCase.
+const _examTypeMap = {
+  'tap_to_build': 'tapToBuild',
+  'multiple_choice': 'multipleChoice',
+  'fill_in_blank': 'fillInBlank',
+  'true_false': 'trueFalse',
+};
+
 final _examQuestionsProvider =
     FutureProvider.family<List<ExerciseModel>, String>((ref, unitId) async {
   final rows = await Supabase.instance.client
@@ -47,6 +55,8 @@ final _examQuestionsProvider =
     // ExerciseModel requires id + lesson_id; map from exam_questions fields
     raw['lesson_id'] = raw['unit_id'];
     raw['sort_order'] = i + 1;
+    // Remap snake_case type to camelCase for enum deserialization
+    raw['type'] = _examTypeMap[raw['type']] ?? raw['type'];
     return ExerciseModel.fromJson(raw);
   }).toList();
 });
