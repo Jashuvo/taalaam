@@ -2343,6 +2343,12 @@ class $VocabularyTable extends Vocabulary
   late final GeneratedColumn<int> frequencyRank = GeneratedColumn<int>(
       'frequency_rank', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _grammarNoteBnMeta =
+      const VerificationMeta('grammarNoteBn');
+  @override
+  late final GeneratedColumn<String> grammarNoteBn = GeneratedColumn<String>(
+      'grammar_note_bn', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _contextSnippetArMeta =
       const VerificationMeta('contextSnippetAr');
   @override
@@ -2376,6 +2382,7 @@ class $VocabularyTable extends Vocabulary
         audioUrl,
         lessonId,
         frequencyRank,
+        grammarNoteBn,
         contextSnippetAr,
         contextSnippetBn,
         createdAt
@@ -2445,6 +2452,12 @@ class $VocabularyTable extends Vocabulary
           frequencyRank.isAcceptableOrUnknown(
               data['frequency_rank']!, _frequencyRankMeta));
     }
+    if (data.containsKey('grammar_note_bn')) {
+      context.handle(
+          _grammarNoteBnMeta,
+          grammarNoteBn.isAcceptableOrUnknown(
+              data['grammar_note_bn']!, _grammarNoteBnMeta));
+    }
     if (data.containsKey('context_snippet_ar')) {
       context.handle(
           _contextSnippetArMeta,
@@ -2492,6 +2505,8 @@ class $VocabularyTable extends Vocabulary
           .read(DriftSqlType.string, data['${effectivePrefix}lesson_id']),
       frequencyRank: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}frequency_rank']),
+      grammarNoteBn: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}grammar_note_bn']),
       contextSnippetAr: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}context_snippet_ar']),
       contextSnippetBn: attachedDatabase.typeMapping.read(
@@ -2519,6 +2534,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
   final String? audioUrl;
   final String? lessonId;
   final int? frequencyRank;
+  final String? grammarNoteBn;
   final String? contextSnippetAr;
   final String? contextSnippetBn;
   final DateTime createdAt;
@@ -2534,6 +2550,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       this.audioUrl,
       this.lessonId,
       this.frequencyRank,
+      this.grammarNoteBn,
       this.contextSnippetAr,
       this.contextSnippetBn,
       required this.createdAt});
@@ -2566,6 +2583,9 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
     }
     if (!nullToAbsent || frequencyRank != null) {
       map['frequency_rank'] = Variable<int>(frequencyRank);
+    }
+    if (!nullToAbsent || grammarNoteBn != null) {
+      map['grammar_note_bn'] = Variable<String>(grammarNoteBn);
     }
     if (!nullToAbsent || contextSnippetAr != null) {
       map['context_snippet_ar'] = Variable<String>(contextSnippetAr);
@@ -2605,6 +2625,9 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       frequencyRank: frequencyRank == null && nullToAbsent
           ? const Value.absent()
           : Value(frequencyRank),
+      grammarNoteBn: grammarNoteBn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grammarNoteBn),
       contextSnippetAr: contextSnippetAr == null && nullToAbsent
           ? const Value.absent()
           : Value(contextSnippetAr),
@@ -2630,6 +2653,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       audioUrl: serializer.fromJson<String?>(json['audioUrl']),
       lessonId: serializer.fromJson<String?>(json['lessonId']),
       frequencyRank: serializer.fromJson<int?>(json['frequencyRank']),
+      grammarNoteBn: serializer.fromJson<String?>(json['grammarNoteBn']),
       contextSnippetAr: serializer.fromJson<String?>(json['contextSnippetAr']),
       contextSnippetBn: serializer.fromJson<String?>(json['contextSnippetBn']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2650,6 +2674,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       'audioUrl': serializer.toJson<String?>(audioUrl),
       'lessonId': serializer.toJson<String?>(lessonId),
       'frequencyRank': serializer.toJson<int?>(frequencyRank),
+      'grammarNoteBn': serializer.toJson<String?>(grammarNoteBn),
       'contextSnippetAr': serializer.toJson<String?>(contextSnippetAr),
       'contextSnippetBn': serializer.toJson<String?>(contextSnippetBn),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2668,6 +2693,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
           Value<String?> audioUrl = const Value.absent(),
           Value<String?> lessonId = const Value.absent(),
           Value<int?> frequencyRank = const Value.absent(),
+          Value<String?> grammarNoteBn = const Value.absent(),
           Value<String?> contextSnippetAr = const Value.absent(),
           Value<String?> contextSnippetBn = const Value.absent(),
           DateTime? createdAt}) =>
@@ -2686,6 +2712,8 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
         lessonId: lessonId.present ? lessonId.value : this.lessonId,
         frequencyRank:
             frequencyRank.present ? frequencyRank.value : this.frequencyRank,
+        grammarNoteBn:
+            grammarNoteBn.present ? grammarNoteBn.value : this.grammarNoteBn,
         contextSnippetAr: contextSnippetAr.present
             ? contextSnippetAr.value
             : this.contextSnippetAr,
@@ -2712,6 +2740,9 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       frequencyRank: data.frequencyRank.present
           ? data.frequencyRank.value
           : this.frequencyRank,
+      grammarNoteBn: data.grammarNoteBn.present
+          ? data.grammarNoteBn.value
+          : this.grammarNoteBn,
       contextSnippetAr: data.contextSnippetAr.present
           ? data.contextSnippetAr.value
           : this.contextSnippetAr,
@@ -2736,6 +2767,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
           ..write('audioUrl: $audioUrl, ')
           ..write('lessonId: $lessonId, ')
           ..write('frequencyRank: $frequencyRank, ')
+          ..write('grammarNoteBn: $grammarNoteBn, ')
           ..write('contextSnippetAr: $contextSnippetAr, ')
           ..write('contextSnippetBn: $contextSnippetBn, ')
           ..write('createdAt: $createdAt')
@@ -2756,6 +2788,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
       audioUrl,
       lessonId,
       frequencyRank,
+      grammarNoteBn,
       contextSnippetAr,
       contextSnippetBn,
       createdAt);
@@ -2774,6 +2807,7 @@ class VocabEntry extends DataClass implements Insertable<VocabEntry> {
           other.audioUrl == this.audioUrl &&
           other.lessonId == this.lessonId &&
           other.frequencyRank == this.frequencyRank &&
+          other.grammarNoteBn == this.grammarNoteBn &&
           other.contextSnippetAr == this.contextSnippetAr &&
           other.contextSnippetBn == this.contextSnippetBn &&
           other.createdAt == this.createdAt);
@@ -2791,6 +2825,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
   final Value<String?> audioUrl;
   final Value<String?> lessonId;
   final Value<int?> frequencyRank;
+  final Value<String?> grammarNoteBn;
   final Value<String?> contextSnippetAr;
   final Value<String?> contextSnippetBn;
   final Value<DateTime> createdAt;
@@ -2807,6 +2842,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     this.audioUrl = const Value.absent(),
     this.lessonId = const Value.absent(),
     this.frequencyRank = const Value.absent(),
+    this.grammarNoteBn = const Value.absent(),
     this.contextSnippetAr = const Value.absent(),
     this.contextSnippetBn = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2824,6 +2860,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     this.audioUrl = const Value.absent(),
     this.lessonId = const Value.absent(),
     this.frequencyRank = const Value.absent(),
+    this.grammarNoteBn = const Value.absent(),
     this.contextSnippetAr = const Value.absent(),
     this.contextSnippetBn = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2843,6 +2880,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     Expression<String>? audioUrl,
     Expression<String>? lessonId,
     Expression<int>? frequencyRank,
+    Expression<String>? grammarNoteBn,
     Expression<String>? contextSnippetAr,
     Expression<String>? contextSnippetBn,
     Expression<DateTime>? createdAt,
@@ -2860,6 +2898,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
       if (audioUrl != null) 'audio_url': audioUrl,
       if (lessonId != null) 'lesson_id': lessonId,
       if (frequencyRank != null) 'frequency_rank': frequencyRank,
+      if (grammarNoteBn != null) 'grammar_note_bn': grammarNoteBn,
       if (contextSnippetAr != null) 'context_snippet_ar': contextSnippetAr,
       if (contextSnippetBn != null) 'context_snippet_bn': contextSnippetBn,
       if (createdAt != null) 'created_at': createdAt,
@@ -2879,6 +2918,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
       Value<String?>? audioUrl,
       Value<String?>? lessonId,
       Value<int?>? frequencyRank,
+      Value<String?>? grammarNoteBn,
       Value<String?>? contextSnippetAr,
       Value<String?>? contextSnippetBn,
       Value<DateTime>? createdAt,
@@ -2895,6 +2935,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
       audioUrl: audioUrl ?? this.audioUrl,
       lessonId: lessonId ?? this.lessonId,
       frequencyRank: frequencyRank ?? this.frequencyRank,
+      grammarNoteBn: grammarNoteBn ?? this.grammarNoteBn,
       contextSnippetAr: contextSnippetAr ?? this.contextSnippetAr,
       contextSnippetBn: contextSnippetBn ?? this.contextSnippetBn,
       createdAt: createdAt ?? this.createdAt,
@@ -2938,6 +2979,9 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
     if (frequencyRank.present) {
       map['frequency_rank'] = Variable<int>(frequencyRank.value);
     }
+    if (grammarNoteBn.present) {
+      map['grammar_note_bn'] = Variable<String>(grammarNoteBn.value);
+    }
     if (contextSnippetAr.present) {
       map['context_snippet_ar'] = Variable<String>(contextSnippetAr.value);
     }
@@ -2967,6 +3011,7 @@ class VocabularyCompanion extends UpdateCompanion<VocabEntry> {
           ..write('audioUrl: $audioUrl, ')
           ..write('lessonId: $lessonId, ')
           ..write('frequencyRank: $frequencyRank, ')
+          ..write('grammarNoteBn: $grammarNoteBn, ')
           ..write('contextSnippetAr: $contextSnippetAr, ')
           ..write('contextSnippetBn: $contextSnippetBn, ')
           ..write('createdAt: $createdAt, ')
@@ -6965,6 +7010,7 @@ typedef $$VocabularyTableCreateCompanionBuilder = VocabularyCompanion Function({
   Value<String?> audioUrl,
   Value<String?> lessonId,
   Value<int?> frequencyRank,
+  Value<String?> grammarNoteBn,
   Value<String?> contextSnippetAr,
   Value<String?> contextSnippetBn,
   Value<DateTime> createdAt,
@@ -6982,6 +7028,7 @@ typedef $$VocabularyTableUpdateCompanionBuilder = VocabularyCompanion Function({
   Value<String?> audioUrl,
   Value<String?> lessonId,
   Value<int?> frequencyRank,
+  Value<String?> grammarNoteBn,
   Value<String?> contextSnippetAr,
   Value<String?> contextSnippetBn,
   Value<DateTime> createdAt,
@@ -7061,6 +7108,9 @@ class $$VocabularyTableFilterComposer
 
   ColumnFilters<int> get frequencyRank => $composableBuilder(
       column: $table.frequencyRank, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get grammarNoteBn => $composableBuilder(
+      column: $table.grammarNoteBn, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get contextSnippetAr => $composableBuilder(
       column: $table.contextSnippetAr,
@@ -7156,6 +7206,10 @@ class $$VocabularyTableOrderingComposer
       column: $table.frequencyRank,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get grammarNoteBn => $composableBuilder(
+      column: $table.grammarNoteBn,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get contextSnippetAr => $composableBuilder(
       column: $table.contextSnippetAr,
       builder: (column) => ColumnOrderings(column));
@@ -7226,6 +7280,9 @@ class $$VocabularyTableAnnotationComposer
 
   GeneratedColumn<int> get frequencyRank => $composableBuilder(
       column: $table.frequencyRank, builder: (column) => column);
+
+  GeneratedColumn<String> get grammarNoteBn => $composableBuilder(
+      column: $table.grammarNoteBn, builder: (column) => column);
 
   GeneratedColumn<String> get contextSnippetAr => $composableBuilder(
       column: $table.contextSnippetAr, builder: (column) => column);
@@ -7312,6 +7369,7 @@ class $$VocabularyTableTableManager extends RootTableManager<
             Value<String?> audioUrl = const Value.absent(),
             Value<String?> lessonId = const Value.absent(),
             Value<int?> frequencyRank = const Value.absent(),
+            Value<String?> grammarNoteBn = const Value.absent(),
             Value<String?> contextSnippetAr = const Value.absent(),
             Value<String?> contextSnippetBn = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -7329,6 +7387,7 @@ class $$VocabularyTableTableManager extends RootTableManager<
             audioUrl: audioUrl,
             lessonId: lessonId,
             frequencyRank: frequencyRank,
+            grammarNoteBn: grammarNoteBn,
             contextSnippetAr: contextSnippetAr,
             contextSnippetBn: contextSnippetBn,
             createdAt: createdAt,
@@ -7346,6 +7405,7 @@ class $$VocabularyTableTableManager extends RootTableManager<
             Value<String?> audioUrl = const Value.absent(),
             Value<String?> lessonId = const Value.absent(),
             Value<int?> frequencyRank = const Value.absent(),
+            Value<String?> grammarNoteBn = const Value.absent(),
             Value<String?> contextSnippetAr = const Value.absent(),
             Value<String?> contextSnippetBn = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -7363,6 +7423,7 @@ class $$VocabularyTableTableManager extends RootTableManager<
             audioUrl: audioUrl,
             lessonId: lessonId,
             frequencyRank: frequencyRank,
+            grammarNoteBn: grammarNoteBn,
             contextSnippetAr: contextSnippetAr,
             contextSnippetBn: contextSnippetBn,
             createdAt: createdAt,

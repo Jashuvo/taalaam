@@ -18,6 +18,7 @@ class Vocabulary extends Table {
   TextColumn get lessonId =>
       text().nullable().references(Lessons, #id)();
   IntColumn get frequencyRank => integer().nullable()();
+  TextColumn get grammarNoteBn => text().nullable()();
   // Optional Islamic/classical context snippets (Ayah, Hadith, etc.)
   TextColumn get contextSnippetAr => text().nullable()();
   TextColumn get contextSnippetBn => text().nullable()();

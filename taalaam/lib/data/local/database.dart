@@ -31,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -63,6 +63,10 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE vocabulary ADD COLUMN context_snippet_ar TEXT');
         await customStatement(
             'ALTER TABLE vocabulary ADD COLUMN context_snippet_bn TEXT');
+      }
+      if (from < 5) {
+        await customStatement(
+            'ALTER TABLE vocabulary ADD COLUMN grammar_note_bn TEXT');
       }
     },
   );
