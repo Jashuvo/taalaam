@@ -51,13 +51,21 @@ final _examQuestionsProvider =
 
   return selected.asMap().entries.map((entry) {
     final i = entry.key;
-    final raw = Map<String, dynamic>.from(entry.value as Map);
-    // ExerciseModel requires id + lesson_id; map from exam_questions fields
-    raw['lesson_id'] = raw['unit_id'];
-    raw['sort_order'] = i + 1;
-    // Remap snake_case type to camelCase for enum deserialization
-    raw['type'] = _examTypeMap[raw['type']] ?? raw['type'];
-    return ExerciseModel.fromJson(raw);
+    final src = Map<String, dynamic>.from(entry.value as Map);
+    // ExerciseModel.fromJson uses camelCase keys (no fieldRename annotation).
+    // Supabase returns snake_case column names — remap everything manually.
+    return ExerciseModel.fromJson({
+      'id': src['id'],
+      'lessonId': src['unit_id'],
+      'type': _examTypeMap[src['type']] ?? src['type'],
+      'sortOrder': i + 1,
+      'promptAr': src['prompt_ar'],
+      'promptBn': src['prompt_bn'],
+      'correctAnswer': src['correct_answer'] as Map<String, dynamic>? ?? {},
+      'distractors': src['distractors'] as Map<String, dynamic>?,
+      'grammarNoteBn': src['grammar_note_bn'],
+      'difficulty': src['difficulty'] ?? 1,
+    });
   }).toList();
 });
 
