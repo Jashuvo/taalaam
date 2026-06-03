@@ -3,6 +3,9 @@ taalaam/supabase/functions/.env
 .env
 *.env
 
+# Claude Code local settings (may contain approved commands with tokens)
+.claude/settings.json
+
 # macOS
 .DS_Store
 .AppleDouble

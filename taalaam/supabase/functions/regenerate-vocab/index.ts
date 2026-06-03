@@ -4,7 +4,7 @@
 // vocabulary rows for the lesson.
 // Deploy: supabase functions deploy regenerate-vocab --no-verify-jwt
 
-import { GoogleGenAI } from 'npm:@google/genai';
+import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
 const corsHeaders = {
@@ -108,22 +108,14 @@ Deno.serve(async (req: Request) => {
       `Exercises:\n${exerciseSummary}\n\n` +
       `Extract the vocabulary list from these exercises. Return only the JSON array.`;
 
-    const ai = new GoogleGenAI({ apiKey: Deno.env.get('GEMINI_API_KEY')! });
+    const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: VOCAB_SYSTEM_PROMPT,
+    });
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini API timeout after 60 seconds')), 60_000)
-    );
-
-    const result = await Promise.race([
-      ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        config: { systemInstruction: VOCAB_SYSTEM_PROMPT },
-      }),
-      timeoutPromise,
-    ]);
-
-    let responseText = (result.text ?? '').trim();
+    const result = await model.generateContent(userPrompt);
+    let responseText = result.response.text().trim();
     if (responseText.startsWith('```')) {
       responseText = responseText
         .replace(/^```(?:json)?\n?/, '')
