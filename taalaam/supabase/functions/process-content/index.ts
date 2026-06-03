@@ -531,18 +531,20 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
 
     // Smart tier-based insertion: slots the unit at the correct position
     // and shifts higher-tier units forward automatically.
+    const unitSlug = `${track}-${Date.now()}`;
     const { data: newUnitId, error: unitErr } = await supabase.rpc('insert_and_shift_unit', {
       p_track_id: trackRow?.id,
       p_title_bn: parsed.unit_title_bn,
       p_title_ar: parsed.unit_title_ar,
       p_tier_level: parsed.evaluated_tier ?? 1,
+      p_slug: unitSlug,
     });
     if (unitErr) throw unitErr;
 
-    // Set slug + source_material_id (not in plpgsql function)
+    // Set source_material_id (slug already set by the RPC)
     await supabase
       .from('units')
-      .update({ slug: `${track}-${Date.now()}`, source_material_id: material_id })
+      .update({ source_material_id: material_id })
       .eq('id', newUnitId);
 
     const unit = { id: newUnitId as string };
