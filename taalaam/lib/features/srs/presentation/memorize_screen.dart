@@ -278,10 +278,14 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
           if (_checked) ...[
             _FeedbackBanner(correct: _correct, correctAnswer: _correctAnswer),
             const SizedBox(height: 14),
+            if (entry?.grammarNoteBn != null)
+              _GrammarNote(note: entry!.grammarNoteBn!),
             // Feature 3: context snippet revealed on answer
             if (entry?.contextSnippetAr != null ||
-                entry?.contextSnippetBn != null)
+                entry?.contextSnippetBn != null) ...[
+              const SizedBox(height: 8),
               _ContextSnippet(entry: entry!),
+            ],
             const SizedBox(height: 14),
             FilledButton(
               onPressed: () => widget.notifier.rate(_correct ? 3 : 1),
@@ -479,6 +483,45 @@ class _FeedbackBanner extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Grammar note block ────────────────────────────────────────────────────────
+
+class _GrammarNote extends StatelessWidget {
+  final String note;
+  const _GrammarNote({required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: theme.colorScheme.secondary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded,
+              size: 14, color: theme.colorScheme.secondary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              note,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
         ],

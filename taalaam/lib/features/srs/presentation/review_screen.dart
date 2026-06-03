@@ -270,6 +270,36 @@ class _FlippedFace extends ConsumerWidget {
                 textAlign: TextAlign.center,
               ),
             ],
+            if (entry?.grammarNoteBn != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: theme.colorScheme.secondary.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 13, color: theme.colorScheme.secondary),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        entry!.grammarNoteBn!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         );
       },

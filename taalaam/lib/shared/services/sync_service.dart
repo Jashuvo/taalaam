@@ -123,6 +123,9 @@ class SyncService {
               audioUrl: Value(r['audio_url'] as String?),
               lessonId: Value(lessonId),
               frequencyRank: Value(r['frequency_rank'] as int?),
+              grammarNoteBn: Value(r['grammar_note_bn'] as String?),
+              contextSnippetAr: Value(r['context_snippet_ar'] as String?),
+              contextSnippetBn: Value(r['context_snippet_bn'] as String?),
             ));
       }
     } catch (_) {

@@ -26,7 +26,7 @@ final unitsForTrackProvider =
   ref.read(syncServiceProvider).syncUnits(trackId).ignore();
   return (db.select(db.units)
         ..where((t) => t.trackId.equals(trackId))
-        ..orderBy([(t) => drift.OrderingTerm.asc(t.sortOrder)]))
+        ..orderBy([(t) => drift.OrderingTerm.asc(t.sequenceOrder)]))
       .watch();
 });
 
