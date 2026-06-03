@@ -725,9 +725,38 @@ class _UnitHeader extends StatelessWidget {
           Row(
             children: [
               _StatusChip(status: unit['status'] as String? ?? 'draft'),
+              const SizedBox(width: 8),
+              _TierChip(tier: unit['tier_level'] as int? ?? 1),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TierChip extends StatelessWidget {
+  final int tier;
+  const _TierChip({required this.tier});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = switch (tier) {
+      1 => (bg: Colors.blue.shade100,   fg: Colors.blue.shade800),
+      2 => (bg: Colors.purple.shade100, fg: Colors.purple.shade800),
+      3 => (bg: Colors.amber.shade100,  fg: Colors.amber.shade900),
+      4 => (bg: Colors.red.shade100,    fg: Colors.red.shade800),
+      _ => (bg: Colors.grey.shade100,   fg: Colors.grey.shade700),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: colors.bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'Tier $tier',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.fg),
       ),
     );
   }

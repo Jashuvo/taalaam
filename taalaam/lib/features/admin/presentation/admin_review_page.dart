@@ -7,8 +7,8 @@ import '../../../shared/widgets/confirm_dialog.dart';
 final _allUnitsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final rows = await Supabase.instance.client
       .from('units')
-      .select('id, title_bn, title_ar, status, track_id, sort_order')
-      .order('sort_order', ascending: true);
+      .select('id, title_bn, title_ar, status, track_id, sort_order, tier_level, sequence_order')
+      .order('sequence_order', ascending: true);
   return List<Map<String, dynamic>>.from(rows as List);
 });
 
@@ -149,7 +149,7 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
       for (int i = 0; i < reordered.length; i++) {
         await Supabase.instance.client
             .from('units')
-            .update({'sort_order': i}).eq('id', reordered[i]['id']);
+            .update({'sort_order': i, 'sequence_order': i}).eq('id', reordered[i]['id']);
       }
     } catch (e) {
       if (mounted) {
@@ -434,6 +434,8 @@ class _UnitCardState extends State<_UnitCard> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _TierChip(tier: widget.unit['tier_level'] as int? ?? 1),
+                    const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 7, vertical: 3),
@@ -539,6 +541,33 @@ class _UnitCardState extends State<_UnitCard> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TierChip extends StatelessWidget {
+  final int tier;
+  const _TierChip({required this.tier});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = switch (tier) {
+      1 => (bg: Colors.blue.shade100,   fg: Colors.blue.shade800),
+      2 => (bg: Colors.purple.shade100, fg: Colors.purple.shade800),
+      3 => (bg: Colors.amber.shade100,  fg: Colors.amber.shade900),
+      4 => (bg: Colors.red.shade100,    fg: Colors.red.shade800),
+      _ => (bg: Colors.grey.shade100,   fg: Colors.grey.shade700),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: colors.bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'T$tier',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.fg),
       ),
     );
   }
