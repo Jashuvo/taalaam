@@ -727,9 +727,35 @@ class _UnitHeader extends StatelessWidget {
               _StatusChip(status: unit['status'] as String? ?? 'draft'),
               const SizedBox(width: 8),
               _TierChip(tier: unit['tier_level'] as int? ?? 1),
+              const SizedBox(width: 8),
+              _SeqChip(order: unit['sequence_order'] as int? ?? 0),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SeqChip extends StatelessWidget {
+  final int order;
+  const _SeqChip({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '#$order',
+        style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurfaceVariant),
       ),
     );
   }

@@ -282,8 +282,53 @@ class _UnitCard extends StatefulWidget {
   State<_UnitCard> createState() => _UnitCardState();
 }
 
+// Tier labels for the override dropdown — aligned with Salafi Arabic curriculum
+const _tierDropdownLabels = <int, String>{
+  1: 'T1 — মৌলিক শব্দ ও ইশারা',
+  2: 'T2 — বাক্য সম্প্রসারণ ও গুণাবলী',
+  3: 'T3 — ক্রিয়ার প্রাথমিক রূপান্তর',
+  4: 'T4 — উচ্চতর শাস্ত্রীয় বাক্য গঠন',
+};
+
 class _UnitCardState extends State<_UnitCard> {
   bool _busy = false;
+  late int _currentTier;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTier = widget.unit['tier_level'] as int? ?? 1;
+  }
+
+  @override
+  void didUpdateWidget(_UnitCard old) {
+    super.didUpdateWidget(old);
+    _currentTier = widget.unit['tier_level'] as int? ?? 1;
+  }
+
+  Future<void> _overrideTier(int newTier) async {
+    if (newTier == _currentTier) return;
+    setState(() {
+      _currentTier = newTier;
+      _busy = true;
+    });
+    try {
+      await Supabase.instance.client
+          .from('units')
+          .update({'tier_level': newTier}).eq('id', widget.unit['id']);
+      // Reposition in the sequence timeline
+      await Supabase.instance.client.functions
+          .invoke('sort-units', body: {'track_id': widget.unit['track_id']});
+      widget.onRefresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _aiSort() async {
     final confirmed = await showConfirmDialog(
@@ -434,7 +479,9 @@ class _UnitCardState extends State<_UnitCard> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _TierChip(tier: widget.unit['tier_level'] as int? ?? 1),
+                    _TierChip(tier: _currentTier),
+                    const SizedBox(width: 4),
+                    _SeqChip(order: widget.unit['sequence_order'] as int? ?? 0),
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -462,7 +509,32 @@ class _UnitCardState extends State<_UnitCard> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            // ── Tier override row ────────────────────────────────────────────
+            Row(
+              children: [
+                Text('টিয়ার:',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(width: 8),
+                DropdownButton<int>(
+                  value: _currentTier,
+                  isDense: true,
+                  underline: const SizedBox.shrink(),
+                  items: [1, 2, 3, 4]
+                      .map((t) => DropdownMenuItem(
+                            value: t,
+                            child: Text(
+                              _tierDropdownLabels[t] ?? 'T$t',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: _busy ? null : (t) { if (t != null) _overrideTier(t); },
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
             // ── Action row ───────────────────────────────────────────────────
             if (_busy)
               const SizedBox(
@@ -541,6 +613,30 @@ class _UnitCardState extends State<_UnitCard> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SeqChip extends StatelessWidget {
+  final int order;
+  const _SeqChip({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '#$order',
+        style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurfaceVariant),
       ),
     );
   }

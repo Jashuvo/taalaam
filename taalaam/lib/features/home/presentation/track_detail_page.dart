@@ -6,12 +6,46 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import 'home_provider.dart';
 
-// ── Path geometry constants ───────────────────────────────────────────────────
-
+// ── Path geometry ─────────────────────────────────────────────────────────────
 const _nodeSize = 64.0;
 const _rowHeight = 116.0;
-// Horizontal positions as fractions of available width: centre → right → centre → left
 const _xFractions = [0.5, 0.78, 0.5, 0.22];
+
+// ── Tier metadata — Salafi Saudi Arabic curriculum ────────────────────────────
+const _tierGradients = <int, List<Color>>{
+  1: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+  2: [Color(0xFF6A1B9A), Color(0xFF8E24AA)],
+  3: [Color(0xFFBF360C), Color(0xFFF4511E)],
+  4: [Color(0xFFB71C1C), Color(0xFFE53935)],
+};
+
+// Tier 1: Core vocabulary — the most frequent Quranic nouns/pronouns
+// Tier 2: Sentence construction — إضافة, na't, ḥurūf jarr (Quranic phrase patterns)
+// Tier 3: Verbs — الماضي, المضارع, الأمر (essential for Quran and spoken Saudi)
+// Tier 4: Classical mastery — abwāb, ishtiqāq, tafsīr-level text
+const _tierNames = <int, String>{
+  1: 'মৌলিক শব্দভাণ্ডার',
+  2: 'বাক্য রচনা',
+  3: 'ক্রিয়ার জগৎ',
+  4: 'উচ্চতর শাস্ত্র',
+};
+
+const _tierNamesAr = <int, String>{
+  1: 'الكلمات الأساسية',
+  2: 'تركيب الجملة',
+  3: 'عالم الأفعال',
+  4: 'الفصحى المتقدمة',
+};
+
+const _tierDescriptions = <int, String>{
+  1: 'কুরআনের সর্বাধিক ব্যবহৃত বিশেষ্য, সর্বনাম ও প্রাথমিক শব্দ',
+  2: 'ইযাফা, নাত ও হরফে জার — কুরআনের বাক্যগঠনের মূলনীতি',
+  3: 'মাযি, মুযারি ও আমর — কুরআন ও কথ্য আরবির অপরিহার্য ক্রিয়াপদ',
+  4: 'অবওয়াব, ইশতিকাক ও তাফসিরের শাস্ত্রীয় আরবি',
+};
+
+List<Color> _tierColors(int tier) =>
+    _tierGradients[tier] ?? _tierGradients[1]!;
 
 // ── Page shell ────────────────────────────────────────────────────────────────
 
@@ -39,91 +73,89 @@ class TrackDetailPage extends ConsumerWidget {
   }
 }
 
-// ── Body ──────────────────────────────────────────────────────────────────────
+// ── Body (stateful: owns the selected-tier world state) ───────────────────────
 
-class _TrackBody extends ConsumerWidget {
+class _TrackBody extends ConsumerStatefulWidget {
   final Track track;
   const _TrackBody({required this.track});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TrackBody> createState() => _TrackBodyState();
+}
+
+class _TrackBodyState extends ConsumerState<_TrackBody> {
+  int _selectedTier = 1;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isQuranic = track.slug == 'quranic';
-    final unitsAsync = ref.watch(unitsForTrackProvider(track.id));
+    final isQuranic = widget.track.slug == 'quranic';
+    final unitsAsync = ref.watch(unitsForTrackProvider(widget.track.id));
     final completedAsync = ref.watch(completedLessonIdsProvider);
     final bookmarkedAsync = ref.watch(bookmarkedLessonIdsProvider);
+    final gradientColors =
+        isQuranic ? AppColors.gradientQuranic : AppColors.gradientConversational;
 
-    final gradientColors = isQuranic
-        ? AppColors.gradientQuranic
-        : AppColors.gradientConversational;
+    final allUnits = unitsAsync.valueOrNull;
+
+    // Show app bar + loader/error before units are ready
+    if (allUnits == null) {
+      return Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            _buildAppBar(gradientColors),
+            SliverFillRemaining(
+              child: Center(
+                child: unitsAsync.hasError
+                    ? Text('পাঠ লোড হচ্ছে না।',
+                        style: TextStyle(color: theme.colorScheme.error))
+                    : const CircularProgressIndicator(),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Determine which tiers have content
+    final availableTiers =
+        allUnits.map((u) => u.tierLevel).toSet().toList()..sort();
+
+    // If the saved tier has no units (e.g. first load or content deleted), snap to lowest
+    int effectiveTier = _selectedTier;
+    if (availableTiers.isNotEmpty && !availableTiers.contains(_selectedTier)) {
+      effectiveTier = availableTiers.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedTier = availableTiers.first);
+      });
+    }
+
+    final filteredUnits =
+        allUnits.where((u) => u.tierLevel == effectiveTier).toList();
+    final completedIds = completedAsync.valueOrNull ?? {};
+    final bookmarkedIds = bookmarkedAsync.valueOrNull ?? {};
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // ── Collapsible gradient app bar ─────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 130,
-            pinned: true,
-            backgroundColor: gradientColors[0],
-            foregroundColor: Colors.white,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: gradientColors,
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(72, 8, 24, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          track.nameBn,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: Text(
-                            track.nameAr,
-                            style: const TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 16,
-                              height: 1.4,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+          // ── Collapsible track app bar ──────────────────────────────────
+          _buildAppBar(gradientColors),
+
+          // ── Sticky Duolingo-style world/section selector ───────────────
+          if (availableTiers.isNotEmpty)
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _SectionBarDelegate(
+                selectedTier: effectiveTier,
+                availableTiers: availableTiers,
+                allUnits: allUnits,
+                onSelectTier: (t) => setState(() => _selectedTier = t),
               ),
             ),
-          ),
 
-          // ── Units + lesson path ──────────────────────────────────────────
-          unitsAsync.when(
-            loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator())),
-            error: (e, _) => SliverFillRemaining(
-              child: Center(
-                  child: Text('পাঠ লোড হচ্ছে না।',
-                      style:
-                          TextStyle(color: theme.colorScheme.error))),
-            ),
-            data: (units) {
-              if (units.isEmpty) {
-                return SliverFillRemaining(
+          // ── Filtered units for the selected section ────────────────────
+          filteredUnits.isEmpty
+              ? SliverFillRemaining(
                   child: Center(
                     child: Padding(
                       padding: const EdgeInsets.all(32),
@@ -131,11 +163,10 @@ class _TrackBody extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.hourglass_empty,
-                              size: 64,
-                              color: theme.colorScheme.outline),
+                              size: 64, color: theme.colorScheme.outline),
                           const SizedBox(height: 16),
                           Text(
-                            'এই কোর্সে এখনও কোনো পাঠ নেই।\nশীঘ্রই আসছে ইনশাআল্লাহ!',
+                            'এই বিভাগে এখনও কোনো পাঠ নেই।\nশীঘ্রই আসছে ইনশাআল্লাহ!',
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyLarge?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant),
@@ -144,25 +175,316 @@ class _TrackBody extends ConsumerWidget {
                       ),
                     ),
                   ),
-                );
-              }
-              final completedIds = completedAsync.valueOrNull ?? {};
-              final bookmarkedIds = bookmarkedAsync.valueOrNull ?? {};
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => _UnitSection(
-                    unit: units[i],
-                    unitNumber: i + 1,
-                    completedIds: completedIds,
-                    bookmarkedIds: bookmarkedIds,
-                    gradientColors: gradientColors,
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => _UnitSection(
+                      unit: filteredUnits[i],
+                      unitNumber: i + 1,
+                      completedIds: completedIds,
+                      bookmarkedIds: bookmarkedIds,
+                      tierColors: _tierColors(filteredUnits[i].tierLevel),
+                    ),
+                    childCount: filteredUnits.length,
                   ),
-                  childCount: units.length,
                 ),
-              );
-            },
-          ),
+
           const SliverToBoxAdapter(child: SizedBox(height: 48)),
+        ],
+      ),
+    );
+  }
+
+  SliverAppBar _buildAppBar(List<Color> gradientColors) {
+    return SliverAppBar(
+      expandedHeight: 130,
+      pinned: true,
+      backgroundColor: gradientColors[0],
+      foregroundColor: Colors.white,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
+            ),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(72, 8, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    widget.track.nameBn,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 3),
+                  Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Text(
+                      widget.track.nameAr,
+                      style: const TextStyle(
+                          fontFamily: 'NotoNaskhArabic',
+                          fontSize: 16,
+                          height: 1.4,
+                          color: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sticky section bar ────────────────────────────────────────────────────────
+
+class _SectionBarDelegate extends SliverPersistentHeaderDelegate {
+  final int selectedTier;
+  final List<int> availableTiers;
+  final List<Unit> allUnits;
+  final ValueChanged<int> onSelectTier;
+
+  static const double _h = 62.0;
+
+  const _SectionBarDelegate({
+    required this.selectedTier,
+    required this.availableTiers,
+    required this.allUnits,
+    required this.onSelectTier,
+  });
+
+  @override
+  double get minExtent => _h;
+  @override
+  double get maxExtent => _h;
+
+  @override
+  bool shouldRebuild(_SectionBarDelegate old) =>
+      selectedTier != old.selectedTier ||
+      availableTiers.length != old.availableTiers.length;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final colors = _tierColors(selectedTier);
+    final name = _tierNames[selectedTier] ?? 'বিভাগ $selectedTier';
+    final nameAr = _tierNamesAr[selectedTier] ?? '';
+    final unitCount =
+        allUnits.where((u) => u.tierLevel == selectedTier).length;
+    final idx = availableTiers.indexOf(selectedTier);
+    final hasPrev = idx > 0;
+    final hasNext = idx < availableTiers.length - 1;
+
+    return Material(
+      elevation: overlapsContent ? 4 : 0,
+      color: colors[0],
+      child: Row(
+        children: [
+          // ← prev section
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded,
+                color: Colors.white, size: 28),
+            onPressed: hasPrev
+                ? () => onSelectTier(availableTiers[idx - 1])
+                : null,
+            disabledColor: Colors.white24,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+
+          // Center: section name + tap to pick
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _showPicker(context),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'বিভাগ ${idx + 1} — $name',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white70, size: 18),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$unitCount টি ইউনিট',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 11),
+                      ),
+                      const SizedBox(width: 8),
+                      Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Text(
+                          nameAr,
+                          style: const TextStyle(
+                              fontFamily: 'NotoNaskhArabic',
+                              fontSize: 12,
+                              height: 1.4,
+                              color: Colors.white54),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // → next section
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded,
+                color: Colors.white, size: 28),
+            onPressed: hasNext
+                ? () => onSelectTier(availableTiers[idx + 1])
+                : null,
+            disabledColor: Colors.white24,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _SectionPickerSheet(
+        availableTiers: availableTiers,
+        selectedTier: selectedTier,
+        allUnits: allUnits,
+        onSelect: (tier) {
+          onSelectTier(tier);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+}
+
+// ── Section picker bottom sheet ───────────────────────────────────────────────
+
+class _SectionPickerSheet extends StatelessWidget {
+  final List<int> availableTiers;
+  final int selectedTier;
+  final List<Unit> allUnits;
+  final ValueChanged<int> onSelect;
+
+  const _SectionPickerSheet({
+    required this.availableTiers,
+    required this.selectedTier,
+    required this.allUnits,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: AppRadius.xlBorder,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+            child: Row(
+              children: [
+                const Icon(Icons.layers_outlined),
+                const SizedBox(width: 10),
+                Text('বিভাগ নির্বাচন করুন',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ...availableTiers.map((tier) {
+            final colors = _tierColors(tier);
+            final name = _tierNames[tier] ?? 'বিভাগ $tier';
+            final nameAr = _tierNamesAr[tier] ?? '';
+            final desc = _tierDescriptions[tier] ?? '';
+            final count = allUnits.where((u) => u.tierLevel == tier).length;
+            final isSelected = tier == selectedTier;
+            final tierIdx = availableTiers.indexOf(tier);
+
+            return ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              leading: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: colors),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${tierIdx + 1}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16),
+                  ),
+                ),
+              ),
+              title: Row(
+                children: [
+                  Text(name,
+                      style: TextStyle(
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal)),
+                  const SizedBox(width: 8),
+                  Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Text(
+                      nameAr,
+                      style: const TextStyle(
+                          fontFamily: 'NotoNaskhArabic',
+                          fontSize: 13,
+                          height: 1.4,
+                          color: Colors.grey),
+                    ),
+                  ),
+                ],
+              ),
+              subtitle: Text(
+                '$desc • $count ইউনিট',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              trailing: isSelected
+                  ? Icon(Icons.check_circle_rounded, color: colors[0])
+                  : null,
+              onTap: () => onSelect(tier),
+            );
+          }),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -176,14 +498,14 @@ class _UnitSection extends ConsumerWidget {
   final int unitNumber;
   final Set<String> completedIds;
   final Set<String> bookmarkedIds;
-  final List<Color> gradientColors;
+  final List<Color> tierColors;
 
   const _UnitSection({
     required this.unit,
     required this.unitNumber,
     required this.completedIds,
     required this.bookmarkedIds,
-    required this.gradientColors,
+    required this.tierColors,
   });
 
   @override
@@ -201,7 +523,7 @@ class _UnitSection extends ConsumerWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: gradientColors,
+              colors: tierColors,
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -324,17 +646,14 @@ class _LessonPath extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // Path lines
             CustomPaint(
               size: Size(width, totalHeight),
               painter: _PathPainter(
                 positions: positions,
-                isDoneList: lessons
-                    .map((l) => completedIds.contains(l.id))
-                    .toList(),
+                isDoneList:
+                    lessons.map((l) => completedIds.contains(l.id)).toList(),
               ),
             ),
-            // Nodes
             ...List.generate(lessons.length, (i) {
               final pos = positions[i];
               return Positioned(
@@ -374,16 +693,12 @@ class _PathPainter extends CustomPainter {
 
       final from = positions[i];
       final to = positions[i + 1];
-
-      // Trim start/end so the line connects node edges, not centres
       final delta = to - from;
       final dist = delta.distance;
       final unitV = Offset(delta.dx / dist, delta.dy / dist);
       const gap = _nodeSize / 2 + 3;
       final start = from + unitV * gap;
       final end = to - unitV * gap;
-
-      // Smooth S-curve between the two node edges
       final mid = (end.dy - start.dy) * 0.45;
       final path = Path()
         ..moveTo(start.dx, start.dy)
@@ -466,7 +781,6 @@ class _LessonNode extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Circle node
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               width: _nodeSize,
@@ -493,7 +807,6 @@ class _LessonNode extends StatelessWidget {
               child: Center(child: nodeIcon),
             ),
             const SizedBox(height: 6),
-            // Lesson title — readable size, clipped to 1 line
             SizedBox(
               width: _nodeSize + 16,
               child: Text(
@@ -513,9 +826,9 @@ class _LessonNode extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 3),
-            // XP badge
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                 color: isDone
                     ? AppColors.correctTile.withValues(alpha: 0.15)
@@ -620,7 +933,7 @@ class _LessonNode extends StatelessWidget {
   }
 }
 
-// ── Exam node (end of each unit path) ─────────────────────────────────────────
+// ── Exam node ─────────────────────────────────────────────────────────────────
 
 class _ExamNode extends StatefulWidget {
   final Lesson examLesson;
@@ -645,9 +958,7 @@ class _ExamNodeState extends State<_ExamNode>
   void initState() {
     super.initState();
     _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    );
+        vsync: this, duration: const Duration(milliseconds: 1800));
     if (widget.isUnlocked && !widget.isDone) _pulse.repeat();
   }
 
@@ -670,7 +981,6 @@ class _ExamNodeState extends State<_ExamNode>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     const examSize = 80.0;
     const gold = AppColors.gold;
     const goldDark = Color(0xFFB8860B);
@@ -678,24 +988,22 @@ class _ExamNodeState extends State<_ExamNode>
     final Color bg;
     final Color borderColor;
     final Widget icon;
-    final String label;
 
     if (widget.isDone) {
       bg = gold;
       borderColor = goldDark;
-      icon = const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 36);
-      label = 'সম্পন্ন!';
+      icon = const Icon(Icons.emoji_events_rounded,
+          color: Colors.white, size: 36);
     } else if (widget.isUnlocked) {
       bg = gold;
       borderColor = Colors.white.withValues(alpha: 0.8);
-      icon = const Icon(Icons.shield_rounded, color: Colors.white, size: 36);
-      label = 'পরীক্ষা দিন';
+      icon =
+          const Icon(Icons.shield_rounded, color: Colors.white, size: 36);
     } else {
       bg = theme.colorScheme.surfaceContainerHighest;
       borderColor = theme.colorScheme.outline.withValues(alpha: 0.4);
       icon = Icon(Icons.lock_outline_rounded,
           color: theme.colorScheme.onSurfaceVariant, size: 28);
-      label = 'পাঠ শেষ করুন';
     }
 
     return Padding(
@@ -708,7 +1016,6 @@ class _ExamNodeState extends State<_ExamNode>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Pulsing glow ring (unlocked only)
               AnimatedBuilder(
                 animation: _pulse,
                 builder: (_, child) {
@@ -755,17 +1062,19 @@ class _ExamNodeState extends State<_ExamNode>
                 ),
               ),
               const SizedBox(height: 8),
-              // "পরীক্ষা" label
               Text(
                 'মডিউল পরীক্ষা',
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: widget.isUnlocked ? gold : theme.colorScheme.onSurfaceVariant,
+                  color: widget.isUnlocked
+                      ? gold
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 2),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
                   color: widget.isUnlocked
                       ? gold.withValues(alpha: 0.15)
@@ -778,7 +1087,7 @@ class _ExamNodeState extends State<_ExamNode>
                 child: Text(
                   widget.isUnlocked
                       ? '${widget.examLesson.xpReward} XP • ${widget.examLesson.gemReward} 💎'
-                      : label,
+                      : 'পাঠ শেষ করুন',
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: widget.isUnlocked
                         ? gold
