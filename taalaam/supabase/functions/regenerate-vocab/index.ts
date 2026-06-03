@@ -109,12 +109,23 @@ Deno.serve(async (req: Request) => {
       `Extract the vocabulary list from these exercises. Return only the JSON array.`;
 
     const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: VOCAB_SYSTEM_PROMPT,
-    });
 
-    const result = await model.generateContent(userPrompt);
+    const tryGenerate = async (modelName: string) => {
+      const m = genAI.getGenerativeModel({ model: modelName, systemInstruction: VOCAB_SYSTEM_PROMPT });
+      return m.generateContent(userPrompt);
+    };
+
+    let result;
+    try {
+      result = await tryGenerate('gemini-2.5-flash');
+    } catch (primaryErr) {
+      const msg = String(primaryErr);
+      if (msg.includes('503') || msg.includes('overloaded') || msg.includes('unavailable')) {
+        result = await tryGenerate('gemini-1.5-flash');
+      } else {
+        throw primaryErr;
+      }
+    }
     let responseText = result.response.text().trim();
     if (responseText.startsWith('```')) {
       responseText = responseText
