@@ -21,7 +21,7 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
+const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
 
 async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<{ text: string; model: string }> {
   const genAI = new GoogleGenerativeAI(apiKey);
