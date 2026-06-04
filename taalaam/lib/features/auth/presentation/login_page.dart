@@ -102,7 +102,11 @@ class _LoginPageState extends ConsumerState<LoginPage>
         }
       } else {
         await ref.read(authServiceProvider).signInWithEmail(email, pass);
-        if (mounted) context.go('/home');
+        if (mounted) {
+          // Admin who signs in via the learner app goes straight to admin dashboard
+          final isAdmin = ref.read(isAdminProvider);
+          context.go(isAdmin ? '/admin' : '/home');
+        }
       }
     } on AuthException catch (e) {
       setState(() => _error = _translateError(e.message));

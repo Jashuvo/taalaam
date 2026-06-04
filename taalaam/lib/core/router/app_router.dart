@@ -4,6 +4,7 @@ import '../../app.dart';
 import '../../features/admin/presentation/admin_home_page.dart';
 import '../../features/admin/presentation/admin_review_page.dart';
 import '../../features/admin/presentation/admin_upload_page.dart';
+import '../../features/auth/presentation/admin_login_page.dart';
 import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/onboarding_page.dart';
@@ -51,7 +52,9 @@ final appRouterProvider =
       // ── Auth ─────────────────────────────────────────────────
       GoRoute(
         path: '/login',
-        builder: (_, __) => const LoginPage(),
+        builder: (_, __) => flavor == AppFlavor.admin
+            ? const AdminLoginPage()
+            : const LoginPage(),
       ),
       GoRoute(
         path: '/onboarding',

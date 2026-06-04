@@ -375,7 +375,6 @@ class _UnitCardState extends State<_UnitCard> {
       await Supabase.instance.client
           .from('units')
           .update({'tier_level': newTier}).eq('id', widget.unit['id']);
-      // Reposition in the sequence timeline
       await Supabase.instance.client.functions
           .invoke('sort-units', body: {'track_id': widget.unit['track_id']});
       widget.onRefresh();
@@ -387,6 +386,45 @@ class _UnitCardState extends State<_UnitCard> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _showTierPicker() async {
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('টিয়ার পরিবর্তন'),
+        children: [1, 2, 3, 4].map((t) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(ctx, t),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(children: [
+              Container(
+                width: 28, height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: t == _currentTier
+                      ? Theme.of(ctx).colorScheme.primaryContainer
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text('T$t',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: t == _currentTier
+                          ? Theme.of(ctx).colorScheme.onPrimaryContainer
+                          : null,
+                    )),
+              ),
+              const SizedBox(width: 10),
+              Text(_tierDropdownLabels[t] ?? 'T$t',
+                  style: const TextStyle(fontSize: 13)),
+            ]),
+          ),
+        )).toList(),
+      ),
+    );
+    if (picked != null && picked != _currentTier) _overrideTier(picked);
   }
 
   Future<void> _moveToTrack() async {
@@ -553,136 +591,97 @@ class _UnitCardState extends State<_UnitCard> {
     final titleBn = widget.unit['title_bn'] as String? ?? 'Untitled';
     final titleAr = widget.unit['title_ar'] as String?;
     final isDraft = widget.isDraft;
+    final trackSlug = (widget.unit['tracks'] as Map?)?['slug'] as String? ?? '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Title row ───────────────────────────────────────────────────
+            // ── Chips + status + drag ─────────────────────────────────────
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(titleBn,
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.bold)),
-                      if (titleAr != null && titleAr.isNotEmpty)
-                        Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: Text(
-                            titleAr,
-                            style: const TextStyle(
-                                fontFamily: 'NotoNaskhArabic',
-                                fontSize: 14,
-                                height: 1.6),
-                          ),
-                        ),
-                    ],
+                _TrackChip(slug: trackSlug),
+                const SizedBox(width: 4),
+                _TierChip(
+                  tier: _currentTier,
+                  onTap: _busy ? null : _showTierPicker,
+                ),
+                const SizedBox(width: 4),
+                _SeqChip(order: widget.unit['sequence_order'] as int? ?? 0),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDraft ? Colors.orange.shade100 : Colors.green.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isDraft ? 'DRAFT' : 'LIVE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isDraft ? Colors.orange.shade800 : Colors.green.shade800,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _TrackChip(slug: (widget.unit['tracks'] as Map?)?['slug'] as String? ?? ''),
-                    const SizedBox(width: 4),
-                    _TierChip(tier: _currentTier),
-                    const SizedBox(width: 4),
-                    _SeqChip(order: widget.unit['sequence_order'] as int? ?? 0),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isDraft
-                            ? Colors.orange.shade100
-                            : Colors.green.shade100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        isDraft ? 'DRAFT' : 'LIVE',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isDraft
-                                ? Colors.orange.shade800
-                                : Colors.green.shade800),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Icon(Icons.drag_handle,
-                        color: Colors.grey, size: 18),
-                  ],
-                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.drag_handle, color: Colors.grey, size: 18),
               ],
             ),
             const SizedBox(height: 8),
-            // ── Tier override + track move row ───────────────────────────────
-            Row(
-              children: [
-                Text('টিয়ার:',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant)),
-                const SizedBox(width: 8),
-                DropdownButton<int>(
-                  value: _currentTier,
-                  isDense: true,
-                  underline: const SizedBox.shrink(),
-                  items: [1, 2, 3, 4]
-                      .map((t) => DropdownMenuItem(
-                            value: t,
-                            child: Text(
-                              _tierDropdownLabels[t] ?? 'T$t',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: _busy ? null : (t) { if (t != null) _overrideTier(t); },
-                ),
-                const Spacer(),
-                TextButton.icon(
-                  icon: const Icon(Icons.swap_horiz, size: 14),
-                  label: const Text('ট্র্যাক বদলান'),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    textStyle: const TextStyle(fontSize: 12),
+
+            // ── Title ─────────────────────────────────────────────────────
+            Text(titleBn,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            if (titleAr != null && titleAr.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Directionality(
+                textDirection: TextDirection.rtl,
+                child: Text(
+                  titleAr,
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 13,
+                    height: 1.6,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  onPressed: _busy ? null : _moveToTrack,
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            // ── Action row ───────────────────────────────────────────────────
+              ),
+            ],
+            const SizedBox(height: 10),
+
+            // ── Actions ───────────────────────────────────────────────────
             if (_busy)
               const SizedBox(
-                  height: 28,
-                  child: Center(
-                      child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))))
+                height: 32,
+                child: Center(
+                  child: SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
             else
               Row(
                 children: [
-                  // AI Sort — highlighted so it's always easy to find
                   FilledButton.icon(
                     icon: const Icon(Icons.auto_awesome, size: 14),
                     label: const Text('AI Sort'),
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 34),
+                      minimumSize: const Size(0, 32),
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      backgroundColor:
-                          theme.colorScheme.secondaryContainer,
-                      foregroundColor:
-                          theme.colorScheme.onSecondaryContainer,
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      foregroundColor: theme.colorScheme.onSecondaryContainer,
                     ),
                     onPressed: _aiSort,
                   ),
@@ -691,41 +690,46 @@ class _UnitCardState extends State<_UnitCard> {
                     icon: const Icon(Icons.edit_outlined, size: 14),
                     label: const Text('Edit'),
                     style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 34),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 10),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                     onPressed: () =>
                         context.go('/admin/review/${widget.unit['id']}'),
                   ),
                   const Spacer(),
+                  IconButton(
+                    icon: Icon(Icons.swap_horiz,
+                        size: 18, color: theme.colorScheme.primary),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'ট্র্যাক বদলান',
+                    onPressed: _moveToTrack,
+                  ),
                   if (isDraft)
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.publish, size: 14),
-                      label: const Text('Publish'),
+                    OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 34),
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: const Size(0, 32),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         foregroundColor: Colors.green.shade700,
                         side: BorderSide(color: Colors.green.shade400),
+                        textStyle: const TextStyle(fontSize: 12),
                       ),
                       onPressed: _publish,
+                      child: const Text('Publish'),
                     )
                   else
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.unpublished_outlined,
-                          size: 14),
-                      label: const Text('Unpublish'),
+                    OutlinedButton(
                       style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 34),
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 10),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        minimumSize: const Size(0, 32),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
                       onPressed: _unpublish,
+                      child: const Text('Unpublish'),
                     ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 2),
                   IconButton(
                     icon: Icon(Icons.delete_outline,
                         size: 18, color: theme.colorScheme.error),
@@ -768,7 +772,8 @@ class _SeqChip extends StatelessWidget {
 
 class _TierChip extends StatelessWidget {
   final int tier;
-  const _TierChip({required this.tier});
+  final VoidCallback? onTap;
+  const _TierChip({required this.tier, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -779,17 +784,29 @@ class _TierChip extends StatelessWidget {
       4 => (bg: Colors.red.shade100,    fg: Colors.red.shade800),
       _ => (bg: Colors.grey.shade100,   fg: Colors.grey.shade700),
     };
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: colors.bg,
         borderRadius: BorderRadius.circular(4),
+        border: onTap != null
+            ? Border.all(color: colors.fg.withValues(alpha: 0.35))
+            : null,
       ),
-      child: Text(
-        'T$tier',
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.fg),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('T$tier',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.fg)),
+          if (onTap != null) ...[
+            const SizedBox(width: 2),
+            Icon(Icons.arrow_drop_down, size: 12, color: colors.fg),
+          ],
+        ],
       ),
     );
+    if (onTap == null) return chip;
+    return GestureDetector(onTap: onTap, child: chip);
   }
 }
 
