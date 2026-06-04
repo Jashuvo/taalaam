@@ -37,8 +37,10 @@ Deno.serve(async (req: Request) => {
   const userIds = (authUsers ?? []).map((u: any) => u.id);
 
   // Fetch streaks and progress in parallel
+  // NOTE: 'hearts' lives only in local Drift — not in the Supabase streaks table.
+  // Selecting it would cause a PostgREST schema-cache error and null data.
   const [streaksRes, progressRes] = await Promise.all([
-    sb.from('streaks').select('user_id, current_streak, longest_streak, total_xp, hearts, last_activity_date').in('user_id', userIds),
+    sb.from('streaks').select('user_id, current_streak, longest_streak, total_xp, last_activity_date').in('user_id', userIds),
     sb.from('user_progress').select('user_id').in('user_id', userIds),
   ]);
 
@@ -62,7 +64,6 @@ Deno.serve(async (req: Request) => {
       current_streak: streak?.current_streak ?? 0,
       longest_streak: streak?.longest_streak ?? 0,
       total_xp: streak?.total_xp ?? 0,
-      hearts: streak?.hearts ?? 0,
       last_active: streak?.last_activity_date ?? null,
       lessons_completed: completionCount.get(u.id) ?? 0,
     };

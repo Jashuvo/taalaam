@@ -256,7 +256,6 @@ class _UserRow extends StatelessWidget {
                     _DetailChip(label: 'Last Sign-in', value: _formatDate(lastSignIn)),
                     _DetailChip(label: 'Last Active', value: _formatDate(lastActive)),
                     _DetailChip(label: 'Max Streak', value: '${user['longest_streak'] ?? 0} days'),
-                    _DetailChip(label: 'Hearts', value: '${user['hearts'] ?? 0} ♥'),
                     _DetailChip(label: 'Provider', value: provider),
                     _DetailChip(label: 'Type', value: isAnon ? 'Anonymous' : 'Registered'),
                   ],

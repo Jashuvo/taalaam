@@ -73,8 +73,9 @@ Deno.serve(async (req: Request) => {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
+  // NOTE: 'hearts' lives only in local Drift — not in the Supabase streaks table.
   const [streaksRes, progressRes, recentRes, monthRes] = await Promise.all([
-    sb.from('streaks').select('user_id, current_streak, longest_streak, total_xp, hearts'),
+    sb.from('streaks').select('user_id, current_streak, longest_streak, total_xp'),
     sb.from('user_progress').select('user_id, lesson_id, completed_at', { count: 'exact' }),
     sb.from('user_progress').select('user_id').gte('completed_at', sevenDaysAgo),
     sb.from('user_progress').select('user_id').gte('completed_at', thirtyDaysAgo),
