@@ -13,6 +13,7 @@ enum ExerciseType {
   chatComplete,
   translateBuild,
   listenSelect,
+  speakArabic,
 }
 
 @freezed

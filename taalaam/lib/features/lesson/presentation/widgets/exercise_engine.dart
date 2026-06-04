@@ -6,6 +6,7 @@ import 'exercise_drag_drop.dart';
 import 'exercise_fill_blank.dart';
 import 'exercise_listen_select.dart';
 import 'exercise_multiple_choice.dart';
+import 'exercise_speak_arabic.dart';
 import 'exercise_tap_to_build.dart';
 import 'exercise_translate_build.dart';
 import 'exercise_true_false.dart';
@@ -47,6 +48,8 @@ class ExerciseEngine extends StatelessWidget {
             vocabMap: vocabMap),
       ExerciseType.listenSelect =>
         ExerciseListenSelect(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.speakArabic =>
+        ExerciseSpeakArabic(exercise: exercise, onAnswered: onAnswered),
     };
   }
 }

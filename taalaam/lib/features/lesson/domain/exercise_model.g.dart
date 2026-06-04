@@ -50,4 +50,5 @@ const _$ExerciseTypeEnumMap = {
   ExerciseType.chatComplete: 'chatComplete',
   ExerciseType.translateBuild: 'translateBuild',
   ExerciseType.listenSelect: 'listenSelect',
+  ExerciseType.speakArabic: 'speakArabic',
 };

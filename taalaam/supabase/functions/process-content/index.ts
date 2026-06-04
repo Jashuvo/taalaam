@@ -376,6 +376,20 @@ NEW EXERCISE TYPES (use in addition to the 6 above)
     - Generate 1-2 per lesson using KEY vocabulary words
     - difficulty: 2
 
+[speak_arabic] — Learner speaks an Arabic word aloud; Gemini transcribes and checks pronunciation.
+  prompt_bn: "এই আরবি শব্দটি বলুন"
+  prompt_ar: null
+  correct_answer: {
+    "expected_ar": "كِتَابٌ",
+    "transliteration": "kitābun",
+    "meaning_bn": "বই"
+  }
+  Rules:
+    - Generate at most 1 per lesson (pick the most important vocab word for the lesson)
+    - "expected_ar" must have full harakat — this is what gets spoken and verified
+    - difficulty: 2
+    - Do NOT generate for chat_complete lessons (conversational only)
+
 ════════════════════════════════════════════
 VARIABLE EXERCISE COUNT RULE
 ════════════════════════════════════════════
@@ -423,7 +437,7 @@ const OUTPUT_SCHEMA = `Return ONLY a valid JSON object matching this exact schem
       ],
       "exercises": [
         {
-          "type": "multiple_choice | drag_drop | true_false | fill_in_blank | tap_to_build | word_scramble | chat_complete | translate_build | listen_select",
+          "type": "multiple_choice | drag_drop | true_false | fill_in_blank | tap_to_build | word_scramble | chat_complete | translate_build | listen_select | speak_arabic",
           "sort_order": "number — sequential from 1",
           "prompt_bn": "string — instruction in Bangla",
           "prompt_ar": "string | null — Arabic text to display (required for multiple_choice, optional for others)",
