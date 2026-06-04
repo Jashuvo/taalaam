@@ -1,16 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../app.dart';
-import '../../features/admin/presentation/admin_home_page.dart';
+import '../../features/admin/presentation/admin_dashboard_page.dart';
 import '../../features/admin/presentation/admin_review_page.dart';
+import '../../features/admin/presentation/admin_shell.dart';
+import '../../features/admin/presentation/admin_unit_review_page.dart';
 import '../../features/admin/presentation/admin_upload_page.dart';
+import '../../features/admin/presentation/admin_users_page.dart';
 import '../../features/auth/presentation/admin_login_page.dart';
 import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/onboarding_page.dart';
 import '../../features/auth/presentation/profile_page.dart';
 import '../../features/lesson/presentation/exam_screen.dart';
-import '../../features/admin/presentation/admin_unit_review_page.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/home/presentation/leaderboard_page.dart';
 import '../../features/home/presentation/settings_page.dart';
@@ -42,15 +44,9 @@ final appRouterProvider =
       final goingToLogin = loc == '/login';
 
       // ── Learner flavor: hard-block any /admin path ──────────────────
-      // Admin routes don't exist in the learner build. Any attempt to
-      // reach /admin/* is silently redirected to /home. This prevents
-      // the learner's Supabase client from handling admin logins, which
-      // would replace the active learner session.
       if (!isAdmin && loc.startsWith('/admin')) return '/home';
 
-      // ── Admin flavor: hard-block any non-admin path ─────────────────
-      // Learner routes don't exist in the admin build. Keeps the admin
-      // Supabase client (with AdminLocalStorage) completely isolated.
+      // ── Admin flavor: hard-block non-admin, non-login paths ─────────
       if (isAdmin && !loc.startsWith('/admin') && !goingToLogin) {
         return '/admin';
       }
@@ -144,27 +140,38 @@ final appRouterProvider =
 
       // ── Admin-only routes ────────────────────────────────────────────
       if (isAdmin) ...[
-        GoRoute(
-          path: '/admin',
-          builder: (_, __) => const AdminHomePage(),
+        // Shell wraps dashboard, content review, upload, users
+        ShellRoute(
+          builder: (context, state, child) => AdminShell(
+            currentLocation: state.matchedLocation,
+            child: child,
+          ),
           routes: [
             GoRoute(
-              path: 'upload',
+              path: '/admin',
+              builder: (_, __) => const AdminDashboardPage(),
+            ),
+            GoRoute(
+              path: '/admin/review',
+              builder: (_, __) => const AdminReviewPage(),
+            ),
+            GoRoute(
+              path: '/admin/upload',
               builder: (_, __) => const AdminUploadPage(),
             ),
             GoRoute(
-              path: 'review',
-              builder: (_, __) => const AdminReviewPage(),
-              routes: [
-                GoRoute(
-                  path: ':unitId',
-                  builder: (_, state) => AdminUnitReviewPage(
-                    unitId: state.pathParameters['unitId']!,
-                  ),
-                ),
-              ],
+              path: '/admin/users',
+              builder: (_, __) => const AdminUsersPage(),
             ),
           ],
+        ),
+
+        // Full-page (no shell) — unit detail editor
+        GoRoute(
+          path: '/admin/review/:unitId',
+          builder: (_, state) => AdminUnitReviewPage(
+            unitId: state.pathParameters['unitId']!,
+          ),
         ),
       ],
     ],
