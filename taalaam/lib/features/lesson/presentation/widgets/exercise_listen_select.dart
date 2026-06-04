@@ -21,6 +21,7 @@ class ExerciseListenSelect extends StatefulWidget {
 class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
   late final FlutterTts _tts;
   bool _speaking = false;
+  bool _ttsUnavailable = false;
   int? _selected;
   late final List<String> _options;
   late final int _correctIdx;
@@ -38,13 +39,14 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
     _correctIdx = rawOptions.indexOf(correctVal);
 
     _tts = FlutterTts();
-    _tts.setLanguage('ar');
-    _tts.setSpeechRate(0.45);
     _tts.setCompletionHandler(() {
       if (mounted) setState(() => _speaking = false);
     });
-    // Auto-play on load
-    WidgetsBinding.instance.addPostFrameCallback((_) => _speak());
+    _tts.setErrorHandler((_) {
+      if (mounted) setState(() { _speaking = false; _ttsUnavailable = true; });
+    });
+    _tts.setSpeechRate(0.45);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initVoiceAndPlay());
   }
 
   @override
@@ -53,10 +55,39 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
     super.dispose();
   }
 
-  Future<void> _speak({bool slow = false}) async {
-    if (_speaking) {
-      await _tts.stop();
+  /// Picks the best available Arabic voice then auto-plays.
+  /// flutter_tts on web needs a voice that exactly matches the system's
+  /// installed voices — 'ar' alone often finds nothing; try ar-SA / ar-EG.
+  Future<void> _initVoiceAndPlay() async {
+    if (!mounted) return;
+    try {
+      final voices = await _tts.getVoices as List?;
+      if (voices != null) {
+        final arVoice = voices.cast<Map>().firstWhere(
+          (v) => (v['locale'] as String? ?? '').startsWith('ar'),
+          orElse: () => {},
+        );
+        if (arVoice.isNotEmpty) {
+          await _tts.setLanguage(arVoice['locale'] as String);
+        } else {
+          // No Arabic voice on this device — try common locale codes anyway
+          for (final lang in ['ar-SA', 'ar-EG', 'ar-001', 'ar']) {
+            final result = await _tts.setLanguage(lang);
+            if (result == 1) break;
+          }
+        }
+      } else {
+        await _tts.setLanguage('ar-SA');
+      }
+    } catch (_) {
+      await _tts.setLanguage('ar-SA');
     }
+    _speak();
+  }
+
+  Future<void> _speak({bool slow = false}) async {
+    if (_ttsUnavailable) return;
+    if (_speaking) await _tts.stop();
     await _tts.setSpeechRate(slow ? 0.25 : 0.45);
     setState(() => _speaking = true);
     await _tts.speak(_speakText);
@@ -84,24 +115,42 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
           ),
 
         // Audio buttons
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _AudioButton(
-              icon: _speaking ? Icons.volume_up : Icons.volume_up_outlined,
-              label: 'বাজান',
-              color: AppColors.teal,
-              onTap: () => _speak(),
+        if (_ttsUnavailable)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.volume_off_rounded,
+                    size: 16, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(
+                  'এই ডিভাইসে আরবি অডিও নেই',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
             ),
-            const SizedBox(width: 16),
-            _AudioButton(
-              icon: Icons.slow_motion_video_rounded,
-              label: 'ধীরে',
-              color: theme.colorScheme.secondary,
-              onTap: () => _speak(slow: true),
-            ),
-          ],
-        ),
+          )
+        else
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _AudioButton(
+                icon: _speaking ? Icons.volume_up : Icons.volume_up_outlined,
+                label: 'বাজান',
+                color: AppColors.teal,
+                onTap: () => _speak(),
+              ),
+              const SizedBox(width: 16),
+              _AudioButton(
+                icon: Icons.slow_motion_video_rounded,
+                label: 'ধীরে',
+                color: theme.colorScheme.secondary,
+                onTap: () => _speak(slow: true),
+              ),
+            ],
+          ),
         const SizedBox(height: 28),
 
         // Option chips
