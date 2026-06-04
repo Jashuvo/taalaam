@@ -390,8 +390,6 @@ class _UnitCardState extends State<_UnitCard> {
       await Supabase.instance.client
           .from('units')
           .update({'tier_level': newTier}).eq('id', widget.unit['id']);
-      await Supabase.instance.client.functions
-          .invoke('sort-units', body: {'track_id': widget.unit['track_id']});
       widget.onRefresh();
     } catch (e) {
       if (mounted) {
