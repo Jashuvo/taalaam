@@ -5,9 +5,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 
 final _allUnitsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  // Join with tracks to get track name — shown as a badge on each unit card
   final rows = await Supabase.instance.client
       .from('units')
-      .select('id, title_bn, title_ar, status, track_id, sort_order, tier_level, sequence_order')
+      .select('id, title_bn, title_ar, status, track_id, sort_order, tier_level, sequence_order, tracks(slug, name_bn)')
       .order('sequence_order', ascending: true);
   return List<Map<String, dynamic>>.from(rows as List);
 });
@@ -479,6 +480,8 @@ class _UnitCardState extends State<_UnitCard> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    _TrackChip(slug: (widget.unit['tracks'] as Map?)?['slug'] as String? ?? ''),
+                    const SizedBox(width: 4),
                     _TierChip(tier: _currentTier),
                     const SizedBox(width: 4),
                     _SeqChip(order: widget.unit['sequence_order'] as int? ?? 0),
@@ -664,6 +667,37 @@ class _TierChip extends StatelessWidget {
       child: Text(
         'T$tier',
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.fg),
+      ),
+    );
+  }
+}
+
+class _TrackChip extends StatelessWidget {
+  final String slug;
+  const _TrackChip({required this.slug});
+
+  @override
+  Widget build(BuildContext context) {
+    final isQuranic = slug == 'quranic';
+    final bg = isQuranic ? const Color(0xFFE8F5E9) : const Color(0xFFE3F2FD);
+    final fg = isQuranic ? const Color(0xFF2E7D32) : const Color(0xFF1565C0);
+    final label = isQuranic ? 'কুরআন' : 'কথা';
+    final icon = isQuranic ? Icons.menu_book : Icons.record_voice_over;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: fg),
+          const SizedBox(width: 3),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.bold, color: fg)),
+        ],
       ),
     );
   }
