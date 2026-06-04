@@ -161,6 +161,29 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     }
   }
 
+  Future<void> _changeTier(int newTier) async {
+    try {
+      await Supabase.instance.client
+          .from('units')
+          .update({'tier_level': newTier})
+          .eq('id', widget.unitId);
+      setState(() => _unit = {...?_unit, 'tier_level': newTier});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tier $newTier-এ পরিবর্তন হয়েছে।'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
+      }
+    }
+  }
+
   Future<void> _publishUnit() async {
     setState(() => _publishing = true);
     try {
@@ -694,7 +717,19 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      _UnitHeader(unit: _unit!),
+                      _UnitHeader(
+                        unit: _unit!,
+                        onTierTap: () async {
+                          final current = _unit!['tier_level'] as int? ?? 1;
+                          final picked = await showDialog<int>(
+                            context: context,
+                            builder: (_) => _TierPickerDialog(current: current),
+                          );
+                          if (picked != null && picked != current) {
+                            _changeTier(picked);
+                          }
+                        },
+                      ),
                       const SizedBox(height: 20),
                       Text(
                         'পাঠসমূহ (${_lessons.length}টি)',
@@ -736,7 +771,8 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
 
 class _UnitHeader extends StatelessWidget {
   final Map<String, dynamic> unit;
-  const _UnitHeader({required this.unit});
+  final VoidCallback? onTierTap;
+  const _UnitHeader({required this.unit, this.onTierTap});
 
   @override
   Widget build(BuildContext context) {
@@ -770,7 +806,13 @@ class _UnitHeader extends StatelessWidget {
             children: [
               _StatusChip(status: unit['status'] as String? ?? 'draft'),
               const SizedBox(width: 8),
-              _TierChip(tier: unit['tier_level'] as int? ?? 1),
+              GestureDetector(
+                onTap: onTierTap,
+                child: _TierChip(
+                  tier: unit['tier_level'] as int? ?? 1,
+                  tappable: onTierTap != null,
+                ),
+              ),
               const SizedBox(width: 8),
               _SeqChip(order: unit['sequence_order'] as int? ?? 0),
             ],
@@ -807,7 +849,8 @@ class _SeqChip extends StatelessWidget {
 
 class _TierChip extends StatelessWidget {
   final int tier;
-  const _TierChip({required this.tier});
+  final bool tappable;
+  const _TierChip({required this.tier, this.tappable = false});
 
   @override
   Widget build(BuildContext context) {
@@ -823,11 +866,118 @@ class _TierChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.bg,
         borderRadius: BorderRadius.circular(4),
+        border: tappable
+            ? Border.all(color: colors.fg.withValues(alpha: 0.4), width: 1)
+            : null,
       ),
-      child: Text(
-        'Tier $tier',
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.fg),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'T$tier',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colors.fg),
+          ),
+          if (tappable) ...[
+            const SizedBox(width: 3),
+            Icon(Icons.edit_rounded, size: 10, color: colors.fg),
+          ],
+        ],
       ),
+    );
+  }
+}
+
+class _TierPickerDialog extends StatelessWidget {
+  final int current;
+  const _TierPickerDialog({required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    const tiers = [
+      (1, 'Tier 1', 'মৌলিক শব্দ ও পরিচিতি'),
+      (2, 'Tier 2', 'বাক্যরীতি ও যৌগিক পদ'),
+      (3, 'Tier 3', 'ক্রিয়াপদ ও রূপান্তর'),
+      (4, 'Tier 4', 'উচ্চতর শাস্ত্র ও তাফসির'),
+    ];
+    return AlertDialog(
+      title: const Text('Tier পরিবর্তন করুন'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: tiers.map((t) {
+          final (n, label, desc) = t;
+          final isSelected = n == current;
+          final colors = switch (n) {
+            1 => (bg: Colors.blue.shade100,   fg: Colors.blue.shade800),
+            2 => (bg: Colors.purple.shade100, fg: Colors.purple.shade800),
+            3 => (bg: Colors.amber.shade100,  fg: Colors.amber.shade900),
+            4 => (bg: Colors.red.shade100,    fg: Colors.red.shade800),
+            _ => (bg: Colors.grey.shade100,   fg: Colors.grey.shade700),
+          };
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => Navigator.pop(context, n),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSelected ? colors.bg : null,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected ? colors.fg : Colors.grey.shade300,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: colors.bg,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$n',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: colors.fg,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected ? colors.fg : null)),
+                          Text(desc,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    if (isSelected)
+                      Icon(Icons.check_circle_rounded,
+                          color: colors.fg, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('বাতিল'),
+        ),
+      ],
     );
   }
 }
