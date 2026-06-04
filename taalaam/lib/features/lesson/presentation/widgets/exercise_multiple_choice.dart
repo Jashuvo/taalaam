@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
-import 'arabic_word_tooltip.dart';
+import 'arabic_word_tooltip.dart' show ArabicSentenceWithTooltips;
 
 class ExerciseMultipleChoice extends StatefulWidget {
   final ExerciseModel exercise;
@@ -102,14 +102,14 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         vertical: 16, horizontal: 20),
-                    child: ArabicWordTooltip(
-                      word: _options[i],
-                      vocabMap: widget.vocabMap,
+                    child: Text(
+                      _options[i],
                       style: TextStyle(
                           fontFamily: 'NotoNaskhArabic',
                           fontSize: 20,
                           height: 1.8,
                           color: textColor ?? theme.colorScheme.onSurface),
+                      textDirection: TextDirection.rtl,
                     ),
                   ),
                 ),

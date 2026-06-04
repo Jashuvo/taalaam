@@ -44,7 +44,7 @@ class ArabicWordTooltip extends StatelessWidget {
     );
 
     return GestureDetector(
-      onLongPress: () => _showPopup(context, entry),
+      onTap: () => _showPopup(context, entry),
       child: Text(
         word,
         style: tappableStyle,
