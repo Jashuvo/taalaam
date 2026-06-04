@@ -67,6 +67,8 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
       for (final trackId in trackIds) {
         final res = await Supabase.instance.client.functions
             .invoke('sort-units', body: {'track_id': trackId});
+        final errMsg = res.data?['error'] as String?;
+        if (errMsg != null) throw Exception('sort-units: $errMsg');
         final merged = (res.data?['merged'] as List?)?.cast<String>() ?? [];
         final tierChanges = (res.data?['tier_changes'] as List?)
             ?.cast<Map<String, dynamic>>() ?? [];
@@ -645,8 +647,6 @@ class _UnitCardState extends State<_UnitCard> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.drag_handle, color: Colors.grey, size: 18),
               ],
             ),
             const SizedBox(height: 8),

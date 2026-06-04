@@ -244,15 +244,10 @@ Deno.serve(async (req: Request) => {
         mergedSummary.push(reason ?? `Merged ${merge_ids.length} duplicate unit(s) into ${keep_id}`);
       }
 
-      // ── Build final valid list (exclude deleted + moved-away units) ─────────
+      // ── Apply track reassignments (move wrong-track modules) ──────────────
       const deletedIds = new Set(
         mergeGroups.flatMap((g: any) => (g.merge_ids as string[] | undefined) ?? [])
       );
-      const validSorted = sortedIds.filter(
-        (id) => allKnownIds.has(id) && !deletedIds.has(id) && !movedToOtherTrack.has(id)
-      );
-
-      // ── Apply track reassignments (move wrong-track modules) ──────────────
       const movedToOtherTrack = new Set<string>();
       const trackChanges: { id: string; title_bn: string; from_track: string; to_track: string; reason: string }[] = [];
 
@@ -260,7 +255,7 @@ Deno.serve(async (req: Request) => {
         const { id, track: targetSlug, reason } = assignment;
         if (!allKnownIds.has(id)) continue;
         const targetTrackId = trackBySlug.get(targetSlug);
-        if (!targetTrackId || targetTrackId === track_id) continue; // already on correct track or unknown slug
+        if (!targetTrackId || targetTrackId === track_id) continue;
 
         await supabase.from('units').update({ track_id: targetTrackId }).eq('id', id);
         movedToOtherTrack.add(id);
@@ -273,6 +268,11 @@ Deno.serve(async (req: Request) => {
           reason: reason ?? `Moved to ${targetSlug} track`,
         });
       }
+
+      // ── Build final valid list (after merges + track moves are known) ──────
+      const validSorted = sortedIds.filter(
+        (id) => allKnownIds.has(id) && !deletedIds.has(id) && !movedToOtherTrack.has(id)
+      );
 
       // ── Apply tier_level assignments ───────────────────────────────────────
       const tierMap = new Map(tierAssignments.map((a) => [a.id, a.tier]));
