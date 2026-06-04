@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -403,47 +404,54 @@ class _GoogleLogo extends StatelessWidget {
       );
 }
 
+/// Draws the Google "G" logo:
+/// four coloured arc strokes forming a near-complete ring,
+/// with a gap on the right side bridged by a blue horizontal bar.
 class _GoogleLogoPainter extends CustomPainter {
   const _GoogleLogoPainter();
+
+  static const _blue   = Color(0xFF4285F4);
+  static const _red    = Color(0xFFEA4335);
+  static const _yellow = Color(0xFFFBBC05);
+  static const _green  = Color(0xFF34A853);
 
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
     final cy = size.height / 2;
-    final r = size.width / 2;
+    final sw = size.width * 0.26;      // ring stroke width
+    final r  = cx - sw / 2;            // arc centre radius
 
-    final colors = [
-      const Color(0xFF4285F4),
-      const Color(0xFF34A853),
-      const Color(0xFFFBBC05),
-      const Color(0xFFEA4335),
-    ];
+    // Half-angle of the gap where the bar edges meet the ring
+    final ga = math.asin((sw / 2) / r);
 
-    final paint = Paint()..style = PaintingStyle.fill;
+    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
+    final p = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = sw
+      ..strokeCap = StrokeCap.butt;
 
-    // Blue arc (right)
-    paint.color = colors[0];
-    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r),
-        -0.34, 2.04, true, paint);
+    // Blue:   +ga (below bar) → 90°
+    p.color = _blue;
+    canvas.drawArc(rect, ga, math.pi / 2 - ga, false, p);
 
-    // Green arc (bottom)
-    paint.color = colors[1];
-    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r),
-        1.7, 1.4, true, paint);
+    // Red:    90° → 210°
+    p.color = _red;
+    canvas.drawArc(rect, math.pi / 2, math.pi * 2 / 3, false, p);
 
-    // Yellow arc (left-bottom)
-    paint.color = colors[2];
-    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r),
-        3.1, 1.3, true, paint);
+    // Yellow: 210° → 270°
+    p.color = _yellow;
+    canvas.drawArc(rect, math.pi * 7 / 6, math.pi / 3, false, p);
 
-    // Red arc (top-left)
-    paint.color = colors[3];
-    canvas.drawArc(Rect.fromCircle(center: Offset(cx, cy), radius: r),
-        4.4, 1.26, true, paint);
+    // Green:  270° → (360° − ga)
+    p.color = _green;
+    canvas.drawArc(rect, math.pi * 3 / 2, math.pi / 2 - ga, false, p);
 
-    // White centre hole
-    paint.color = Colors.white;
-    canvas.drawCircle(Offset(cx, cy), r * 0.6, paint);
+    // Horizontal bar (blue): centre → outer-right edge, height = sw
+    canvas.drawRect(
+      Rect.fromLTWH(cx, cy - sw / 2, r + sw / 2, sw),
+      Paint()..color = _blue,
+    );
   }
 
   @override
