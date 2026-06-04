@@ -156,12 +156,16 @@ class UploadNotifier extends Notifier<UploadPageState> {
       final String? textContent =
           ext == 'txt' ? String.fromCharCodes(fs.file.bytes!) : null;
 
-      await supabase.functions.invoke('process-content', body: {
+      final res = await supabase.functions.invoke('process-content', body: {
         'material_id': mat['id'],
         'track': state.track,
         'notes': note.trim(),
         if (textContent != null) 'text_content': textContent,
       });
+      final resData = res.data;
+      if (resData is Map && resData['error'] != null) {
+        throw Exception(resData['error'].toString());
+      }
 
       _updateFile(index, status: 'সফল ✓', success: true);
       state = state.copyWith(anySuccess: true);

@@ -709,14 +709,6 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
       })
       .eq('id', material_id);
 
-    // Fire-and-forget: auto-run sort-units to deduplicate and reorder the track
-    const adminToken = req.headers.get('Authorization') ?? '';
-    fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/sort-units`, {
-      method: 'POST',
-      headers: { 'Authorization': adminToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ track_id: trackRow?.id }),
-    }).catch(() => { /* non-fatal: admin can trigger sort-units manually */ });
-
     return new Response(
       JSON.stringify({ success: true, unit_id: unit.id, lesson_count: parsed.lessons.length }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
