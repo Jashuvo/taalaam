@@ -61,20 +61,24 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     setState(() => _sorting = true);
     try {
       final allMerged = <String>[];
+      final allTierChanges = <Map<String, dynamic>>[];
       for (final trackId in trackIds) {
         final res = await Supabase.instance.client.functions
             .invoke('sort-units', body: {'track_id': trackId});
         final merged = (res.data?['merged'] as List?)?.cast<String>() ?? [];
+        final tierChanges = (res.data?['tier_changes'] as List?)
+            ?.cast<Map<String, dynamic>>() ?? [];
         allMerged.addAll(merged);
+        allTierChanges.addAll(tierChanges);
       }
       _refresh();
       if (!mounted) return;
-      if (allMerged.isNotEmpty) {
-        _showMergeSummary(allMerged);
+      if (allMerged.isNotEmpty || allTierChanges.isNotEmpty) {
+        _showSortSummary(allMerged, allTierChanges);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Units sorted — no duplicates found.'),
+              content: Text('Units sorted & tiers assigned — no duplicates found.'),
               backgroundColor: Colors.green),
         );
       }
@@ -88,14 +92,14 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     }
   }
 
-  void _showMergeSummary(List<String> merged) {
+  void _showSortSummary(List<String> merged, List<Map<String, dynamic>> tierChanges) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Row(children: [
           Icon(Icons.auto_awesome, color: Colors.green),
           SizedBox(width: 8),
-          Text('Sort & Merge Complete'),
+          Text('Sort & Tier Complete'),
         ]),
         content: SizedBox(
           width: 480,
@@ -104,24 +108,40 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '${merged.length} duplicate group(s) were merged. '
-                  'Their lessons have been moved into single parent modules:',
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                ...merged.map((reason) => Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.4)),
-                      ),
-                      child: Text(reason,
-                          style: const TextStyle(fontSize: 13)),
-                    )),
+                if (tierChanges.isNotEmpty) ...[
+                  Text('${tierChanges.length} tier reassignment(s):',
+                      style: Theme.of(ctx).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  ...tierChanges.map((c) => Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'T${c['old_tier']} → T${c['new_tier']}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      )),
+                  const SizedBox(height: 16),
+                ],
+                if (merged.isNotEmpty) ...[
+                  Text('${merged.length} duplicate group(s) merged:',
+                      style: Theme.of(ctx).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  ...merged.map((reason) => Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(reason, style: const TextStyle(fontSize: 13)),
+                      )),
+                ],
               ],
             ),
           ),

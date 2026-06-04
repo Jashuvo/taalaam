@@ -1,5 +1,5 @@
 // supabase/functions/sort-units/index.ts
-// Sorts units AND merges near-identical duplicate units by moving lessons.
+// Sorts units, assigns tier levels (T1–T4), AND merges near-identical duplicates.
 // Deploy: supabase functions deploy sort-units --no-verify-jwt
 
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
@@ -21,7 +21,7 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
-const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
 
 async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -41,29 +41,62 @@ async function geminiGenerate(apiKey: string, systemInstruction: string, prompt:
 
 const SYSTEM_PROMPT = `You are an expert Curriculum Architect and Arabic Linguist specializing in designing gamified, step-by-step language courses (Duolingo-style micro-learning).
 
-The target audience consists of Bengali speakers learning Classical/Fusha Arabic, with emphasis on Islamic/Salafi vocabulary contexts.
+The target audience: Bengali speakers learning Classical/Fusha Arabic, with emphasis on Islamic/Salafi vocabulary contexts.
 
-### PEDAGOGICAL ORDERING RULES
-1. Vocabulary Before Syntax: Nouns/vocabulary before structures.
-2. Demonstratives Before Sentences: هذا / هذه right after basic nouns, BEFORE full sentence building.
-3. Gradual Cognitive Load: Isolated Nouns → Pointers + Nouns → Nominal Sentences → Verbal Sentences → Advanced.
-4. Difficulty Levels: beginner → intermediate → advanced.
-5. No Cognitive Interruption: Never insert a stray vocabulary module in the middle of a focused grammar sequence.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## TIER CLASSIFICATION RULES
+Assign EVERY module to exactly one of 4 tiers based on its content:
 
-### CRITICAL CONSTRAINT — MANDATORY MERGING
-Do NOT allow sequential modules with near-identical target structures. If multiple modules target the same Arabic verb pattern (باب), the same grammatical construction, or the same vocabulary theme, they MUST be merged.
+T1 — FOUNDATIONAL (মৌলিক শব্দ ও পরিচিতি):
+  Target: core vocabulary, first contact with Arabic script
+  Signals: greetings, pronouns (أنا/أنت/هو), demonstratives (هذا/هذه/ذلك),
+           basic nouns (body, family, objects, numbers, colors, days),
+           simple labels, no grammar structures yet
 
-Example of what must be merged into ONE module:
-- "ক্রিয়ার রূপান্তর: সাহায্য করা"
-- "ক্রিয়ার রূপান্তর: বাব নাসারা"
-- "ক্রিয়ার রূপান্তর ও ব্যবহার (باب نَصَرَ يَنْصُرُ)"
-→ All three should become ONE module: "ক্রিয়ার রূপান্তর (বাব নাসারা)" and their lessons merged inside it.
+T2 — STRUCTURAL (বাক্যরীতি ও যৌগিক পদ):
+  Target: first sentence patterns, noun grammar
+  Signals: nominal sentences (جملة اسمية), ال definite article,
+           إضافة genitive constructs, حروف الجر prepositions,
+           adjective-noun agreement, simple plurals, topic vocabulary
+           (daily life, workplace, markets, time)
 
-For merged modules: pick the most descriptive title. The "keep" module gets all lessons from the others.
+T3 — VERBAL (ক্রিয়াপদ ও রূপান্তর):
+  Target: verb system and morphological patterns
+  Signals: Maadi/Mudaari/Amr verb forms, common أبواب (نصر، كتب، ذهب),
+           verb sentences (جملة فعلية), subject-verb agreement,
+           basic negation (لا/لم/لن), derived verb forms
 
-### OUTPUT FORMAT (STRICT JSON — NO MARKDOWN, NO EXTRA TEXT)
+T4 — ADVANCED (উচ্চতর শাস্ত্র ও তাফসির):
+  Target: classical morphology, complex syntax, Quranic scholarship
+  Signals: broken plurals, صرف derivations, conditional شرط sentences,
+           إعراب case analysis, Quranic tafsir vocabulary,
+           advanced نحو constructs, classical literary Arabic
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PEDAGOGICAL ORDERING RULES
+Within tiers, order modules so each one builds on the previous:
+1. Vocabulary before syntax — nouns before sentence structures
+2. Demonstratives (هذا/هذه) before nominal sentences
+3. Cognitive load: Isolated Nouns → Pointers+Nouns → Sentences → Verbs → Advanced
+4. Never break a focused grammar sequence with an unrelated vocabulary module
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## MANDATORY MERGING RULE
+If multiple modules target the same Arabic pattern, construction, or vocab theme → MERGE them.
+
+Example: "ক্রিয়ার রূপান্তর: বাব নাসারা" + "ক্রিয়ার রূপান্তর (باب نَصَرَ)" → ONE module.
+
+For merged modules: pick the most descriptive title. The "keep" module absorbs all lessons.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## OUTPUT FORMAT (STRICT JSON — NO MARKDOWN, NO EXTRA TEXT)
 {
   "sorted_ids": ["id-1", "id-2", "id-3"],
+  "tier_assignments": [
+    { "id": "id-1", "tier": 1 },
+    { "id": "id-2", "tier": 1 },
+    { "id": "id-3", "tier": 2 }
+  ],
   "merge_groups": [
     {
       "keep_id": "id-2",
@@ -76,9 +109,11 @@ For merged modules: pick the most descriptive title. The "keep" module gets all 
 }
 
 RULES:
-- sorted_ids must contain ONLY the final module IDs after merging (merge_ids are deleted, do NOT include them in sorted_ids).
-- If no merges needed, return "merge_groups": [].
-- Titles in keep_title_bn/ar are optional but recommended when the existing title is unclear.`;
+- sorted_ids: final IDs after merging, in full pedagogical sequence across ALL tiers
+  (T1 modules first, then T2, then T3, then T4 — within each tier ordered pedagogically)
+- tier_assignments: EVERY final module ID must appear here with its tier (1–4)
+- merge_ids are deleted — do NOT include them in sorted_ids or tier_assignments
+- If no merges needed, return "merge_groups": []`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -105,21 +140,22 @@ Deno.serve(async (req: Request) => {
 
       const { data: units, error: unitErr } = await supabase
         .from('units')
-        .select('id, title_bn, title_ar, sort_order')
+        .select('id, title_bn, title_ar, tier_level, sort_order')
         .eq('track_id', track_id)
         .order('sort_order');
 
       if (unitErr) { await respond({ error: unitErr.message }); return; }
       if (!units || units.length < 2) {
-        await respond({ sorted_ids: units?.map((u: any) => u.id) ?? [], merged: [] });
+        await respond({ sorted_ids: units?.map((u: any) => u.id) ?? [], merged: [], tier_changes: [] });
         return;
       }
 
       const userMessage =
-        'Analyse these modules. Sort them pedagogically AND identify any that must be merged.\n\n' +
+        'Analyse these modules. Sort them pedagogically, assign each to a tier (T1–T4), and identify any that must be merged.\n\n' +
+        'Current tier shown for context only — override if the content belongs elsewhere.\n\n' +
         'Modules:\n' +
         units.map((u: any, i: number) =>
-          `${i + 1}. ID: ${u.id}\n   Bengali: ${u.title_bn}\n   Arabic: ${u.title_ar ?? '—'}`
+          `${i + 1}. ID: ${u.id}\n   Bengali: ${u.title_bn}\n   Arabic: ${u.title_ar ?? '—'}\n   Current tier: T${u.tier_level ?? 1}`
         ).join('\n\n') +
         '\n\nReturn the strict JSON object as specified. No markdown.';
 
@@ -128,6 +164,7 @@ Deno.serve(async (req: Request) => {
 
       const parsed = JSON.parse(rawText);
       const sortedIds: string[] = parsed.sorted_ids ?? [];
+      const tierAssignments: { id: string; tier: number }[] = parsed.tier_assignments ?? [];
       const mergeGroups: any[] = parsed.merge_groups ?? [];
 
       const allKnownIds = new Set(units.map((u: any) => u.id as string));
@@ -139,7 +176,6 @@ Deno.serve(async (req: Request) => {
         if (!keep_id || !Array.isArray(merge_ids)) continue;
         if (!allKnownIds.has(keep_id)) continue;
 
-        // Optionally rename the kept unit if a better title was suggested
         if (keep_title_bn || keep_title_ar) {
           const titleUpdate: any = {};
           if (keep_title_bn) titleUpdate.title_bn = keep_title_bn;
@@ -147,7 +183,6 @@ Deno.serve(async (req: Request) => {
           await supabase.from('units').update(titleUpdate).eq('id', keep_id);
         }
 
-        // Get current max sort_order in keep unit
         const { data: keepLessons } = await supabase
           .from('lessons').select('sort_order').eq('unit_id', keep_id)
           .order('sort_order', { ascending: false }).limit(1);
@@ -155,12 +190,9 @@ Deno.serve(async (req: Request) => {
 
         for (const mergeId of merge_ids) {
           if (!allKnownIds.has(mergeId)) continue;
-
-          // Fetch lessons to move
           const { data: moveLessons } = await supabase
             .from('lessons').select('id')
             .eq('unit_id', mergeId).order('sort_order');
-
           if (moveLessons && moveLessons.length > 0) {
             for (const lesson of moveLessons) {
               offset += 1;
@@ -169,27 +201,47 @@ Deno.serve(async (req: Request) => {
                 .eq('id', lesson.id);
             }
           }
-
-          // Delete the now-empty unit
           await supabase.from('units').delete().eq('id', mergeId);
         }
 
         mergedSummary.push(reason ?? `Merged ${merge_ids.length} duplicate unit(s) into ${keep_id}`);
       }
 
-      // ── Apply sort order (skip deleted IDs) ───────────────────────────────
+      // ── Build final valid list (exclude deleted merge_ids) ─────────────────
       const deletedIds = new Set(
         mergeGroups.flatMap((g: any) => (g.merge_ids as string[] | undefined) ?? [])
       );
       const validSorted = sortedIds.filter((id) => allKnownIds.has(id) && !deletedIds.has(id));
 
+      // ── Apply tier_level assignments ───────────────────────────────────────
+      const tierMap = new Map(tierAssignments.map((a) => [a.id, a.tier]));
+      const tierChanges: { id: string; old_tier: number; new_tier: number }[] = [];
+
+      for (const unit of units) {
+        if (deletedIds.has(unit.id)) continue;
+        const newTier = tierMap.get(unit.id);
+        if (newTier && newTier !== unit.tier_level) {
+          await supabase.from('units').update({ tier_level: newTier }).eq('id', unit.id);
+          tierChanges.push({ id: unit.id, old_tier: unit.tier_level ?? 1, new_tier: newTier });
+        }
+      }
+
+      // ── Apply sort_order (global position) and sequence_order (per-tier) ──
+      // Group by tier in sorted order to compute per-tier sequence_order
+      const tierCounters = new Map<number, number>();
       await Promise.all(
-        validSorted.map((id, i) =>
-          supabase.from('units').update({ sort_order: i }).eq('id', id),
-        ),
+        validSorted.map((id, globalIdx) => {
+          const tier = tierMap.get(id) ?? (units.find((u: any) => u.id === id)?.tier_level ?? 1);
+          const seqInTier = (tierCounters.get(tier) ?? 0) + 1;
+          tierCounters.set(tier, seqInTier);
+          return supabase.from('units').update({
+            sort_order: globalIdx,
+            sequence_order: seqInTier,
+          }).eq('id', id);
+        }),
       );
 
-      await respond({ sorted_ids: validSorted, merged: mergedSummary });
+      await respond({ sorted_ids: validSorted, merged: mergedSummary, tier_changes: tierChanges });
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);
       try { await respond({ error: msg }); } catch (_) {}
