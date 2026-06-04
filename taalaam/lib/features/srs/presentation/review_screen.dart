@@ -175,16 +175,20 @@ class _FrontFace extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final entry = ref.watch(_vocabEntryProvider(vocabId)).valueOrNull;
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: entry == null
-          ? const CircularProgressIndicator()
-          : Text(
-              entry.arabic,
-              style: const TextStyle(
-                  fontFamily: 'NotoNaskhArabic', fontSize: 48, height: 1.6),
-              textAlign: TextAlign.center,
+    final entryAsync = ref.watch(_vocabEntryProvider(vocabId));
+    return entryAsync.when(
+      loading: () => const CircularProgressIndicator(),
+      error: (_, __) => const Icon(Icons.error_outline),
+      data: (entry) => entry == null
+          ? const SizedBox.shrink()
+          : Directionality(
+              textDirection: TextDirection.rtl,
+              child: Text(
+                entry.arabic,
+                style: const TextStyle(
+                    fontFamily: 'NotoNaskhArabic', fontSize: 48, height: 1.6),
+                textAlign: TextAlign.center,
+              ),
             ),
     );
   }
@@ -200,7 +204,7 @@ class _FlippedFace extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final entry = ref.watch(_vocabEntryProvider(vocabId)).valueOrNull;
-    if (entry == null) return const CircularProgressIndicator();
+    if (entry == null) return const SizedBox.shrink();
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [

@@ -9,20 +9,23 @@ class SrsLocalSource {
 
   Future<int> countDueCards(String userId) async {
     final now = DateTime.now();
-    final count = await (_db.select(_db.srsCards)
-          ..where((t) =>
-              t.userId.equals(userId) & t.dueDate.isSmallerOrEqualValue(now)))
-        .get();
-    return count.length;
+    final q = _db.select(_db.srsCards).join([
+      innerJoin(_db.vocabulary, _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+    ])
+      ..where(_db.srsCards.userId.equals(userId) &
+          _db.srsCards.dueDate.isSmallerOrEqualValue(now));
+    return (await q.get()).length;
   }
 
   Future<List<SrsCard>> getDueCards(String userId, {int limit = 50}) async {
     final now = DateTime.now();
-    return (_db.select(_db.srsCards)
-          ..where((t) =>
-              t.userId.equals(userId) & t.dueDate.isSmallerOrEqualValue(now))
-          ..limit(limit))
-        .get();
+    final q = _db.select(_db.srsCards).join([
+      innerJoin(_db.vocabulary, _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+    ])
+      ..where(_db.srsCards.userId.equals(userId) &
+          _db.srsCards.dueDate.isSmallerOrEqualValue(now))
+      ..limit(limit);
+    return (await q.get()).map((r) => r.readTable(_db.srsCards)).toList();
   }
 
   Future<void> createCard(String userId, String vocabularyId) async {

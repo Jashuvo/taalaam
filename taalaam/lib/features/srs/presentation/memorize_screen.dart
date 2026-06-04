@@ -174,6 +174,11 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
     final entry = _entry;
     final inWordBank = _inWordBankMode;
 
+    // Entry not yet loaded
+    if (entry == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
       child: Column(
@@ -207,15 +212,15 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    entry?.meaningBn ?? '…',
+                    entry.meaningBn,
                     style: theme.textTheme.headlineSmall
                         ?.copyWith(fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
-                  if (entry?.transliteration != null) ...[
+                  if (entry.transliteration != null) ...[
                     const SizedBox(height: 6),
                     Text(
-                      entry!.transliteration!,
+                      entry.transliteration!,
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                           fontStyle: FontStyle.italic),
@@ -275,17 +280,16 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
           if (_checked) ...[
             _FeedbackBanner(correct: _correct, correctAnswer: _correctAnswer),
             const SizedBox(height: 14),
-            if (entry?.grammarNoteBn != null)
-              _GrammarNote(note: entry!.grammarNoteBn!),
-            if (entry?.rootLetters != null) ...[
+            if (entry.grammarNoteBn != null)
+              _GrammarNote(note: entry.grammarNoteBn!),
+            if (entry.rootLetters != null) ...[
               const SizedBox(height: 8),
-              _RootLettersBanner(rootLetters: entry!.rootLetters!),
+              _RootLettersBanner(rootLetters: entry.rootLetters!),
             ],
-            // Feature 3: context snippet revealed on answer
-            if (entry?.contextSnippetAr != null ||
-                entry?.contextSnippetBn != null) ...[
+            if (entry.contextSnippetAr != null ||
+                entry.contextSnippetBn != null) ...[
               const SizedBox(height: 8),
-              _ContextSnippet(entry: entry!),
+              _ContextSnippet(entry: entry),
             ],
             const SizedBox(height: 14),
             FilledButton(
