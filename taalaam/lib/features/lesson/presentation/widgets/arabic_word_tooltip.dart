@@ -32,9 +32,24 @@ class ArabicWordTooltip extends StatelessWidget {
 
     if (entry == null) return text;
 
+    final tappableStyle = (style ?? const TextStyle(
+      fontFamily: 'NotoNaskhArabic',
+      fontSize: 22,
+      height: 1.8,
+    )).copyWith(
+      decoration: TextDecoration.underline,
+      decorationStyle: TextDecorationStyle.dotted,
+      decorationColor: AppColors.teal,
+      decorationThickness: 2,
+    );
+
     return GestureDetector(
       onTap: () => _showPopup(context, entry),
-      child: text,
+      child: Text(
+        word,
+        style: tappableStyle,
+        textDirection: TextDirection.rtl,
+      ),
     );
   }
 
