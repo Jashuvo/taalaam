@@ -23,14 +23,14 @@ async function checkAdmin(req: Request): Promise<Response | null> {
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'];
 
-async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<string> {
+async function geminiGenerate(apiKey: string, systemInstruction: string, prompt: string): Promise<{ text: string; model: string }> {
   const genAI = new GoogleGenerativeAI(apiKey);
   let lastErr: unknown;
   for (const modelName of GEMINI_MODELS) {
     try {
       const m = genAI.getGenerativeModel({ model: modelName, systemInstruction });
       const result = await m.generateContent(prompt);
-      return result.response.text();
+      return { text: result.response.text(), model: modelName };
     } catch (err) {
       lastErr = err;
     }
@@ -195,8 +195,8 @@ Deno.serve(async (req: Request) => {
         ).join('\n\n') +
         '\n\nReturn the strict JSON object as specified. No markdown.';
 
-      const rawText = (await geminiGenerate(Deno.env.get('GEMINI_API_KEY')!, SYSTEM_PROMPT, userMessage)).trim()
-        .replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+      const { text: rawTextRaw, model: modelUsed } = await geminiGenerate(Deno.env.get('GEMINI_API_KEY')!, SYSTEM_PROMPT, userMessage);
+      const rawText = rawTextRaw.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
       const parsed = JSON.parse(rawText);
       const sortedIds: string[] = parsed.sorted_ids ?? [];
@@ -302,7 +302,7 @@ Deno.serve(async (req: Request) => {
         }),
       );
 
-      await respond({ sorted_ids: validSorted, merged: mergedSummary, tier_changes: tierChanges, track_changes: trackChanges });
+      await respond({ sorted_ids: validSorted, merged: mergedSummary, tier_changes: tierChanges, track_changes: trackChanges, model_used: modelUsed });
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);
       try { await respond({ error: msg }); } catch (_) {}

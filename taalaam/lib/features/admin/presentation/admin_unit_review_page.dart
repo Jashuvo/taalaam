@@ -477,12 +477,13 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
       final duplicates = (res.data?['duplicates'] as List?)
               ?.cast<Map<String, dynamic>>() ??
           [];
+      final model = res.data?['model_used'] as String? ?? 'unknown';
       if (duplicates.isNotEmpty) {
-        _showDuplicateWarning(duplicates);
+        _showDuplicateWarning(duplicates, model);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('পাঠগুলো সফলভাবে সাজানো হয়েছে!'),
+          SnackBar(
+            content: Text('পাঠগুলো সফলভাবে সাজানো হয়েছে! ($model)'),
             backgroundColor: Colors.green,
           ),
         );
@@ -497,7 +498,7 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     }
   }
 
-  void _showDuplicateWarning(List<Map<String, dynamic>> duplicates) {
+  void _showDuplicateWarning(List<Map<String, dynamic>> duplicates, [String? modelUsed]) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -548,6 +549,15 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
                     ),
                   );
                 }),
+                if (modelUsed != null) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Icon(Icons.smart_toy_outlined, size: 13, color: Colors.grey.shade500),
+                    const SizedBox(width: 5),
+                    Text('Model: $modelUsed',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  ]),
+                ],
               ],
             ),
           ),

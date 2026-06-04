@@ -63,6 +63,7 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
       final allMerged = <String>[];
       final allTierChanges = <Map<String, dynamic>>[];
       final allTrackChanges = <Map<String, dynamic>>[];
+      final modelsUsed = <String>{};
       for (final trackId in trackIds) {
         final res = await Supabase.instance.client.functions
             .invoke('sort-units', body: {'track_id': trackId});
@@ -71,18 +72,21 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
             ?.cast<Map<String, dynamic>>() ?? [];
         final trackChanges = (res.data?['track_changes'] as List?)
             ?.cast<Map<String, dynamic>>() ?? [];
+        final model = res.data?['model_used'] as String?;
         allMerged.addAll(merged);
         allTierChanges.addAll(tierChanges);
         allTrackChanges.addAll(trackChanges);
+        if (model != null) modelsUsed.add(model);
       }
       _refresh();
       if (!mounted) return;
+      final modelLabel = modelsUsed.isNotEmpty ? modelsUsed.join(', ') : 'unknown';
       if (allMerged.isNotEmpty || allTierChanges.isNotEmpty || allTrackChanges.isNotEmpty) {
-        _showSortSummary(allMerged, allTierChanges, allTrackChanges);
+        _showSortSummary(allMerged, allTierChanges, allTrackChanges, modelLabel);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Units sorted & tiers assigned — no duplicates found.'),
+          SnackBar(
+              content: Text('Units sorted & tiers assigned — no duplicates found. ($modelLabel)'),
               backgroundColor: Colors.green),
         );
       }
@@ -96,7 +100,7 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     }
   }
 
-  void _showSortSummary(List<String> merged, List<Map<String, dynamic>> tierChanges, List<Map<String, dynamic>> trackChanges) {
+  void _showSortSummary(List<String> merged, List<Map<String, dynamic>> tierChanges, List<Map<String, dynamic>> trackChanges, [String? modelUsed]) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -179,6 +183,15 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
                         ),
                         child: Text(reason, style: const TextStyle(fontSize: 13)),
                       )),
+                ],
+                if (modelUsed != null) ...[
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Icon(Icons.smart_toy_outlined, size: 13, color: Colors.grey.shade500),
+                    const SizedBox(width: 5),
+                    Text('Model: $modelUsed',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  ]),
                 ],
               ],
             ),
