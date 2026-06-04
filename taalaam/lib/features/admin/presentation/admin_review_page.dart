@@ -351,6 +351,58 @@ class _UnitCardState extends State<_UnitCard> {
     }
   }
 
+  Future<void> _moveToTrack() async {
+    final sb = Supabase.instance.client;
+    final currentTrackId = widget.unit['track_id'] as String;
+    final rows = await sb.from('tracks').select('id, slug, name_bn').order('sort_order');
+    final others = (rows as List)
+        .cast<Map<String, dynamic>>()
+        .where((t) => t['id'] != currentTrackId)
+        .toList();
+    if (others.isEmpty || !mounted) return;
+
+    final picked = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('কোন ট্র্যাকে নিয়ে যাবেন?'),
+        children: others.map((t) => SimpleDialogOption(
+          onPressed: () => Navigator.pop(ctx, t),
+          child: Row(children: [
+            Icon(
+              t['slug'] == 'quranic' ? Icons.menu_book : Icons.record_voice_over,
+              size: 18,
+              color: t['slug'] == 'quranic'
+                  ? const Color(0xFF2E7D32)
+                  : const Color(0xFF1565C0),
+            ),
+            const SizedBox(width: 10),
+            Text(t['name_bn'] as String? ?? t['slug'] as String),
+          ]),
+        )).toList(),
+      ),
+    );
+    if (picked == null || !mounted) return;
+
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'মডিউল সরান?',
+      body: '"${widget.unit['title_bn']}" → "${picked['name_bn']}" ট্র্যাকে সরানো হবে।',
+      confirmLabel: 'সরান',
+      cancelLabel: 'বাতিল',
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await sb.from('units').update({'track_id': picked['id']}).eq('id', widget.unit['id']);
+      widget.onRefresh();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _aiSort() async {
     final confirmed = await showConfirmDialog(
       context,
@@ -533,7 +585,7 @@ class _UnitCardState extends State<_UnitCard> {
               ],
             ),
             const SizedBox(height: 8),
-            // ── Tier override row ────────────────────────────────────────────
+            // ── Tier override + track move row ───────────────────────────────
             Row(
               children: [
                 Text('টিয়ার:',
@@ -554,6 +606,17 @@ class _UnitCardState extends State<_UnitCard> {
                           ))
                       .toList(),
                   onChanged: _busy ? null : (t) { if (t != null) _overrideTier(t); },
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.swap_horiz, size: 14),
+                  label: const Text('ট্র্যাক বদলান'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  onPressed: _busy ? null : _moveToTrack,
                 ),
               ],
             ),

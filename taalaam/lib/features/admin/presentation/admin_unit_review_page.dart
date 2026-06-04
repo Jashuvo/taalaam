@@ -286,6 +286,39 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     }
   }
 
+  Future<void> _moveLesson(String lessonId, String lessonTitle) async {
+    final sb = Supabase.instance.client;
+    // Fetch all units across all tracks (excluding this one) with track info
+    final rows = await sb
+        .from('units')
+        .select('id, title_bn, track_id, tracks(slug, name_bn)')
+        .neq('id', widget.unitId)
+        .order('sort_order');
+    final units = List<Map<String, dynamic>>.from(rows as List);
+
+    if (!mounted) return;
+    final target = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => _MoveLessonDialog(units: units, lessonTitle: lessonTitle),
+    );
+    if (target == null || !mounted) return;
+
+    try {
+      await sb.from('lessons').update({'unit_id': target['id']}).eq('id', lessonId);
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"$lessonTitle" → "${target['title_bn']}" এ সরানো হয়েছে ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
+    }
+  }
+
   Future<void> _uploadVocabAudio(String vocabId) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -670,6 +703,7 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
                             onEditVocab: _editVocab,
                             onUploadVocabAudio: (id) => _uploadVocabAudio(id),
                             onRegenVocab: (id) => _regenVocab(id),
+                            onMoveLesson: _moveLesson,
                             regenVocabLoading: _regenVocabLoading
                                 .contains(e.value['id'] as String),
                           )),
@@ -824,6 +858,7 @@ class _LessonSection extends StatefulWidget {
   final Future<void> Function(Map<String, dynamic>) onEditVocab;
   final Future<void> Function(String) onUploadVocabAudio;
   final Future<void> Function(String) onRegenVocab;
+  final Future<void> Function(String lessonId, String lessonTitle) onMoveLesson;
   final bool regenVocabLoading;
 
   const _LessonSection({
@@ -837,6 +872,7 @@ class _LessonSection extends StatefulWidget {
     required this.onEditVocab,
     required this.onUploadVocabAudio,
     required this.onRegenVocab,
+    required this.onMoveLesson,
     this.regenVocabLoading = false,
   });
 
@@ -901,6 +937,20 @@ class _LessonSectionState extends State<_LessonSection> {
                     '${widget.exercises.length} ex · ${widget.vocabulary.length} vocab',
                     style: theme.textTheme.labelSmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () => widget.onMoveLesson(
+                      widget.lesson['id'] as String,
+                      widget.lesson['title_bn'] as String? ?? 'পাঠ ${widget.lessonNumber}',
+                    ),
+                    child: Tooltip(
+                      message: 'অন্য মডিউলে সরান',
+                      child: Icon(Icons.drive_file_move_outlined,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.6)),
+                    ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
@@ -1764,5 +1814,117 @@ class _ExamQuestionsPreviewDialog extends StatelessWidget {
     } catch (_) {
       return '';
     }
+  }
+}
+
+// ── Move-lesson dialog ────────────────────────────────────────────────────────
+
+class _MoveLessonDialog extends StatefulWidget {
+  final List<Map<String, dynamic>> units;
+  final String lessonTitle;
+  const _MoveLessonDialog({required this.units, required this.lessonTitle});
+
+  @override
+  State<_MoveLessonDialog> createState() => _MoveLessonDialogState();
+}
+
+class _MoveLessonDialogState extends State<_MoveLessonDialog> {
+  String _selectedTrackSlug = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Default to the first available track slug
+    final slugs = widget.units
+        .map((u) => (u['tracks'] as Map?)?['slug'] as String? ?? '')
+        .toSet()
+        .toList();
+    if (slugs.isNotEmpty) _selectedTrackSlug = slugs.first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // Group units by track slug
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final u in widget.units) {
+      final slug = (u['tracks'] as Map?)?['slug'] as String? ?? 'other';
+      grouped.putIfAbsent(slug, () => []).add(u);
+    }
+
+    final filteredUnits = grouped[_selectedTrackSlug] ?? [];
+    final trackSlugs = grouped.keys.toList();
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420, maxHeight: 520),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.drive_file_move_outlined, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '"${widget.lessonTitle}" সরান',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: () => Navigator.pop(context)),
+              ]),
+              const SizedBox(height: 14),
+              // Track selector
+              if (trackSlugs.length > 1)
+                SegmentedButton<String>(
+                  segments: trackSlugs.map((slug) => ButtonSegment(
+                    value: slug,
+                    label: Text(slug == 'quranic' ? 'কুরআন' : 'কথা আরবি'),
+                    icon: Icon(slug == 'quranic'
+                        ? Icons.menu_book
+                        : Icons.record_voice_over,
+                        size: 16),
+                  )).toList(),
+                  selected: {_selectedTrackSlug},
+                  onSelectionChanged: (s) =>
+                      setState(() => _selectedTrackSlug = s.first),
+                ),
+              const SizedBox(height: 12),
+              Text('মডিউল বেছে নিন:',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 6),
+              Flexible(
+                child: filteredUnits.isEmpty
+                    ? const Center(child: Text('কোনো মডিউল নেই'))
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filteredUnits.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (ctx, i) {
+                          final u = filteredUnits[i];
+                          return ListTile(
+                            dense: true,
+                            title: Text(u['title_bn'] as String? ?? ''),
+                            trailing: const Icon(Icons.arrow_forward_ios,
+                                size: 14),
+                            onTap: () => Navigator.pop(context, u),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
