@@ -9,6 +9,14 @@ import '../../../shared/widgets/arabic_audio_button.dart';
 import '../../auth/presentation/auth_provider.dart';
 import 'srs_provider.dart';
 
+// Cached vocab lookup — prevents FutureBuilder recreating the Future on every rebuild.
+final _vocabEntryProvider = FutureProvider.autoDispose
+    .family<VocabEntry?, String>((ref, vocabId) async {
+  final db = ref.read(appDatabaseProvider);
+  return (db.select(db.vocabulary)..where((t) => t.id.equals(vocabId)))
+      .getSingleOrNull();
+});
+
 class ReviewScreen extends ConsumerWidget {
   const ReviewScreen({super.key});
 
@@ -167,23 +175,17 @@ class _FrontFace extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final db = ref.watch(appDatabaseProvider);
-    return FutureBuilder(
-      future: (db.select(db.vocabulary)
-            ..where((t) => t.id.equals(vocabId)))
-          .getSingleOrNull(),
-      builder: (ctx, snap) {
-        final entry = snap.data;
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Text(
-            entry?.arabic ?? '...',
-            style: const TextStyle(
-                fontFamily: 'NotoNaskhArabic', fontSize: 48, height: 1.6),
-            textAlign: TextAlign.center,
-          ),
-        );
-      },
+    final entry = ref.watch(_vocabEntryProvider(vocabId)).valueOrNull;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: entry == null
+          ? const CircularProgressIndicator()
+          : Text(
+              entry.arabic,
+              style: const TextStyle(
+                  fontFamily: 'NotoNaskhArabic', fontSize: 48, height: 1.6),
+              textAlign: TextAlign.center,
+            ),
     );
   }
 }
@@ -197,112 +199,105 @@ class _FlippedFace extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final db = ref.watch(appDatabaseProvider);
-    return FutureBuilder(
-      future: (db.select(db.vocabulary)
-            ..where((t) => t.id.equals(vocabId)))
-          .getSingleOrNull(),
-      builder: (ctx, snap) {
-        final entry = snap.data;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Directionality(
-              textDirection: TextDirection.rtl,
-              child: Text(
-                entry?.arabic ?? '',
-                style: const TextStyle(
-                    fontFamily: 'NotoNaskhArabic', fontSize: 36, height: 1.6),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            ArabicAudioButton(audioUrl: entry?.audioUrl),
-            const SizedBox(height: 8),
-            if (entry?.transliteration != null)
-              Text(entry!.transliteration!,
-                  style: theme.textTheme.bodySmall?.copyWith(
+    final entry = ref.watch(_vocabEntryProvider(vocabId)).valueOrNull;
+    if (entry == null) return const CircularProgressIndicator();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Directionality(
+          textDirection: TextDirection.rtl,
+          child: Text(
+            entry.arabic,
+            style: const TextStyle(
+                fontFamily: 'NotoNaskhArabic', fontSize: 36, height: 1.6),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        ArabicAudioButton(audioUrl: entry.audioUrl),
+        const SizedBox(height: 8),
+        if (entry.transliteration != null)
+          Text(entry.transliteration!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 12),
+        Text(
+          entry.meaningBn,
+          style: theme.textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
+        if (entry.meaningEn != null) ...[
+          const SizedBox(height: 4),
+          Text(entry.meaningEn!,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant)),
+        ],
+        if (entry.rootLetters != null) ...[
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.account_tree_outlined,
+                  size: 14,
+                  color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text('মূল: ',
+                  style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 12),
-            Text(
-              entry?.meaningBn ?? '',
-              style: theme.textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            if (entry?.meaningEn != null) ...[
-              const SizedBox(height: 4),
-              Text(entry!.meaningEn!,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant)),
-            ],
-            if (entry?.rootLetters != null) ...[
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.account_tree_outlined,
-                      size: 14,
-                      color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Text('মূল: ',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant)),
-                  Directionality(
-                    textDirection: TextDirection.rtl,
-                    child: Text(
-                      entry!.rootLetters!,
-                      style: TextStyle(
-                        fontFamily: 'NotoNaskhArabic',
-                        fontSize: 16,
-                        height: 1.6,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
+              Directionality(
+                textDirection: TextDirection.rtl,
+                child: Text(
+                  entry.rootLetters!,
+                  style: TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 16,
+                    height: 1.6,
+                    color: theme.colorScheme.primary,
                   ),
-                ],
-              ),
-            ],
-            if (entry?.frequencyRank != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                'কুরআনে ${entry!.frequencyRank}তম সর্বাধিক ব্যবহৃত',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: theme.colorScheme.tertiary),
-                textAlign: TextAlign.center,
-              ),
-            ],
-            if (entry?.grammarNoteBn != null) ...[
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: theme.colorScheme.secondary.withValues(alpha: 0.3)),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.info_outline_rounded,
-                        size: 13, color: theme.colorScheme.secondary),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        entry!.grammarNoteBn!,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+              ),
+            ],
+          ),
+        ],
+        if (entry.frequencyRank != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'কুরআনে ${entry.frequencyRank}তম সর্বাধিক ব্যবহৃত',
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: theme.colorScheme.tertiary),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        if (entry.grammarNoteBn != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 13, color: theme.colorScheme.secondary),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    entry.grammarNoteBn!,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSecondaryContainer,
+                      fontStyle: FontStyle.italic,
                     ),
-                  ],
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              ),
-            ],
-          ],
-        );
-      },
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -315,22 +310,14 @@ class _ContextSnippetLoader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final db = ref.watch(appDatabaseProvider);
-    return FutureBuilder(
-      future: (db.select(db.vocabulary)
-            ..where((t) => t.id.equals(vocabId)))
-          .getSingleOrNull(),
-      builder: (ctx, snap) {
-        final entry = snap.data;
-        if (entry == null) return const SizedBox.shrink();
-        if (entry.contextSnippetAr == null && entry.contextSnippetBn == null) {
-          return const SizedBox.shrink();
-        }
-        return Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: _ContextSnippetBlock(entry: entry),
-        );
-      },
+    final entry = ref.watch(_vocabEntryProvider(vocabId)).valueOrNull;
+    if (entry == null) return const SizedBox.shrink();
+    if (entry.contextSnippetAr == null && entry.contextSnippetBn == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: _ContextSnippetBlock(entry: entry),
     );
   }
 }

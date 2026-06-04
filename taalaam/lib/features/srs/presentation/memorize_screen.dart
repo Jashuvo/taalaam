@@ -96,6 +96,7 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
     super.initState();
     _useWordBank = widget.card.stability < _kWordBankStabilityThreshold ||
         widget.card.reps < _kWordBankRepsThreshold;
+    _loadEntry();
   }
 
   @override
@@ -169,10 +170,6 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (_entry == null) {
-      _loadEntry();
-    }
-
     final theme = Theme.of(context);
     final entry = _entry;
     final inWordBank = _inWordBankMode;
