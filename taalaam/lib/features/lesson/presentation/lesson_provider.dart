@@ -32,13 +32,19 @@ final lessonVocabProvider =
 // ── Session state ─────────────────────────────────────────────────────────────
 
 class LessonSessionState {
-  final List<dynamic> exercises; // ExerciseModel list
+  final List<dynamic> exercises;
   final int currentIndex;
   final int hearts;
   final bool showFeedback;
   final bool? lastCorrect;
   final bool completed;
   final int correctCount;
+  // Gamification
+  final int consecutiveCorrect;
+  final bool showMilestone;
+  // Previous-mistakes round
+  final List<int> wrongIndices;
+  final bool isMistakeRound;
 
   const LessonSessionState({
     required this.exercises,
@@ -48,6 +54,10 @@ class LessonSessionState {
     this.lastCorrect,
     this.completed = false,
     this.correctCount = 0,
+    this.consecutiveCorrect = 0,
+    this.showMilestone = false,
+    this.wrongIndices = const [],
+    this.isMistakeRound = false,
   });
 
   bool get isLastExercise => currentIndex >= exercises.length - 1;
@@ -61,15 +71,24 @@ class LessonSessionState {
     bool? lastCorrect,
     bool? completed,
     int? correctCount,
+    int? consecutiveCorrect,
+    bool? showMilestone,
+    List<int>? wrongIndices,
+    bool? isMistakeRound,
+    List<dynamic>? exercises,
   }) =>
       LessonSessionState(
-        exercises: exercises,
+        exercises: exercises ?? this.exercises,
         currentIndex: currentIndex ?? this.currentIndex,
         hearts: hearts ?? this.hearts,
         showFeedback: showFeedback ?? this.showFeedback,
         lastCorrect: lastCorrect ?? this.lastCorrect,
         completed: completed ?? this.completed,
         correctCount: correctCount ?? this.correctCount,
+        consecutiveCorrect: consecutiveCorrect ?? this.consecutiveCorrect,
+        showMilestone: showMilestone ?? this.showMilestone,
+        wrongIndices: wrongIndices ?? this.wrongIndices,
+        isMistakeRound: isMistakeRound ?? this.isMistakeRound,
       );
 }
 
@@ -77,9 +96,6 @@ class LessonSessionNotifier extends StateNotifier<LessonSessionState> {
   LessonSessionNotifier(List<dynamic> exercises)
       : super(LessonSessionState(exercises: _smartOrder(exercises)));
 
-  // Fully random shuffle so every session feels different.
-  // Only guarantee: first exercise is the easiest type available,
-  // so learners never open a lesson with a hard exercise cold.
   static List<dynamic> _smartOrder(List<dynamic> raw) {
     if (raw.isEmpty) return raw;
     final rng = Random();
@@ -96,17 +112,49 @@ class LessonSessionNotifier extends StateNotifier<LessonSessionState> {
   }
 
   void answer(bool correct) {
+    final newConsecutive = correct ? state.consecutiveCorrect + 1 : 0;
+    final newWrong = correct
+        ? state.wrongIndices
+        : [...state.wrongIndices, state.currentIndex];
+
+    // Trigger full-screen milestone at 5 or 10 in a row
+    final milestone = correct &&
+        !state.isMistakeRound &&
+        (newConsecutive == 5 || newConsecutive == 10);
+
     state = state.copyWith(
-      showFeedback: true,
+      showFeedback: !milestone,
+      showMilestone: milestone,
       lastCorrect: correct,
       hearts: correct ? state.hearts : (state.hearts - 1).clamp(0, 5),
       correctCount: correct ? state.correctCount + 1 : state.correctCount,
+      consecutiveCorrect: newConsecutive,
+      wrongIndices: newWrong,
     );
+  }
+
+  void dismissMilestone() {
+    // After milestone screen, show feedback sheet for the last answer
+    state = state.copyWith(showMilestone: false, showFeedback: true);
   }
 
   void next() {
     if (state.isLastExercise) {
-      state = state.copyWith(showFeedback: false, completed: true);
+      // End of main exercises: append wrong ones for the mistake round
+      if (state.wrongIndices.isNotEmpty && !state.isMistakeRound) {
+        final mistakeExercises = state.wrongIndices
+            .map((i) => state.exercises[i])
+            .toList();
+        state = state.copyWith(
+          showFeedback: false,
+          exercises: [...state.exercises, ...mistakeExercises],
+          currentIndex: state.currentIndex + 1,
+          isMistakeRound: true,
+          consecutiveCorrect: 0,
+        );
+      } else {
+        state = state.copyWith(showFeedback: false, completed: true);
+      }
     } else {
       state = state.copyWith(
         showFeedback: false,

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+import 'arabic_word_tooltip.dart';
 
 class ExerciseTrueFalse extends StatefulWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
+  final Map<String, VocabularyModel> vocabMap;
   const ExerciseTrueFalse(
-      {required this.exercise, required this.onAnswered, super.key});
+      {required this.exercise, required this.onAnswered,
+       this.vocabMap = const {}, super.key});
 
   @override
   State<ExerciseTrueFalse> createState() => _ExerciseTrueFalseState();
@@ -21,6 +25,8 @@ class _ExerciseTrueFalseState extends State<ExerciseTrueFalse> {
   String get _stmtBn =>
       widget.exercise.correctAnswer['statement_bn'] as String? ?? '';
 
+  bool get _canCheck => _selected != null;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -34,21 +40,18 @@ class _ExerciseTrueFalseState extends State<ExerciseTrueFalse> {
                 style: theme.textTheme.titleMedium,
                 textAlign: TextAlign.center),
           ),
-        // Arabic statement
         if (_stmtAr.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              child: Text(
-                _stmtAr,
+            child: Center(
+              child: ArabicSentenceWithTooltips(
+                sentence: _stmtAr,
+                vocabMap: widget.vocabMap,
                 style: const TextStyle(
                     fontFamily: 'NotoNaskhArabic', fontSize: 26, height: 1.8),
-                textAlign: TextAlign.center,
               ),
             ),
           ),
-        // Bangla translation
         if (_stmtBn.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 32),
@@ -68,10 +71,7 @@ class _ExerciseTrueFalseState extends State<ExerciseTrueFalse> {
                 selected: _selected == true,
                 onTap: _selected != null
                     ? null
-                    : () {
-                        setState(() => _selected = true);
-                        widget.onAnswered(_isTrue == true);
-                      },
+                    : () => setState(() => _selected = true),
               ),
             ),
             const SizedBox(width: 12),
@@ -82,13 +82,17 @@ class _ExerciseTrueFalseState extends State<ExerciseTrueFalse> {
                 selected: _selected == false,
                 onTap: _selected != null
                     ? null
-                    : () {
-                        setState(() => _selected = false);
-                        widget.onAnswered(_isTrue == false);
-                      },
+                    : () => setState(() => _selected = false),
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: _canCheck
+              ? () => widget.onAnswered(_selected == _isTrue)
+              : null,
+          child: const Text('যাচাই করুন'),
         ),
       ],
     );

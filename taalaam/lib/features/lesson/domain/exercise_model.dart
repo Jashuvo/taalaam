@@ -10,6 +10,9 @@ enum ExerciseType {
   dragDrop,
   wordScramble,
   trueFalse,
+  chatComplete,
+  translateBuild,
+  listenSelect,
 }
 
 @freezed

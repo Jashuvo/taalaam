@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+import 'arabic_word_tooltip.dart';
 
 class ExerciseTapToBuild extends StatefulWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
+  final Map<String, VocabularyModel> vocabMap;
   const ExerciseTapToBuild(
-      {required this.exercise, required this.onAnswered, super.key});
+      {required this.exercise, required this.onAnswered,
+       this.vocabMap = const {}, super.key});
 
   @override
   State<ExerciseTapToBuild> createState() => _ExerciseTapToBuildState();
 }
 
 class _ExerciseTapToBuildState extends State<ExerciseTapToBuild> {
-  late List<String> _bank; // shuffled word bank
-  final List<String> _built = []; // words user has tapped
+  late List<String> _bank;
+  final List<String> _built = [];
   bool _answered = false;
 
   List<String> get _correctWords =>
@@ -74,7 +78,8 @@ class _ExerciseTapToBuildState extends State<ExerciseTapToBuild> {
                             _built.remove(w);
                             _bank.add(w);
                           }),
-                  child: _WordChip(word: w, active: true),
+                  child: _WordChip(word: w, active: true,
+                      vocabMap: widget.vocabMap),
                 );
               }).toList(),
             ),
@@ -96,7 +101,8 @@ class _ExerciseTapToBuildState extends State<ExerciseTapToBuild> {
                           _bank.remove(w);
                           _built.add(w);
                         }),
-                child: _WordChip(word: w, active: false),
+                child: _WordChip(word: w, active: false,
+                    vocabMap: widget.vocabMap),
               );
             }).toList(),
           ),
@@ -109,7 +115,7 @@ class _ExerciseTapToBuildState extends State<ExerciseTapToBuild> {
                   setState(() => _answered = true);
                   widget.onAnswered(_checkAnswer());
                 },
-          child: const Text('জমা দিন'),
+          child: const Text('যাচাই করুন'),
         ),
       ],
     );
@@ -119,7 +125,9 @@ class _ExerciseTapToBuildState extends State<ExerciseTapToBuild> {
 class _WordChip extends StatelessWidget {
   final String word;
   final bool active;
-  const _WordChip({required this.word, required this.active});
+  final Map<String, VocabularyModel> vocabMap;
+  const _WordChip({required this.word, required this.active,
+      this.vocabMap = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -137,8 +145,9 @@ class _WordChip extends StatelessWidget {
               : theme.colorScheme.outline,
         ),
       ),
-      child: Text(
-        word,
+      child: ArabicWordTooltip(
+        word: word,
+        vocabMap: vocabMap,
         style: TextStyle(
           fontFamily: 'NotoNaskhArabic',
           fontSize: 20,

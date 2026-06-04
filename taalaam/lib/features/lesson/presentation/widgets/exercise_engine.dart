@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+import 'exercise_chat_complete.dart';
 import 'exercise_drag_drop.dart';
 import 'exercise_fill_blank.dart';
+import 'exercise_listen_select.dart';
 import 'exercise_multiple_choice.dart';
 import 'exercise_tap_to_build.dart';
+import 'exercise_translate_build.dart';
 import 'exercise_true_false.dart';
 import 'exercise_word_scramble.dart';
 
@@ -19,11 +22,13 @@ class ExerciseEngine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vocabMap = {for (final v in vocab) v.arabic: v};
     return switch (exercise.type) {
       ExerciseType.multipleChoice => ExerciseMultipleChoice(
-          exercise: exercise, onAnswered: onAnswered),
+          exercise: exercise, onAnswered: onAnswered, vocabMap: vocabMap),
       ExerciseType.tapToBuild =>
-        ExerciseTapToBuild(exercise: exercise, onAnswered: onAnswered),
+        ExerciseTapToBuild(exercise: exercise, onAnswered: onAnswered,
+            vocabMap: vocabMap),
       ExerciseType.fillInBlank =>
         ExerciseFillBlank(exercise: exercise, onAnswered: onAnswered,
             vocab: vocab, extraWords: extraWords),
@@ -32,7 +37,16 @@ class ExerciseEngine extends StatelessWidget {
       ExerciseType.wordScramble =>
         ExerciseWordScramble(exercise: exercise, onAnswered: onAnswered),
       ExerciseType.trueFalse =>
-        ExerciseTrueFalse(exercise: exercise, onAnswered: onAnswered),
+        ExerciseTrueFalse(exercise: exercise, onAnswered: onAnswered,
+            vocabMap: vocabMap),
+      ExerciseType.chatComplete =>
+        ExerciseChatComplete(exercise: exercise, onAnswered: onAnswered,
+            vocabMap: vocabMap),
+      ExerciseType.translateBuild =>
+        ExerciseTranslateBuild(exercise: exercise, onAnswered: onAnswered,
+            vocabMap: vocabMap),
+      ExerciseType.listenSelect =>
+        ExerciseListenSelect(exercise: exercise, onAnswered: onAnswered),
     };
   }
 }

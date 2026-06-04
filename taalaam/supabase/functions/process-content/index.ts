@@ -325,7 +325,74 @@ NON-NEGOTIABLE RULES
 5. All exercises use vocabulary from THIS LESSON's vocabulary list
 6. grammar_note_bn must explain the GRAMMAR RULE (not just translate the sentence)
 7. sort_order is sequential starting at 1
-8. Every lesson must have at least: 2× multiple_choice, 1× drag_drop, 1× true_false, 1× fill_in_blank, 1× tap_to_build`;
+8. Every lesson must have at least: 2× multiple_choice, 1× drag_drop, 1× true_false, 1× fill_in_blank, 1× tap_to_build
+
+════════════════════════════════════════════
+NEW EXERCISE TYPES (use in addition to the 6 above)
+════════════════════════════════════════════
+
+[translate_build] — Show Arabic sentence, learner builds Bengali translation using Bengali word chips
+  DIRECTION: Arabic → Bengali (opposite of tap_to_build)
+  prompt_ar: "أَنَا طَالِبٌ جَدِيدٌ"
+  prompt_bn: "বাংলায় অনুবাদ করুন"
+  correct_answer: { "words": ["আমি","একজন","নতুন","ছাত্র"], "order_matters": true, "distractor_words": ["শিক্ষক","পুরানো","সে"] }
+  Rules:
+    - "words" = Bengali translation words, one per array element
+    - "distractor_words" = 2-3 wrong Bengali chips from lesson vocab meanings
+    - Use vocabulary already introduced earlier in this lesson
+    - difficulty: 3
+    - Generate at least 1 per lesson (or 2 if lesson has 6+ words)
+
+[chat_complete] — CONVERSATIONAL TRACK ONLY. Show a dialogue opener, learner picks the correct reply.
+  prompt_bn: "কথোপকথন সম্পন্ন করুন"
+  correct_answer: {
+    "speaker_a_ar": "كَيْفَ حَالُكَ؟",
+    "speaker_a_bn": "তুমি কেমন আছ?",
+    "options": [
+      {"ar": "بِخَيْرٍ، وَأَنْتَ؟", "bn": "ভালো, তুমি?"},
+      {"ar": "شُكْرًا", "bn": "ধন্যবাদ"},
+      {"ar": "مَعَ السَّلَامَةِ", "bn": "আল্লাহ হাফেজ"}
+    ],
+    "correct_index": 0
+  }
+  Rules:
+    - ONLY generate for "conversational" track content
+    - Exactly 3 options; all must use vocabulary from THIS lesson
+    - speaker_a line must be from the lesson's conversational context
+    - difficulty: 3
+
+[listen_select] — Learner hears an Arabic word (TTS), picks the Bangla meaning.
+  prompt_bn: "শুনুন এবং সঠিক অর্থ বেছে নিন"
+  correct_answer: {
+    "speak_text": "أُسْتَاذٌ",
+    "mode": "ar_to_bn",
+    "options": ["শিক্ষক","ছাত্র","নতুন","সে"],
+    "correct_index": 0
+  }
+  Rules:
+    - "speak_text" = the exact Arabic word/phrase to speak (with full harakat)
+    - "mode" is always "ar_to_bn" for our app
+    - Exactly 4 options, from THIS lesson's vocabulary
+    - Generate 1-2 per lesson using KEY vocabulary words
+    - difficulty: 2
+
+════════════════════════════════════════════
+VARIABLE EXERCISE COUNT RULE
+════════════════════════════════════════════
+Do NOT use a fixed number of exercises. Scale based on vocabulary:
+  - 1-3 vocab words  → generate 5-6 exercises
+  - 4-5 vocab words  → generate 7-9 exercises
+  - 6-8 vocab words  → generate 10-14 exercises
+  Each vocabulary word MUST appear in at least 2 different exercises.
+  Vary exercise types to prevent monotony — no more than 2 consecutive exercises of the same type.
+
+════════════════════════════════════════════
+NEW WORD LABELLING RULE
+════════════════════════════════════════════
+For the FIRST exercise that introduces each vocabulary word (always a multiple_choice or listen_select),
+prefix prompt_bn with "নতুন শব্দ: " followed by the normal instruction.
+Example: "নতুন শব্দ: «أُسْتَاذٌ» শব্দের অর্থ কী?"
+This signals to the app that this exercise introduces a brand-new word.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OUTPUT SCHEMA (shown to Gemini as part of each request)
@@ -356,7 +423,7 @@ const OUTPUT_SCHEMA = `Return ONLY a valid JSON object matching this exact schem
       ],
       "exercises": [
         {
-          "type": "multiple_choice | drag_drop | true_false | fill_in_blank | tap_to_build | word_scramble",
+          "type": "multiple_choice | drag_drop | true_false | fill_in_blank | tap_to_build | word_scramble | chat_complete | translate_build | listen_select",
           "sort_order": "number — sequential from 1",
           "prompt_bn": "string — instruction in Bangla",
           "prompt_ar": "string | null — Arabic text to display (required for multiple_choice, optional for others)",

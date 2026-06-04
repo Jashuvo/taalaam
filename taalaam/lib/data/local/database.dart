@@ -31,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -79,13 +79,14 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE units ADD COLUMN unlock_metadata TEXT');
       }
       if (from < 8) {
-        // Defensive re-apply: grammar_note_bn may be missing on old web installs
-        // where the v5 migration didn't run. SQLite throws on duplicate column —
-        // catch silently so users already on v7 with the column are unaffected.
         try {
           await customStatement(
               'ALTER TABLE vocabulary ADD COLUMN grammar_note_bn TEXT');
         } catch (_) {}
+      }
+      if (from < 9) {
+        await customStatement(
+            'ALTER TABLE streaks ADD COLUMN streak_goal INTEGER');
       }
     },
   );

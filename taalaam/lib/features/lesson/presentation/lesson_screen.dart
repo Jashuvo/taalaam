@@ -16,6 +16,22 @@ import 'lesson_provider.dart';
 import 'widgets/exercise_engine.dart';
 import 'widgets/grammar_note_sheet.dart';
 
+// ── Exercise type label metadata ──────────────────────────────────────────────
+
+const _typeLabels = <ExerciseType, (String, Color)>{
+  ExerciseType.multipleChoice:  ('সঠিক উত্তর বেছে নিন',     Color(0xFF4F46E5)),
+  ExerciseType.tapToBuild:      ('বাক্য তৈরি করুন',          AppColors.teal),
+  ExerciseType.fillInBlank:     ('শূন্যস্থান পূরণ করুন',    Color(0xFFB45309)),
+  ExerciseType.trueFalse:       ('সত্য না মিথ্যা?',         Color(0xFF4338CA)),
+  ExerciseType.dragDrop:        ('শব্দ মিলিয়ে দিন',         Color(0xFF7C3AED)),
+  ExerciseType.wordScramble:    ('বাক্য সাজান',              Color(0xFFEA580C)),
+  ExerciseType.chatComplete:    ('কথোপকথন সম্পন্ন করুন',    Color(0xFF0891B2)),
+  ExerciseType.translateBuild:  ('বাংলায় অনুবাদ করুন',      Color(0xFF059669)),
+  ExerciseType.listenSelect:    ('শুনুন ও বেছে নিন',         Color(0xFF0284C7)),
+};
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 class LessonScreen extends ConsumerWidget {
   final String lessonId;
   const LessonScreen({required this.lessonId, super.key});
@@ -113,21 +129,20 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     final vocab =
         ref.watch(lessonVocabProvider(widget.lesson.id as String)).valueOrNull ??
             const [];
-    // Fallback words extracted from other exercises when vocabulary table is empty
     final exerciseWords = _arabicWordsFromExercises(
         session.exercises.cast<ExerciseModel>());
 
-    // SRS card creation + haptic feedback on answer
+    // SRS cards + haptic on answer
     ref.listen<LessonSessionState>(_sessionProvider, (prev, next) {
-      // Haptic on answer
-      if (next.showFeedback && !(prev?.showFeedback ?? false)) {
+      if ((next.showFeedback || next.showMilestone) &&
+          !(prev?.showFeedback ?? false) &&
+          !(prev?.showMilestone ?? false)) {
         if (next.lastCorrect == true) {
           HapticFeedback.lightImpact();
         } else {
           HapticFeedback.mediumImpact();
         }
       }
-      // Write user_progress + SRS cards on lesson complete
       if (next.completed && !(prev?.completed ?? false)) {
         final user = ref.read(currentUserProvider);
         if (user == null) return;
@@ -138,10 +153,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         final pct = next.exercises.isEmpty
             ? 0
             : (next.correctCount / next.exercises.length * 100).round();
-
         final now = DateTime.now();
 
-        // Record lesson completion in local DB (idempotent via conflict update)
         db.into(db.userProgress).insertOnConflictUpdate(
           UserProgressCompanion(
             id: drift.Value('${user.id}_$lessonId'),
@@ -154,9 +167,6 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
           ),
         );
 
-        // Push user_progress to Supabase (fire-and-forget)
-        // No `id` — Supabase column is uuid, local id is a string composite key.
-        // Use onConflict on the unique(user_id, lesson_id) constraint instead.
         Supabase.instance.client.from('user_progress').upsert({
           'user_id': user.id,
           'lesson_id': lessonId,
@@ -166,10 +176,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
           'hearts_remaining': next.hearts,
         }, onConflict: 'user_id,lesson_id').then((_) {}).catchError((_) {});
 
-        // Update streaks locally + push to Supabase
         _updateStreak(db, user.id, xp, now);
 
-        // SRS cards: use vocab if available, else extract pairs from exercises
         final srs = SrsLocalSource(db);
         if (vocab.isNotEmpty) {
           for (final v in vocab) {
@@ -183,6 +191,7 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
       }
     });
 
+    // ── Lesson complete ────────────────────────────────────────────────────
     if (session.completed) {
       final xp = (widget.lesson.xpReward as int? ?? 10) +
           session.correctCount * AppConstants.xpPerExercise;
@@ -192,6 +201,15 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         correctCount: session.correctCount,
         totalCount: session.exercises.length,
         xpEarned: xp,
+        gemReward: widget.lesson.gemReward as int? ?? 0,
+      );
+    }
+
+    // ── Milestone interstitial ─────────────────────────────────────────────
+    if (session.showMilestone) {
+      return _MilestoneScreen(
+        count: session.consecutiveCorrect,
+        onContinue: () => ref.read(_sessionProvider.notifier).dismissMilestone(),
       );
     }
 
@@ -199,13 +217,18 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     final theme = Theme.of(context);
     final progress = (session.currentIndex + 1) / session.exercises.length;
 
+    // Exercise label
+    final labelData = session.isMistakeRound
+        ? ('আগের ভুল', theme.colorScheme.error)
+        : (_typeLabels[exercise.type] ?? ('অনুশীলন', theme.colorScheme.primary));
+    final isNewWord = exercise.promptBn?.startsWith('নতুন শব্দ:') ?? false;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => context.go('/home'),
         ),
-        // ── Thicker animated progress bar ──────────────────────────────
         title: ClipRRect(
           borderRadius: AppRadius.xxlBorder,
           child: TweenAnimationBuilder<double>(
@@ -252,17 +275,60 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // ── Exercise type label + NEW WORD badge ─────────────────
+                  Row(
+                    children: [
+                      if (isNewWord)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.5)),
+                          ),
+                          child: Text(
+                            '⭐ নতুন শব্দ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.gold,
+                            ),
+                          ),
+                        ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: labelData.$2.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: labelData.$2.withValues(alpha: 0.35)),
+                        ),
+                        child: Text(
+                          labelData.$1,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: labelData.$2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   if (exercise.audioUrl != null &&
                       exercise.audioUrl!.isNotEmpty)
                     Align(
                       alignment: Alignment.centerRight,
                       child: ArabicAudioButton(audioUrl: exercise.audioUrl),
                     ),
-                  // ── Animated exercise transition ──────────────────────
                   RepaintBoundary(
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 350),
@@ -293,7 +359,7 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
               ),
             ),
           ),
-          // ── Animated feedback sheet slide-up ──────────────────────────
+          // ── Feedback sheet ───────────────────────────────────────────────
           AnimatedSlide(
             offset: session.showFeedback
                 ? Offset.zero
@@ -321,9 +387,7 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
       ),
     );
   }
-  /// Creates SRS cards from drag_drop exercise pairs when vocab table is empty.
-  /// Inserts synthetic vocabulary rows (with real AR+BN meaning) so the
-  /// foreign key on srs_cards.vocabulary_id is satisfied.
+
   static Future<void> _createSrsFromExercisePairs(
     AppDatabase db,
     SrsLocalSource srs,
@@ -354,11 +418,9 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     }
   }
 
-  /// Updates streak counter and total XP locally + pushes to Supabase.
   Future<void> _updateStreak(
       AppDatabase db, String userId, int xpEarned, DateTime now) async {
     final today = DateTime(now.year, now.month, now.day);
-
     final existing = await (db.select(db.streaks)
           ..where((t) => t.userId.equals(userId)))
         .getSingleOrNull();
@@ -381,13 +443,10 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
             DateTime(lastDate.year, lastDate.month, lastDate.day);
         final diff = today.difference(lastDay).inDays;
         if (diff == 0) {
-          // Same day — don't increment streak, just add XP
           newStreak = existing.currentStreak;
         } else if (diff == 1) {
-          // Consecutive day — increment
           newStreak = existing.currentStreak + 1;
         } else {
-          // Gap — reset streak
           newStreak = 1;
         }
       }
@@ -405,7 +464,6 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
           updatedAt: drift.Value(now),
         ));
 
-    // Push to Supabase (fire-and-forget)
     Supabase.instance.client.from('streaks').upsert({
       'user_id': userId,
       'current_streak': newStreak,
@@ -415,8 +473,6 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     }).then((_) {}).catchError((_) {});
   }
 
-  /// Collects all Arabic words from exercises as fallback distractors
-  /// for fill_in_blank when the vocabulary table has no entries for this lesson.
   static List<String> _arabicWordsFromExercises(List<ExerciseModel> exercises) {
     final words = <String>{};
     for (final ex in exercises) {
@@ -450,6 +506,59 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     return words.toList();
   }
 }
+
+// ── Milestone interstitial ────────────────────────────────────────────────────
+
+class _MilestoneScreen extends StatelessWidget {
+  final int count;
+  final VoidCallback onContinue;
+  const _MilestoneScreen({required this.count, required this.onContinue});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('🔥', style: TextStyle(fontSize: 72)),
+                const SizedBox(height: 24),
+                Text(
+                  'অসাধারণ!',
+                  style: theme.textTheme.headlineLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$count সারিতে সঠিক!',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: onContinue,
+                    child: const Text('চালিয়ে যান'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Out of hearts bar ─────────────────────────────────────────────────────────
 
 class _OutOfHeartsBar extends StatelessWidget {
   final VoidCallback onQuit;

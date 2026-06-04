@@ -47,4 +47,7 @@ const _$ExerciseTypeEnumMap = {
   ExerciseType.dragDrop: 'dragDrop',
   ExerciseType.wordScramble: 'wordScramble',
   ExerciseType.trueFalse: 'trueFalse',
+  ExerciseType.chatComplete: 'chatComplete',
+  ExerciseType.translateBuild: 'translateBuild',
+  ExerciseType.listenSelect: 'listenSelect',
 };

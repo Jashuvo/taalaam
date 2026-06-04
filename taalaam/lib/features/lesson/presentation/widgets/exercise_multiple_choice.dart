@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+import 'arabic_word_tooltip.dart';
 
 class ExerciseMultipleChoice extends StatefulWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
+  final Map<String, VocabularyModel> vocabMap;
   const ExerciseMultipleChoice(
-      {required this.exercise, required this.onAnswered, super.key});
+      {required this.exercise, required this.onAnswered,
+       this.vocabMap = const {}, super.key});
 
   @override
   State<ExerciseMultipleChoice> createState() =>
@@ -21,7 +25,6 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
   @override
   void initState() {
     super.initState();
-    // Identify correct answer by VALUE so shuffle doesn't break the answer
     final raw = List<String>.from(
         widget.exercise.correctAnswer['options'] as List);
     final correctAnswer =
@@ -30,6 +33,8 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
     _options = raw;
     _correctIdx = raw.indexOf(correctAnswer);
   }
+
+  bool get _canCheck => _selected != null;
 
   @override
   Widget build(BuildContext context) {
@@ -49,13 +54,12 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
         if (widget.exercise.promptAr != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 24),
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              child: Text(
-                widget.exercise.promptAr!,
+            child: Center(
+              child: ArabicSentenceWithTooltips(
+                sentence: widget.exercise.promptAr!,
+                vocabMap: widget.vocabMap,
                 style: const TextStyle(
                     fontFamily: 'NotoNaskhArabic', fontSize: 26, height: 1.8),
-                textAlign: TextAlign.center,
               ),
             ),
           ),
@@ -73,7 +77,6 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
               textColor = AppColors.wrongBg;
             }
           }
-          // Staggered slide-in animation per option
           return TweenAnimationBuilder<double>(
             key: ValueKey(i),
             tween: Tween(begin: 0.0, end: 1.0),
@@ -95,24 +98,18 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
                   borderRadius: BorderRadius.circular(12),
                   onTap: _selected != null
                       ? null
-                      : () {
-                          setState(() => _selected = i);
-                          widget.onAnswered(i == _correctIdx);
-                        },
+                      : () => setState(() => _selected = i),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         vertical: 16, horizontal: 20),
-                    child: Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: Text(
-                        _options[i],
-                        style: TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 20,
-                            height: 1.8,
-                            color: textColor ?? theme.colorScheme.onSurface),
-                        textAlign: TextAlign.center,
-                      ),
+                    child: ArabicWordTooltip(
+                      word: _options[i],
+                      vocabMap: widget.vocabMap,
+                      style: TextStyle(
+                          fontFamily: 'NotoNaskhArabic',
+                          fontSize: 20,
+                          height: 1.8,
+                          color: textColor ?? theme.colorScheme.onSurface),
                     ),
                   ),
                 ),
@@ -120,6 +117,13 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
             ),
           );
         }),
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: _canCheck
+              ? () => widget.onAnswered(_selected == _correctIdx)
+              : null,
+          child: const Text('যাচাই করুন'),
+        ),
       ],
     );
   }

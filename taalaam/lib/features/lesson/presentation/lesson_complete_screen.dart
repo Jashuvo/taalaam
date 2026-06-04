@@ -7,6 +7,18 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
+import '../../auth/presentation/auth_provider.dart';
+
+// Returns true if the user has NOT yet set a streak goal (show goal screen once)
+final _needsStreakGoalProvider = FutureProvider.autoDispose<bool>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return false;
+  final db = ref.watch(appDatabaseProvider);
+  final row = await (db.select(db.streaks)
+        ..where((t) => t.userId.equals(user.id)))
+      .getSingleOrNull();
+  return row?.streakGoal == null;
+});
 
 // Finds the next lesson after the current one within the same unit,
 // then falls back to the first lesson of the next unit.
@@ -65,6 +77,7 @@ class LessonCompleteScreen extends ConsumerStatefulWidget {
   final int correctCount;
   final int totalCount;
   final int xpEarned;
+  final int gemReward;
 
   const LessonCompleteScreen({
     required this.lessonId,
@@ -72,6 +85,7 @@ class LessonCompleteScreen extends ConsumerStatefulWidget {
     required this.correctCount,
     required this.totalCount,
     required this.xpEarned,
+    this.gemReward = 0,
     super.key,
   });
 
@@ -115,6 +129,8 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
         .watch(_nextLessonProvider(
             _NextLessonArgs(widget.lessonId, widget.unitId)))
         .valueOrNull;
+    final needsStreakGoal =
+        ref.watch(_needsStreakGoalProvider).valueOrNull ?? false;
     final pct =
         widget.totalCount > 0
             ? (widget.correctCount / widget.totalCount * 100).round()
@@ -193,6 +209,15 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                                 value: '+${widget.xpEarned} XP',
                                 color: AppColors.gold,
                               ),
+                              if (widget.gemReward > 0) ...[
+                                const Divider(height: 20),
+                                _StatRow(
+                                  icon: Icons.diamond_outlined,
+                                  label: 'রত্ন অর্জিত',
+                                  value: '+${widget.gemReward} 💎',
+                                  color: AppColors.teal,
+                                ),
+                              ],
                               const Divider(height: 20),
                               _StatRow(
                                 icon: Icons.check_circle_outline_rounded,
@@ -274,7 +299,8 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                                   foregroundColor:
                                       theme.colorScheme.onSurface)
                               : null,
-                          onPressed: () => context.go('/home'),
+                          onPressed: () => context.go(
+                              needsStreakGoal ? '/streak-goal' : '/home'),
                         ),
                         const SizedBox(height: 12),
                         OutlinedButton.icon(

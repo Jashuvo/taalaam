@@ -16,6 +16,7 @@ class Streaks extends Table {
       integer().withDefault(const Constant(5))();
   DateTimeColumn get updatedAt =>
       dateTime().withDefault(currentDateAndTime)();
+  IntColumn get streakGoal => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {userId};

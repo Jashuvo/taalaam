@@ -81,17 +81,14 @@ class _TrackBody extends ConsumerStatefulWidget {
 }
 
 class _TrackBodyState extends ConsumerState<_TrackBody> {
-  int _selectedTier = 1;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isQuranic = widget.track.slug == 'quranic';
-    final unitsAsync  = ref.watch(unitsForTrackProvider(widget.track.id));
+    final unitsAsync      = ref.watch(unitsForTrackProvider(widget.track.id));
     final completedAsync  = ref.watch(completedLessonIdsProvider);
     final bookmarkedAsync = ref.watch(bookmarkedLessonIdsProvider);
-
-    final trackGradient =
+    final trackGradient   =
         isQuranic ? AppColors.gradientQuranic : AppColors.gradientConversational;
 
     final allUnits = unitsAsync.valueOrNull;
@@ -111,75 +108,47 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
       );
     }
 
-    final availableTiers =
-        allUnits.map((u) => u.tierLevel).toSet().toList()..sort();
-
-    int effectiveTier = _selectedTier;
-    if (availableTiers.isNotEmpty && !availableTiers.contains(_selectedTier)) {
-      effectiveTier = availableTiers.first;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _selectedTier = availableTiers.first);
-      });
-    }
-
-    final filteredUnits =
-        allUnits.where((u) => u.tierLevel == effectiveTier).toList();
     final completedIds  = completedAsync.valueOrNull  ?? {};
     final bookmarkedIds = bookmarkedAsync.valueOrNull ?? {};
+
+    // Group units by tier, sorted
+    final tierGroups = <int, List<Unit>>{};
+    for (final u in allUnits) {
+      (tierGroups[u.tierLevel] ??= []).add(u);
+    }
+    final sortedTiers = tierGroups.keys.toList()..sort();
 
     return Scaffold(
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // ── Compact collapsible app bar ────────────────────────────────────
           _buildAppBar(trackGradient),
-
-          // ── Sticky section selector ────────────────────────────────────────
-          if (availableTiers.isNotEmpty)
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _SectionBarDelegate(
-                selectedTier: effectiveTier,
-                availableTiers: availableTiers,
-                allUnits: allUnits,
-                onSelectTier: (t) => setState(() => _selectedTier = t),
-              ),
-            ),
-
-          // ── Animated tier content ──────────────────────────────────────────
           SliverToBoxAdapter(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, anim) => FadeTransition(
-                opacity: anim,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.04),
-                    end: Offset.zero,
-                  ).animate(anim),
-                  child: child,
-                ),
-              ),
-              child: filteredUnits.isEmpty
-                  ? _EmptyTierPlaceholder(key: ValueKey('empty-$effectiveTier'))
-                  : Column(
-                      key: ValueKey(effectiveTier),
-                      children: [
-                        ...List.generate(filteredUnits.length, (i) =>
-                          _UnitSection(
-                            unit: filteredUnits[i],
-                            unitNumber: i + 1,
-                            completedIds: completedIds,
-                            bookmarkedIds: bookmarkedIds,
-                            tierColors: _tierColors(filteredUnits[i].tierLevel),
-                          ),
-                        ),
-                        const SizedBox(height: 64),
-                      ],
-                    ),
-            ),
+            child: allUnits.isEmpty
+                ? const _EmptyTierPlaceholder()
+                : Builder(builder: (_) {
+                    final items = <Widget>[];
+                    for (int ti = 0; ti < sortedTiers.length; ti++) {
+                      final tier  = sortedTiers[ti];
+                      final units = tierGroups[tier]!;
+                      items.add(_TierSectionBanner(
+                          tier: tier, sectionIndex: ti + 1));
+                      for (int ui = 0; ui < units.length; ui++) {
+                        items.add(_UnitSection(
+                          unit: units[ui],
+                          unitNumber: ui + 1,
+                          completedIds: completedIds,
+                          bookmarkedIds: bookmarkedIds,
+                          tierColors: _tierColors(tier),
+                        ));
+                      }
+                      if (ti < sortedTiers.length - 1) {
+                        items.add(_UpNextCard(nextTier: sortedTiers[ti + 1]));
+                      }
+                    }
+                    items.add(const SizedBox(height: 80));
+                    return Column(children: items);
+                  }),
           ),
         ],
       ),
@@ -835,19 +804,37 @@ class _UnitSection extends ConsumerWidget {
               final examLesson = examAsync.valueOrNull;
               final examDone   = examLesson != null &&
                   completedIds.contains(examLesson.id);
+
+              // Split at midpoint to inject chest node
+              final showChest = lessonList.length >= 4;
+              final mid        = lessonList.length ~/ 2;
+              final firstHalf  = showChest ? lessonList.sublist(0, mid) : lessonList;
+              final secondHalf = showChest ? lessonList.sublist(mid) : <Lesson>[];
+              final chestOpen  = showChest &&
+                  firstHalf.every((l) => completedIds.contains(l.id));
+
               return Column(
                 children: [
                   _LessonPath(
-                    lessons: lessonList,
+                    lessons: firstHalf,
                     completedIds: completedIds,
                     tierColors: tierColors,
                   ),
+                  if (showChest) ...[
+                    _ChestNode(isOpen: chestOpen, tierColors: tierColors),
+                    _LessonPath(
+                      lessons: secondHalf,
+                      completedIds: completedIds,
+                      tierColors: tierColors,
+                    ),
+                  ],
                   if (examLesson != null)
                     _ExamNode(
                       examLesson: examLesson,
                       isUnlocked: allDone,
                       isDone: examDone,
                     ),
+                  _TrophyNode(isComplete: allDone),
                 ],
               );
             },
@@ -1367,6 +1354,297 @@ class _ExamNodeState extends State<_ExamNode>
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tier section banner ───────────────────────────────────────────────────────
+
+class _TierSectionBanner extends StatelessWidget {
+  final int tier;
+  final int sectionIndex;
+  const _TierSectionBanner({required this.tier, required this.sectionIndex});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _tierColors(tier);
+    final name   = _tierNames[tier]   ?? 'বিভাগ $sectionIndex';
+    final nameAr = _tierNamesAr[tier] ?? '';
+    final desc   = _tierDescriptions[tier] ?? '';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: colors[0].withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'বিভাগ $sectionIndex',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  desc,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              if (nameAr.isNotEmpty)
+                Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Text(
+                    nameAr,
+                    style: const TextStyle(
+                      fontFamily: 'NotoNaskhArabic',
+                      fontSize: 13,
+                      height: 1.6,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── UP NEXT card (transition between tiers) ───────────────────────────────────
+
+class _UpNextCard extends StatelessWidget {
+  final int nextTier;
+  const _UpNextCard({required this.nextTier});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final colors = _tierColors(nextTier);
+    final name   = _tierNames[nextTier] ?? 'পরবর্তী বিভাগ';
+    final desc   = _tierDescriptions[nextTier] ?? '';
+    final idx    = nextTier;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 32, 16, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'পরবর্তী বিভাগ',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: colors,
+                      begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    '$idx',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700)),
+                    if (desc.isNotEmpty)
+                      Text(desc,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Chest node (mid-unit reward marker) ──────────────────────────────────────
+
+class _ChestNode extends StatelessWidget {
+  final bool isOpen;
+  final List<Color> tierColors;
+  const _ChestNode({required this.isOpen, required this.tierColors});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: GestureDetector(
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(isOpen
+                    ? 'পরবর্তী অর্ধেক শেষ করলে রত্ন অর্জন করুন!'
+                    : 'অর্ধেক পাঠ সম্পন্ন — চমৎকার!'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: isOpen
+                  ? AppColors.gold.withValues(alpha: 0.18)
+                  : theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isOpen
+                    ? AppColors.gold
+                    : theme.colorScheme.outlineVariant,
+                width: 2,
+              ),
+              boxShadow: isOpen
+                  ? [
+                      BoxShadow(
+                        color: AppColors.gold.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      )
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              isOpen ? Icons.redeem_rounded : Icons.lock_outline_rounded,
+              size: 26,
+              color: isOpen
+                  ? AppColors.gold
+                  : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Trophy node (unit-end completion marker) ──────────────────────────────────
+
+class _TrophyNode extends StatelessWidget {
+  final bool isComplete;
+  const _TrophyNode({required this.isComplete});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
+      child: Center(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 400),
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isComplete
+                ? AppColors.brightGreen.withValues(alpha: 0.15)
+                : theme.colorScheme.surfaceContainerHighest,
+            border: Border.all(
+              color: isComplete
+                  ? AppColors.brightGreen
+                  : theme.colorScheme.outlineVariant,
+              width: 2,
+            ),
+            boxShadow: isComplete
+                ? [
+                    BoxShadow(
+                      color: AppColors.brightGreen.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                    )
+                  ]
+                : null,
+          ),
+          child: Icon(
+            Icons.emoji_events_rounded,
+            size: 28,
+            color: isComplete
+                ? AppColors.brightGreen
+                : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
           ),
         ),
       ),

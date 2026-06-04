@@ -4294,6 +4294,12 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _streakGoalMeta =
+      const VerificationMeta('streakGoal');
+  @override
+  late final GeneratedColumn<int> streakGoal = GeneratedColumn<int>(
+      'streak_goal', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         userId,
@@ -4304,7 +4310,8 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
         freezeCount,
         lastFreezedAt,
         hearts,
-        updatedAt
+        updatedAt,
+        streakGoal
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4364,6 +4371,12 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
       context.handle(_updatedAtMeta,
           updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
     }
+    if (data.containsKey('streak_goal')) {
+      context.handle(
+          _streakGoalMeta,
+          streakGoal.isAcceptableOrUnknown(
+              data['streak_goal']!, _streakGoalMeta));
+    }
     return context;
   }
 
@@ -4391,6 +4404,8 @@ class $StreaksTable extends Streaks with TableInfo<$StreaksTable, Streak> {
           .read(DriftSqlType.int, data['${effectivePrefix}hearts'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      streakGoal: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}streak_goal']),
     );
   }
 
@@ -4410,6 +4425,7 @@ class Streak extends DataClass implements Insertable<Streak> {
   final DateTime? lastFreezedAt;
   final int hearts;
   final DateTime updatedAt;
+  final int? streakGoal;
   const Streak(
       {required this.userId,
       required this.currentStreak,
@@ -4419,7 +4435,8 @@ class Streak extends DataClass implements Insertable<Streak> {
       required this.freezeCount,
       this.lastFreezedAt,
       required this.hearts,
-      required this.updatedAt});
+      required this.updatedAt,
+      this.streakGoal});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4436,6 +4453,9 @@ class Streak extends DataClass implements Insertable<Streak> {
     }
     map['hearts'] = Variable<int>(hearts);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || streakGoal != null) {
+      map['streak_goal'] = Variable<int>(streakGoal);
+    }
     return map;
   }
 
@@ -4454,6 +4474,9 @@ class Streak extends DataClass implements Insertable<Streak> {
           : Value(lastFreezedAt),
       hearts: Value(hearts),
       updatedAt: Value(updatedAt),
+      streakGoal: streakGoal == null && nullToAbsent
+          ? const Value.absent()
+          : Value(streakGoal),
     );
   }
 
@@ -4471,6 +4494,7 @@ class Streak extends DataClass implements Insertable<Streak> {
       lastFreezedAt: serializer.fromJson<DateTime?>(json['lastFreezedAt']),
       hearts: serializer.fromJson<int>(json['hearts']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      streakGoal: serializer.fromJson<int?>(json['streakGoal']),
     );
   }
   @override
@@ -4486,6 +4510,7 @@ class Streak extends DataClass implements Insertable<Streak> {
       'lastFreezedAt': serializer.toJson<DateTime?>(lastFreezedAt),
       'hearts': serializer.toJson<int>(hearts),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'streakGoal': serializer.toJson<int?>(streakGoal),
     };
   }
 
@@ -4498,7 +4523,8 @@ class Streak extends DataClass implements Insertable<Streak> {
           int? freezeCount,
           Value<DateTime?> lastFreezedAt = const Value.absent(),
           int? hearts,
-          DateTime? updatedAt}) =>
+          DateTime? updatedAt,
+          Value<int?> streakGoal = const Value.absent()}) =>
       Streak(
         userId: userId ?? this.userId,
         currentStreak: currentStreak ?? this.currentStreak,
@@ -4512,6 +4538,7 @@ class Streak extends DataClass implements Insertable<Streak> {
             lastFreezedAt.present ? lastFreezedAt.value : this.lastFreezedAt,
         hearts: hearts ?? this.hearts,
         updatedAt: updatedAt ?? this.updatedAt,
+        streakGoal: streakGoal.present ? streakGoal.value : this.streakGoal,
       );
   Streak copyWithCompanion(StreaksCompanion data) {
     return Streak(
@@ -4533,6 +4560,8 @@ class Streak extends DataClass implements Insertable<Streak> {
           : this.lastFreezedAt,
       hearts: data.hearts.present ? data.hearts.value : this.hearts,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      streakGoal:
+          data.streakGoal.present ? data.streakGoal.value : this.streakGoal,
     );
   }
 
@@ -4547,14 +4576,24 @@ class Streak extends DataClass implements Insertable<Streak> {
           ..write('freezeCount: $freezeCount, ')
           ..write('lastFreezedAt: $lastFreezedAt, ')
           ..write('hearts: $hearts, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('streakGoal: $streakGoal')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(userId, currentStreak, longestStreak,
-      lastActivityDate, totalXp, freezeCount, lastFreezedAt, hearts, updatedAt);
+  int get hashCode => Object.hash(
+      userId,
+      currentStreak,
+      longestStreak,
+      lastActivityDate,
+      totalXp,
+      freezeCount,
+      lastFreezedAt,
+      hearts,
+      updatedAt,
+      streakGoal);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4567,7 +4606,8 @@ class Streak extends DataClass implements Insertable<Streak> {
           other.freezeCount == this.freezeCount &&
           other.lastFreezedAt == this.lastFreezedAt &&
           other.hearts == this.hearts &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.streakGoal == this.streakGoal);
 }
 
 class StreaksCompanion extends UpdateCompanion<Streak> {
@@ -4580,6 +4620,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
   final Value<DateTime?> lastFreezedAt;
   final Value<int> hearts;
   final Value<DateTime> updatedAt;
+  final Value<int?> streakGoal;
   final Value<int> rowid;
   const StreaksCompanion({
     this.userId = const Value.absent(),
@@ -4591,6 +4632,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     this.lastFreezedAt = const Value.absent(),
     this.hearts = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.streakGoal = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   StreaksCompanion.insert({
@@ -4603,6 +4645,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     this.lastFreezedAt = const Value.absent(),
     this.hearts = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.streakGoal = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : userId = Value(userId);
   static Insertable<Streak> custom({
@@ -4615,6 +4658,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     Expression<DateTime>? lastFreezedAt,
     Expression<int>? hearts,
     Expression<DateTime>? updatedAt,
+    Expression<int>? streakGoal,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4627,6 +4671,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
       if (lastFreezedAt != null) 'last_freezed_at': lastFreezedAt,
       if (hearts != null) 'hearts': hearts,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (streakGoal != null) 'streak_goal': streakGoal,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4641,6 +4686,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
       Value<DateTime?>? lastFreezedAt,
       Value<int>? hearts,
       Value<DateTime>? updatedAt,
+      Value<int?>? streakGoal,
       Value<int>? rowid}) {
     return StreaksCompanion(
       userId: userId ?? this.userId,
@@ -4652,6 +4698,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
       lastFreezedAt: lastFreezedAt ?? this.lastFreezedAt,
       hearts: hearts ?? this.hearts,
       updatedAt: updatedAt ?? this.updatedAt,
+      streakGoal: streakGoal ?? this.streakGoal,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4686,6 +4733,9 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (streakGoal.present) {
+      map['streak_goal'] = Variable<int>(streakGoal.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4704,6 +4754,7 @@ class StreaksCompanion extends UpdateCompanion<Streak> {
           ..write('lastFreezedAt: $lastFreezedAt, ')
           ..write('hearts: $hearts, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('streakGoal: $streakGoal, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8396,6 +8447,7 @@ typedef $$StreaksTableCreateCompanionBuilder = StreaksCompanion Function({
   Value<DateTime?> lastFreezedAt,
   Value<int> hearts,
   Value<DateTime> updatedAt,
+  Value<int?> streakGoal,
   Value<int> rowid,
 });
 typedef $$StreaksTableUpdateCompanionBuilder = StreaksCompanion Function({
@@ -8408,6 +8460,7 @@ typedef $$StreaksTableUpdateCompanionBuilder = StreaksCompanion Function({
   Value<DateTime?> lastFreezedAt,
   Value<int> hearts,
   Value<DateTime> updatedAt,
+  Value<int?> streakGoal,
   Value<int> rowid,
 });
 
@@ -8447,6 +8500,9 @@ class $$StreaksTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get streakGoal => $composableBuilder(
+      column: $table.streakGoal, builder: (column) => ColumnFilters(column));
 }
 
 class $$StreaksTableOrderingComposer
@@ -8488,6 +8544,9 @@ class $$StreaksTableOrderingComposer
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get streakGoal => $composableBuilder(
+      column: $table.streakGoal, builder: (column) => ColumnOrderings(column));
 }
 
 class $$StreaksTableAnnotationComposer
@@ -8525,6 +8584,9 @@ class $$StreaksTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get streakGoal => $composableBuilder(
+      column: $table.streakGoal, builder: (column) => column);
 }
 
 class $$StreaksTableTableManager extends RootTableManager<
@@ -8559,6 +8621,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             Value<DateTime?> lastFreezedAt = const Value.absent(),
             Value<int> hearts = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<int?> streakGoal = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               StreaksCompanion(
@@ -8571,6 +8634,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             lastFreezedAt: lastFreezedAt,
             hearts: hearts,
             updatedAt: updatedAt,
+            streakGoal: streakGoal,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -8583,6 +8647,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             Value<DateTime?> lastFreezedAt = const Value.absent(),
             Value<int> hearts = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<int?> streakGoal = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               StreaksCompanion.insert(
@@ -8595,6 +8660,7 @@ class $$StreaksTableTableManager extends RootTableManager<
             lastFreezedAt: lastFreezedAt,
             hearts: hearts,
             updatedAt: updatedAt,
+            streakGoal: streakGoal,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
