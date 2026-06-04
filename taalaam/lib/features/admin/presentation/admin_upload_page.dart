@@ -11,20 +11,28 @@ class UploadFileStatus {
   final String status;
   final bool success;
   final bool processing;
+  final bool isDuplicate;
 
   const UploadFileStatus({
     required this.file,
     this.status = 'অপেক্ষায়…',
     this.success = false,
     this.processing = false,
+    this.isDuplicate = false,
   });
 
-  UploadFileStatus copyWith({String? status, bool? success, bool? processing}) =>
+  UploadFileStatus copyWith({
+    String? status,
+    bool? success,
+    bool? processing,
+    bool? isDuplicate,
+  }) =>
       UploadFileStatus(
         file: file,
         status: status ?? this.status,
         success: success ?? this.success,
         processing: processing ?? this.processing,
+        isDuplicate: isDuplicate ?? this.isDuplicate,
       );
 }
 
@@ -59,7 +67,7 @@ class UploadNotifier extends Notifier<UploadPageState> {
   @override
   UploadPageState build() => const UploadPageState();
 
-  void addFiles(List<PlatformFile> incoming) {
+  Future<void> addFiles(List<PlatformFile> incoming) async {
     final existing = state.files;
     final toAdd = incoming
         .where((f) => !existing.any((s) => s.file.name == f.name))
@@ -67,12 +75,34 @@ class UploadNotifier extends Notifier<UploadPageState> {
         .toList();
     if (toAdd.isEmpty) return;
     state = state.copyWith(files: [...existing, ...toAdd]);
+
+    // Check which filenames were already processed before
+    try {
+      final names = toAdd.map((f) => f.file.name).toList();
+      final res = await Supabase.instance.client
+          .from('source_materials')
+          .select('filename')
+          .inFilter('filename', names);
+      final seen = {for (final r in (res as List)) r['filename'] as String};
+      if (seen.isNotEmpty) {
+        final updated = state.files
+            .map((fs) => seen.contains(fs.file.name)
+                ? fs.copyWith(isDuplicate: true)
+                : fs)
+            .toList();
+        state = state.copyWith(files: updated);
+      }
+    } catch (_) {}
   }
 
   void removeAt(int index) {
     final files = [...state.files];
     files.removeAt(index);
     state = state.copyWith(files: files);
+  }
+
+  void resetFile(int index) {
+    _updateFile(index, status: 'অপেক্ষায়…', success: false, processing: false);
   }
 
   void setTrack(String track) => state = state.copyWith(track: track);
@@ -181,7 +211,7 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
       withData: true,
     );
     if (result != null && result.files.isNotEmpty) {
-      ref.read(uploadProvider.notifier).addFiles(result.files);
+      await ref.read(uploadProvider.notifier).addFiles(result.files);
     }
   }
 
@@ -192,7 +222,8 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
     final notifier = ref.read(uploadProvider.notifier);
 
     final hasFiles = upload.files.isNotEmpty;
-    final allDone = hasFiles && upload.files.every((f) => f.success);
+    final hasPending = upload.files.any((f) => !f.success && !f.processing);
+    final allDone = hasFiles && !hasPending;
 
     return Scaffold(
       appBar: AppBar(
@@ -322,9 +353,21 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                                     : theme.colorScheme.onSurfaceVariant,
                                 size: 20,
                               ),
-                        title: Text(fs.file.name,
-                            style: theme.textTheme.bodySmall,
-                            overflow: TextOverflow.ellipsis),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(fs.file.name,
+                                  style: theme.textTheme.bodySmall,
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                            if (fs.isDuplicate && !fs.success)
+                              Tooltip(
+                                message: 'এই ফাইল আগে একবার প্রসেস করা হয়েছে',
+                                child: Icon(Icons.warning_amber_rounded,
+                                    size: 15, color: Colors.orange.shade700),
+                              ),
+                          ],
+                        ),
                         subtitle: Text(fs.status,
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: fs.success
@@ -335,10 +378,25 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                             )),
                         trailing: upload.processingAll
                             ? null
-                            : IconButton(
-                                icon: const Icon(Icons.close, size: 16),
-                                onPressed: () => notifier.removeAt(i),
-                                visualDensity: VisualDensity.compact,
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (fs.success)
+                                    Tooltip(
+                                      message: 'আবার প্রসেস করুন',
+                                      child: IconButton(
+                                        icon: const Icon(Icons.replay, size: 16),
+                                        onPressed: () => notifier.resetFile(i),
+                                        visualDensity: VisualDensity.compact,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, size: 16),
+                                    onPressed: () => notifier.removeAt(i),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ],
                               ),
                       ),
                     );
