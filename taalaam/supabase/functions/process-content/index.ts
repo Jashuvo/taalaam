@@ -323,7 +323,24 @@ NON-NEGOTIABLE RULES
 3. MCQ: exactly 4 options, distractors from same lesson vocab
 4. DragDrop: 3-4 pairs only
 5. All exercises use vocabulary from THIS LESSON's vocabulary list
-6. grammar_note_bn must explain the GRAMMAR RULE (not just translate the sentence)
+6. grammar_note_bn must match the EXERCISE TYPE — write feedback the learner actually needs:
+   • multiple_choice   → why the correct option is right; why common wrong options are wrong
+                         Example: "أُسْتَاذٌ = শিক্ষক (পুংলিঙ্গ) — أُسْتَاذَةٌ হবে নারী শিক্ষকের জন্য।"
+   • true_false        → the grammar rule being tested (gender, case, word meaning)
+                         Example: "তানউয়িন (ٌ) অনির্দিষ্টতা বোঝায় — 'একজন' শব্দ আলাদা লিখতে হয় না।"
+   • fill_in_blank     → why the correct word fills that slot (agreement, case, meaning)
+                         Example: "বিশেষণ বিশেষ্যের পরে বসে এবং লিঙ্গে মিলতে হয়।"
+   • tap_to_build      → the word-order rule demonstrated by this sentence
+                         Example: "আরবিতে সর্বনাম → বিশেষ্য → বিশেষণ ক্রমে বাক্য গঠন হয়।"
+   • translate_build   → what each key word/phrase means + sentence structure tip
+                         Example: "فِي = এ/তে (স্থান বোঝায়) | الْمَضْنَعِ = কারখানা — فِي-এর পরে শব্দে কাসরা হয়।"
+   • word_scramble     → the correct word order rule for this sentence type
+   • drag_drop         → the meaning link between the paired words
+   • listen_select     → what the word means and a memory tip
+                         Example: "طَبِيبٌ = ডাক্তার — মনে রাখুন: طِبّ মানে চিকিৎসা।"
+   • chat_complete     → why the correct reply fits the context; why wrong ones don't
+   • speak_arabic      → pronunciation tip for the word
+                         Example: "مَضْنَعٌ-এ 'দ্ব' উচ্চারণ জোরালো — জিহ্বার পেছন দিয়ে বলুন।"
 7. sort_order is sequential starting at 1
 8. Every lesson must have at least: 2× multiple_choice, 1× drag_drop, 1× true_false, 1× fill_in_blank, 1× tap_to_build
 
