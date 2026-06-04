@@ -89,6 +89,28 @@ Example: "ক্রিয়ার রূপান্তর: বাব নাস
 For merged modules: pick the most descriptive title. The "keep" module absorbs all lessons.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## TRACK CLASSIFICATION RULES
+Modules belong to one of two learning tracks. If a module on the current track
+actually belongs on the other track, flag it in track_assignments.
+
+CONVERSATIONAL (কথোপকথন আরবি) — slug: "conversational":
+  Purpose: everyday spoken Modern Arabic for real communication
+  Signals: greetings, shopping, professions, travel, food, family, emotions,
+           daily objects, common phrases, dialogues, practical scenarios
+  Example titles: "পেশা ও কর্মসংস্থান", "বাজার ও কেনাকাটা", "পরিবার পরিচিতি"
+
+QURANIC (কুরআনিক আরবি) — slug: "quranic":
+  Purpose: Classical/Fusha Arabic for reading Quran and Islamic texts
+  Signals: Quranic vocabulary, verb conjugation patterns (أبواب), morphological
+           tables (صرف), tafsir terms, classical grammar (نحو/إعراب),
+           Islamic/religious context, root-word analysis
+  Example titles: "ক্রিয়ার রূপান্তর", "বাব নাসারা", "মাযি ও মুযারি"
+  TIEBREAKER: When ambiguous → assign to QURANIC (app's primary mission)
+
+In track_assignments: ONLY list modules that need to move to the OTHER track.
+Omit modules that already belong on the current track.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## OUTPUT FORMAT (STRICT JSON — NO MARKDOWN, NO EXTRA TEXT)
 {
   "sorted_ids": ["id-1", "id-2", "id-3"],
@@ -96,6 +118,9 @@ For merged modules: pick the most descriptive title. The "keep" module absorbs a
     { "id": "id-1", "tier": 1 },
     { "id": "id-2", "tier": 1 },
     { "id": "id-3", "tier": 2 }
+  ],
+  "track_assignments": [
+    { "id": "id-4", "track": "quranic", "reason": "Teaches verb conjugation باب — belongs in Quranic track" }
   ],
   "merge_groups": [
     {
@@ -109,10 +134,14 @@ For merged modules: pick the most descriptive title. The "keep" module absorbs a
 }
 
 RULES:
-- sorted_ids: final IDs after merging, in full pedagogical sequence across ALL tiers
+- sorted_ids: final IDs REMAINING on the current track after merging and track moves
   (T1 modules first, then T2, then T3, then T4 — within each tier ordered pedagogically)
-- tier_assignments: EVERY final module ID must appear here with its tier (1–4)
+  Do NOT include IDs listed in track_assignments (those are leaving this track)
+- tier_assignments: EVERY module staying on the current track must appear here
+  Do NOT include track_assignments IDs here
+- track_assignments: only units that are WRONG-TRACK and should move; include a reason
 - merge_ids are deleted — do NOT include them in sorted_ids or tier_assignments
+- If no track moves needed, return "track_assignments": []
 - If no merges needed, return "merge_groups": []`;
 
 Deno.serve(async (req: Request) => {
@@ -138,6 +167,12 @@ Deno.serve(async (req: Request) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       );
 
+      // Fetch all tracks so we can resolve slugs ↔ IDs for track reassignment
+      const { data: allTracks } = await supabase.from('tracks').select('id, slug');
+      const trackById  = new Map((allTracks ?? []).map((t: any) => [t.id, t.slug as string]));
+      const trackBySlug = new Map((allTracks ?? []).map((t: any) => [t.slug as string, t.id as string]));
+      const currentTrackSlug = trackById.get(track_id) ?? 'unknown';
+
       const { data: units, error: unitErr } = await supabase
         .from('units')
         .select('id, title_bn, title_ar, tier_level, sort_order')
@@ -146,13 +181,14 @@ Deno.serve(async (req: Request) => {
 
       if (unitErr) { await respond({ error: unitErr.message }); return; }
       if (!units || units.length < 2) {
-        await respond({ sorted_ids: units?.map((u: any) => u.id) ?? [], merged: [], tier_changes: [] });
+        await respond({ sorted_ids: units?.map((u: any) => u.id) ?? [], merged: [], tier_changes: [], track_changes: [] });
         return;
       }
 
       const userMessage =
-        'Analyse these modules. Sort them pedagogically, assign each to a tier (T1–T4), and identify any that must be merged.\n\n' +
-        'Current tier shown for context only — override if the content belongs elsewhere.\n\n' +
+        `Analyse these modules from the "${currentTrackSlug}" track.\n` +
+        'Tasks: (1) sort pedagogically, (2) assign T1–T4 tier, (3) identify wrong-track modules, (4) merge duplicates.\n\n' +
+        'Current tier shown for context — override if needed.\n\n' +
         'Modules:\n' +
         units.map((u: any, i: number) =>
           `${i + 1}. ID: ${u.id}\n   Bengali: ${u.title_bn}\n   Arabic: ${u.title_ar ?? '—'}\n   Current tier: T${u.tier_level ?? 1}`
@@ -165,6 +201,7 @@ Deno.serve(async (req: Request) => {
       const parsed = JSON.parse(rawText);
       const sortedIds: string[] = parsed.sorted_ids ?? [];
       const tierAssignments: { id: string; tier: number }[] = parsed.tier_assignments ?? [];
+      const trackAssignments: { id: string; track: string; reason?: string }[] = parsed.track_assignments ?? [];
       const mergeGroups: any[] = parsed.merge_groups ?? [];
 
       const allKnownIds = new Set(units.map((u: any) => u.id as string));
@@ -207,11 +244,35 @@ Deno.serve(async (req: Request) => {
         mergedSummary.push(reason ?? `Merged ${merge_ids.length} duplicate unit(s) into ${keep_id}`);
       }
 
-      // ── Build final valid list (exclude deleted merge_ids) ─────────────────
+      // ── Build final valid list (exclude deleted + moved-away units) ─────────
       const deletedIds = new Set(
         mergeGroups.flatMap((g: any) => (g.merge_ids as string[] | undefined) ?? [])
       );
-      const validSorted = sortedIds.filter((id) => allKnownIds.has(id) && !deletedIds.has(id));
+      const validSorted = sortedIds.filter(
+        (id) => allKnownIds.has(id) && !deletedIds.has(id) && !movedToOtherTrack.has(id)
+      );
+
+      // ── Apply track reassignments (move wrong-track modules) ──────────────
+      const movedToOtherTrack = new Set<string>();
+      const trackChanges: { id: string; title_bn: string; from_track: string; to_track: string; reason: string }[] = [];
+
+      for (const assignment of trackAssignments) {
+        const { id, track: targetSlug, reason } = assignment;
+        if (!allKnownIds.has(id)) continue;
+        const targetTrackId = trackBySlug.get(targetSlug);
+        if (!targetTrackId || targetTrackId === track_id) continue; // already on correct track or unknown slug
+
+        await supabase.from('units').update({ track_id: targetTrackId }).eq('id', id);
+        movedToOtherTrack.add(id);
+        const unit = units.find((u: any) => u.id === id);
+        trackChanges.push({
+          id,
+          title_bn: unit?.title_bn ?? id,
+          from_track: currentTrackSlug,
+          to_track: targetSlug,
+          reason: reason ?? `Moved to ${targetSlug} track`,
+        });
+      }
 
       // ── Apply tier_level assignments ───────────────────────────────────────
       const tierMap = new Map(tierAssignments.map((a) => [a.id, a.tier]));
@@ -241,7 +302,7 @@ Deno.serve(async (req: Request) => {
         }),
       );
 
-      await respond({ sorted_ids: validSorted, merged: mergedSummary, tier_changes: tierChanges });
+      await respond({ sorted_ids: validSorted, merged: mergedSummary, tier_changes: tierChanges, track_changes: trackChanges });
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);
       try { await respond({ error: msg }); } catch (_) {}

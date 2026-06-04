@@ -62,19 +62,23 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     try {
       final allMerged = <String>[];
       final allTierChanges = <Map<String, dynamic>>[];
+      final allTrackChanges = <Map<String, dynamic>>[];
       for (final trackId in trackIds) {
         final res = await Supabase.instance.client.functions
             .invoke('sort-units', body: {'track_id': trackId});
         final merged = (res.data?['merged'] as List?)?.cast<String>() ?? [];
         final tierChanges = (res.data?['tier_changes'] as List?)
             ?.cast<Map<String, dynamic>>() ?? [];
+        final trackChanges = (res.data?['track_changes'] as List?)
+            ?.cast<Map<String, dynamic>>() ?? [];
         allMerged.addAll(merged);
         allTierChanges.addAll(tierChanges);
+        allTrackChanges.addAll(trackChanges);
       }
       _refresh();
       if (!mounted) return;
-      if (allMerged.isNotEmpty || allTierChanges.isNotEmpty) {
-        _showSortSummary(allMerged, allTierChanges);
+      if (allMerged.isNotEmpty || allTierChanges.isNotEmpty || allTrackChanges.isNotEmpty) {
+        _showSortSummary(allMerged, allTierChanges, allTrackChanges);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -92,7 +96,7 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     }
   }
 
-  void _showSortSummary(List<String> merged, List<Map<String, dynamic>> tierChanges) {
+  void _showSortSummary(List<String> merged, List<Map<String, dynamic>> tierChanges, List<Map<String, dynamic>> trackChanges) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -108,6 +112,40 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (trackChanges.isNotEmpty) ...[
+                  Text('${trackChanges.length} track reassignment(s):',
+                      style: Theme.of(ctx).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  ...trackChanges.map((c) => Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              c['title_bn'] as String? ?? c['id'] as String,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${c['from_track']} → ${c['to_track']}',
+                              style: TextStyle(fontSize: 11, color: Colors.orange.shade800),
+                            ),
+                            if ((c['reason'] as String?)?.isNotEmpty == true)
+                              Text(
+                                c['reason'] as String,
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                          ],
+                        ),
+                      )),
+                  const SizedBox(height: 16),
+                ],
                 if (tierChanges.isNotEmpty) ...[
                   Text('${tierChanges.length} tier reassignment(s):',
                       style: Theme.of(ctx).textTheme.titleSmall),
