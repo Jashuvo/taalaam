@@ -55,32 +55,17 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
     super.dispose();
   }
 
-  /// Picks the best available Arabic voice then auto-plays.
-  /// flutter_tts on web needs a voice that exactly matches the system's
-  /// installed voices — 'ar' alone often finds nothing; try ar-SA / ar-EG.
+  /// Chrome loads voices asynchronously — calling getVoices() immediately
+  /// returns empty. Wait 300ms then try Arabic locale codes in order.
   Future<void> _initVoiceAndPlay() async {
     if (!mounted) return;
-    try {
-      final voices = await _tts.getVoices as List?;
-      if (voices != null) {
-        final arVoice = voices.cast<Map>().firstWhere(
-          (v) => (v['locale'] as String? ?? '').startsWith('ar'),
-          orElse: () => {},
-        );
-        if (arVoice.isNotEmpty) {
-          await _tts.setLanguage(arVoice['locale'] as String);
-        } else {
-          // No Arabic voice on this device — try common locale codes anyway
-          for (final lang in ['ar-SA', 'ar-EG', 'ar-001', 'ar']) {
-            final result = await _tts.setLanguage(lang);
-            if (result == 1) break;
-          }
-        }
-      } else {
-        await _tts.setLanguage('ar-SA');
-      }
-    } catch (_) {
-      await _tts.setLanguage('ar-SA');
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    for (final lang in ['ar-SA', 'ar-EG', 'ar-001', 'ar']) {
+      try {
+        await _tts.setLanguage(lang);
+        break;
+      } catch (_) {}
     }
     _speak();
   }
@@ -115,15 +100,32 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
           ),
 
         // Audio buttons
-        if (_ttsUnavailable)
+        if (_ttsUnavailable) ...[
+          // No Arabic voice — show the word visually so exercise is still doable
+          if (_speakText.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: Text(
+                  _speakText,
+                  style: const TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 30,
+                    height: 1.8,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.volume_off_rounded,
-                    size: 16, color: theme.colorScheme.onSurfaceVariant),
-                const SizedBox(width: 6),
+                    size: 14, color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(width: 5),
                 Text(
                   'এই ডিভাইসে আরবি অডিও নেই',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -131,8 +133,8 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
                 ),
               ],
             ),
-          )
-        else
+          ),
+        ] else
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
