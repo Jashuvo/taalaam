@@ -26,8 +26,10 @@ import '../../features/track_quran/presentation/tafsir_reader_page.dart';
 // Manual provider — avoids riverpod_generator/analyzer_plugin version conflict
 final appRouterProvider =
     Provider.family<GoRouter, AppFlavor>((ref, flavor) {
+  final isAdmin = flavor == AppFlavor.admin;
+
   final router = GoRouter(
-    initialLocation: flavor == AppFlavor.admin ? '/admin' : '/login',
+    initialLocation: isAdmin ? '/admin' : '/login',
     redirect: (context, state) {
       final loc = state.matchedLocation;
       if (loc == '/') return '/login';
@@ -39,119 +41,135 @@ final appRouterProvider =
       final isLoggedIn = user != null;
       final goingToLogin = loc == '/login';
 
+      // ── Learner flavor: hard-block any /admin path ──────────────────
+      // Admin routes don't exist in the learner build. Any attempt to
+      // reach /admin/* is silently redirected to /home. This prevents
+      // the learner's Supabase client from handling admin logins, which
+      // would replace the active learner session.
+      if (!isAdmin && loc.startsWith('/admin')) return '/home';
+
+      // ── Admin flavor: hard-block any non-admin path ─────────────────
+      // Learner routes don't exist in the admin build. Keeps the admin
+      // Supabase client (with AdminLocalStorage) completely isolated.
+      if (isAdmin && !loc.startsWith('/admin') && !goingToLogin) {
+        return '/admin';
+      }
+
       if (!isLoggedIn && !goingToLogin) return '/login';
-      if (flavor == AppFlavor.admin && isLoggedIn && !ref.read(isAdminProvider)) {
+
+      // Admin flavor: non-admin account → back to login
+      if (isAdmin && isLoggedIn && !ref.read(isAdminProvider)) {
         return '/login';
       }
+
+      // After login, go to the right home screen
       if (isLoggedIn && goingToLogin) {
-        return flavor == AppFlavor.admin ? '/admin' : '/home';
+        return isAdmin ? '/admin' : '/home';
       }
+
       return null;
     },
     routes: [
-      // ── Auth ─────────────────────────────────────────────────
+      // ── Shared: login ────────────────────────────────────────────────
       GoRoute(
         path: '/login',
-        builder: (_, __) => flavor == AppFlavor.admin
-            ? const AdminLoginPage()
-            : const LoginPage(),
-      ),
-      GoRoute(
-        path: '/onboarding',
-        builder: (_, __) => const OnboardingPage(),
+        builder: (_, __) =>
+            isAdmin ? const AdminLoginPage() : const LoginPage(),
       ),
 
-      // ── Learner ──────────────────────────────────────────────
-      GoRoute(
-        path: '/home',
-        builder: (_, __) => const HomePage(),
-      ),
-      GoRoute(
-        path: '/track/:trackId',
-        builder: (_, state) => TrackDetailPage(
-          slug: state.pathParameters['trackId']!,
+      // ── Learner-only routes ──────────────────────────────────────────
+      if (!isAdmin) ...[
+        GoRoute(
+          path: '/onboarding',
+          builder: (_, __) => const OnboardingPage(),
         ),
-      ),
-      GoRoute(
-        path: '/lesson/:lessonId',
-        builder: (_, state) => LessonScreen(
-          lessonId: state.pathParameters['lessonId']!,
+        GoRoute(
+          path: '/home',
+          builder: (_, __) => const HomePage(),
         ),
-      ),
-      GoRoute(
-        path: '/review',
-        builder: (_, __) => const ReviewScreen(),
-      ),
-      GoRoute(
-        path: '/leaderboard',
-        builder: (_, __) => const LeaderboardPage(),
-      ),
-      GoRoute(
-        path: '/settings',
-        builder: (_, __) => const SettingsPage(),
-      ),
-      GoRoute(
-        path: '/profile',
-        builder: (_, __) => const ProfilePage(),
-      ),
-      GoRoute(
-        path: '/exam/:examLessonId',
-        builder: (_, state) => ExamScreen(
-          examLessonId: state.pathParameters['examLessonId']!,
+        GoRoute(
+          path: '/track/:trackId',
+          builder: (_, state) =>
+              TrackDetailPage(slug: state.pathParameters['trackId']!),
         ),
-      ),
-      GoRoute(
-        path: '/conversation',
-        builder: (_, __) => const ConversationScreen(),
-      ),
-      GoRoute(
-        path: '/memorize',
-        builder: (_, __) => const MemorizeScreen(),
-      ),
-      GoRoute(
-        path: '/groups',
-        builder: (_, __) => const GroupsPage(),
-      ),
-      GoRoute(
-        path: '/groups/:groupId',
-        builder: (_, state) => GroupDetailPage(
-          groupId: state.pathParameters['groupId']!,
+        GoRoute(
+          path: '/lesson/:lessonId',
+          builder: (_, state) =>
+              LessonScreen(lessonId: state.pathParameters['lessonId']!),
         ),
-      ),
-      GoRoute(
-        path: '/tafsir/:lessonId',
-        builder: (_, state) => TafsirReaderPage(
-          lessonId: state.pathParameters['lessonId']!,
+        GoRoute(
+          path: '/review',
+          builder: (_, __) => const ReviewScreen(),
         ),
-      ),
+        GoRoute(
+          path: '/leaderboard',
+          builder: (_, __) => const LeaderboardPage(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (_, __) => const SettingsPage(),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (_, __) => const ProfilePage(),
+        ),
+        GoRoute(
+          path: '/exam/:examLessonId',
+          builder: (_, state) =>
+              ExamScreen(examLessonId: state.pathParameters['examLessonId']!),
+        ),
+        GoRoute(
+          path: '/conversation',
+          builder: (_, __) => const ConversationScreen(),
+        ),
+        GoRoute(
+          path: '/memorize',
+          builder: (_, __) => const MemorizeScreen(),
+        ),
+        GoRoute(
+          path: '/groups',
+          builder: (_, __) => const GroupsPage(),
+        ),
+        GoRoute(
+          path: '/groups/:groupId',
+          builder: (_, state) =>
+              GroupDetailPage(groupId: state.pathParameters['groupId']!),
+        ),
+        GoRoute(
+          path: '/tafsir/:lessonId',
+          builder: (_, state) =>
+              TafsirReaderPage(lessonId: state.pathParameters['lessonId']!),
+        ),
+      ],
 
-      // ── Admin ────────────────────────────────────────────────
-      GoRoute(
-        path: '/admin',
-        builder: (_, __) => const AdminHomePage(),
-        routes: [
-          GoRoute(
-            path: 'upload',
-            builder: (_, __) => const AdminUploadPage(),
-          ),
-          GoRoute(
-            path: 'review',
-            builder: (_, __) => const AdminReviewPage(),
-            routes: [
-              GoRoute(
-                path: ':unitId',
-                builder: (_, state) => AdminUnitReviewPage(
-                  unitId: state.pathParameters['unitId']!,
+      // ── Admin-only routes ────────────────────────────────────────────
+      if (isAdmin) ...[
+        GoRoute(
+          path: '/admin',
+          builder: (_, __) => const AdminHomePage(),
+          routes: [
+            GoRoute(
+              path: 'upload',
+              builder: (_, __) => const AdminUploadPage(),
+            ),
+            GoRoute(
+              path: 'review',
+              builder: (_, __) => const AdminReviewPage(),
+              routes: [
+                GoRoute(
+                  path: ':unitId',
+                  builder: (_, state) => AdminUnitReviewPage(
+                    unitId: state.pathParameters['unitId']!,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
+          ],
+        ),
+      ],
     ],
   );
 
   ref.listen(authStateProvider, (_, __) => router.refresh());
   return router;
 });
-
