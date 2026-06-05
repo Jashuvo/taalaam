@@ -447,11 +447,77 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                     child: const Text('ড্রাফট রিভিউ করুন →'),
                   ),
                 ],
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 8),
+                const _BackfillAudioButton(),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BackfillAudioButton extends StatefulWidget {
+  const _BackfillAudioButton();
+  @override
+  State<_BackfillAudioButton> createState() => _BackfillAudioButtonState();
+}
+
+class _BackfillAudioButtonState extends State<_BackfillAudioButton> {
+  bool _loading = false;
+  String? _result;
+
+  Future<void> _run() async {
+    setState(() { _loading = true; _result = null; });
+    try {
+      final res = await Supabase.instance.client.functions
+          .invoke('backfill-audio', body: {});
+      final data = res.data as Map<String, dynamic>?;
+      final done    = data?['done']    as int? ?? 0;
+      final total   = data?['total']   as int? ?? 0;
+      final failed  = data?['failed']  as int? ?? 0;
+      final words   = (data?['words']  as List?)?.cast<String>() ?? [];
+      final buf = StringBuffer('✓ $done/$total অডিও তৈরি হয়েছে');
+      if (failed > 0) buf.write(' ($failed ব্যর্থ)');
+      if (words.isNotEmpty) buf.write('\n${words.join(' • ')}');
+      setState(() => _result = buf.toString());
+    } catch (e) {
+      setState(() => _result = 'ত্রুটি: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          icon: _loading
+              ? const SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.volume_up_outlined, size: 18),
+          label: Text(_loading
+              ? 'অডিও তৈরি হচ্ছে…'
+              : 'পুরনো exercises-এ অডিও যোগ করুন'),
+          onPressed: _loading ? null : _run,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.orange,
+            side: const BorderSide(color: Colors.orange),
+          ),
+        ),
+        if (_result != null) ...[
+          const SizedBox(height: 6),
+          Text(_result!,
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.center),
+        ],
+      ],
     );
   }
 }

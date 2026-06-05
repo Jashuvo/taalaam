@@ -116,6 +116,11 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
     await _tts.setSpeechRate(slow ? 0.25 : 0.45);
     setState(() => _speaking = true);
     await _tts.speak(_speakText);
+    // Safety timeout: if neither completion nor error handler fired after 6s,
+    // the browser silently swallowed the speak() call — reset state.
+    Future.delayed(const Duration(seconds: 6), () {
+      if (mounted && _speaking) setState(() { _speaking = false; _ttsUnavailable = true; });
+    });
   }
 
   // ── Unified play entry point (called by buttons) ─────────────────────────
