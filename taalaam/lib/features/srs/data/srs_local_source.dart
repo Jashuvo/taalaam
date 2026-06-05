@@ -3,30 +3,77 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/local/database.dart';
 import 'fsrs_algorithm.dart';
 
+/// Daily session caps — keeps badges from becoming a demoralising debt spiral.
+const int kDailyNewLimit    = 10;
+const int kDailyReviewLimit = 20;
+
 class SrsLocalSource {
   final AppDatabase _db;
   SrsLocalSource(this._db);
 
-  Future<int> countDueCards(String userId) async {
-    final now = DateTime.now();
+  // ── Counts (capped so the badge never shows an overwhelming number) ───────────
+
+  /// New (never reviewed) cards due today — capped at [kDailyNewLimit].
+  Future<int> countNewCards(String userId) async {
     final q = _db.select(_db.srsCards).join([
-      innerJoin(_db.vocabulary, _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+      innerJoin(_db.vocabulary,
+          _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
     ])
       ..where(_db.srsCards.userId.equals(userId) &
-          _db.srsCards.dueDate.isSmallerOrEqualValue(now));
-    return (await q.get()).length;
+          _db.srsCards.state.equals(0) &
+          _db.srsCards.dueDate.isSmallerOrEqualValue(DateTime.now()));
+    return (await q.get()).length.clamp(0, kDailyNewLimit);
   }
 
-  Future<List<SrsCard>> getDueCards(String userId, {int limit = 50}) async {
-    final now = DateTime.now();
+  /// Previously-seen cards whose interval expired — capped at [kDailyReviewLimit].
+  Future<int> countReviewCards(String userId) async {
     final q = _db.select(_db.srsCards).join([
-      innerJoin(_db.vocabulary, _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+      innerJoin(_db.vocabulary,
+          _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
     ])
       ..where(_db.srsCards.userId.equals(userId) &
-          _db.srsCards.dueDate.isSmallerOrEqualValue(now))
+          _db.srsCards.state.isBiggerThanValue(0) &
+          _db.srsCards.dueDate.isSmallerOrEqualValue(DateTime.now()));
+    return (await q.get()).length.clamp(0, kDailyReviewLimit);
+  }
+
+  // ── Card queues ───────────────────────────────────────────────────────────────
+
+  /// New (never reviewed) words — for the Memorize screen.
+  Future<List<SrsCard>> getNewCards(String userId,
+      {int limit = kDailyNewLimit}) async {
+    final q = _db.select(_db.srsCards).join([
+      innerJoin(_db.vocabulary,
+          _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+    ])
+      ..where(_db.srsCards.userId.equals(userId) &
+          _db.srsCards.state.equals(0) &
+          _db.srsCards.dueDate.isSmallerOrEqualValue(DateTime.now()))
       ..limit(limit);
     return (await q.get()).map((r) => r.readTable(_db.srsCards)).toList();
   }
+
+  /// Previously-seen cards whose interval expired — for the Review screen.
+  /// Ordered oldest-due-first so most overdue cards surface first.
+  Future<List<SrsCard>> getReviewCards(String userId,
+      {int limit = kDailyReviewLimit}) async {
+    final q = _db.select(_db.srsCards).join([
+      innerJoin(_db.vocabulary,
+          _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+    ])
+      ..where(_db.srsCards.userId.equals(userId) &
+          _db.srsCards.state.isBiggerThanValue(0) &
+          _db.srsCards.dueDate.isSmallerOrEqualValue(DateTime.now()))
+      ..orderBy([OrderingTerm.asc(_db.srsCards.dueDate)])
+      ..limit(limit);
+    return (await q.get()).map((r) => r.readTable(_db.srsCards)).toList();
+  }
+
+  // ── Legacy aliases ────────────────────────────────────────────────────────────
+  Future<int> countDueCards(String userId) => countReviewCards(userId);
+  Future<List<SrsCard>> getDueCards(String userId,
+          {int limit = kDailyReviewLimit}) =>
+      getReviewCards(userId, limit: limit);
 
   Future<void> createCard(String userId, String vocabularyId) async {
     final id = '${userId}_$vocabularyId';
@@ -39,7 +86,6 @@ class SrsLocalSource {
           state: const Value(0),
         ));
     // Skip Supabase push for synthetic vocab (no matching FK in remote vocabulary).
-    // Supabase id column is uuid — omit it, use unique(user_id,vocabulary_id).
     if (vocabularyId.startsWith('syn_')) return;
     Supabase.instance.client.from('srs_cards').upsert({
       'user_id': userId,

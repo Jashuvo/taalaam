@@ -39,6 +39,7 @@ final streakProvider = StreamProvider<Streak?>((ref) {
       .watchSingleOrNull();
 });
 
+/// Due review cards (state > 0, interval expired) — capped at 20 for top-bar badge.
 final dueCountProvider = StreamProvider<int>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return Stream.value(0);
@@ -46,9 +47,26 @@ final dueCountProvider = StreamProvider<int>((ref) {
   final now = DateTime.now();
   return (db.select(db.srsCards)
         ..where((t) =>
-            t.userId.equals(user.id) & t.dueDate.isSmallerOrEqualValue(now)))
+            t.userId.equals(user.id) &
+            t.state.isBiggerThanValue(0) &
+            t.dueDate.isSmallerOrEqualValue(now)))
       .watch()
-      .map((cards) => cards.length);
+      .map((cards) => cards.length.clamp(0, 20));
+});
+
+/// New cards (state == 0, never reviewed) — capped at 10 for মুখস্থ badge.
+final newCardCountProvider = StreamProvider<int>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value(0);
+  final db = ref.watch(appDatabaseProvider);
+  final now = DateTime.now();
+  return (db.select(db.srsCards)
+        ..where((t) =>
+            t.userId.equals(user.id) &
+            t.state.equals(0) &
+            t.dueDate.isSmallerOrEqualValue(now)))
+      .watch()
+      .map((cards) => cards.length.clamp(0, 10));
 });
 
 final trackBySlugProvider =

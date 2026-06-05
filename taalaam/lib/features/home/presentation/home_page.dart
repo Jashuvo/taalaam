@@ -297,9 +297,10 @@ class _Badge extends StatelessWidget {
 
 // ── Quick access row ──────────────────────────────────────────────────────────
 
-class _QuickAccessRow extends StatelessWidget {
+class _QuickAccessRow extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final newCount = ref.watch(newCardCountProvider).valueOrNull ?? 0;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
@@ -313,6 +314,7 @@ class _QuickAccessRow extends StatelessWidget {
           icon: Icons.psychology_outlined,
           label: 'মুখস্থ',
           color: const Color(0xFF5B4FCF),
+          badge: newCount,
           onTap: () => context.go('/memorize'),
         ),
         _QuickAccessButton(
@@ -331,11 +333,13 @@ class _QuickAccessButton extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final int badge;
   const _QuickAccessButton(
       {required this.icon,
       required this.label,
       required this.color,
-      required this.onTap});
+      required this.onTap,
+      this.badge = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -344,25 +348,50 @@ class _QuickAccessButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [color, color.withValues(alpha: 0.7)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.35),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color, color.withValues(alpha: 0.7)],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Icon(icon, size: 26, color: Colors.white),
+                child: Icon(icon, size: 26, color: Colors.white),
+              ),
+              if (badge > 0)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    child: Text(
+                      '$badge',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 7),
           Text(

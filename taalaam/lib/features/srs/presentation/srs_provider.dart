@@ -7,17 +7,24 @@ final srsLocalSourceProvider = Provider<SrsLocalSource>((ref) {
   return SrsLocalSource(ref.watch(appDatabaseProvider));
 });
 
-final dueCardCountProvider =
+// ── Badge counts (capped at daily limits) ────────────────────────────────────
+
+/// New (never-seen) words — drives the مُخَسْث badge. Cap: kDailyNewLimit.
+final newCardCountProvider =
     FutureProvider.family<int, String>((ref, userId) async {
-  return ref.read(srsLocalSourceProvider).countDueCards(userId);
+  return ref.read(srsLocalSourceProvider).countNewCards(userId);
 });
 
-final dueCardsProvider =
-    FutureProvider.family<List<SrsCard>, String>((ref, userId) async {
-  return ref.read(srsLocalSourceProvider).getDueCards(userId);
+/// Seen-but-interval-expired cards — drives the review badge. Cap: kDailyReviewLimit.
+final reviewCardCountProvider =
+    FutureProvider.family<int, String>((ref, userId) async {
+  return ref.read(srsLocalSourceProvider).countReviewCards(userId);
 });
 
-// ── Review Session ────────────────────────────────────────────────────────────
+/// Legacy alias — callers that haven't been updated yet.
+final dueCardCountProvider = reviewCardCountProvider;
+
+// ── Review Session (seen cards whose interval expired) ────────────────────────
 
 class ReviewSessionNotifier
     extends StateNotifier<AsyncValue<List<SrsCard>>> {
@@ -35,7 +42,7 @@ class ReviewSessionNotifier
 
   Future<void> _load() async {
     try {
-      _cards = await _src.getDueCards(_userId);
+      _cards = await _src.getReviewCards(_userId);
       _index = 0;
       state = AsyncValue.data(List.unmodifiable(_cards));
     } catch (e, s) {
@@ -54,7 +61,6 @@ class ReviewSessionNotifier
     if (card == null) return;
     await _src.reviewCard(card, rating);
     _index++;
-    // Award XP + streak + heart on last card
     if (_index >= _cards.length && reward == null && _cards.isNotEmpty) {
       reward = await ProgressionService(_db).awardSrsSession(_userId);
     }
@@ -71,7 +77,7 @@ final reviewSessionProvider = StateNotifierProvider.autoDispose
   ),
 );
 
-// ── Memorize Session ──────────────────────────────────────────────────────────
+// ── Memorize Session (new, never-seen cards) ──────────────────────────────────
 
 class MemorizeSessionNotifier
     extends StateNotifier<AsyncValue<List<SrsCard>>> {
@@ -89,8 +95,7 @@ class MemorizeSessionNotifier
 
   Future<void> _load() async {
     try {
-      final all = await _src.getDueCards(_userId, limit: 30);
-      _cards = all;
+      _cards = await _src.getNewCards(_userId);
       _index = 0;
       state = AsyncValue.data(List.unmodifiable(_cards));
     } catch (e, s) {
