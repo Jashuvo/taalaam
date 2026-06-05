@@ -563,12 +563,12 @@ Deno.serve(async (req: Request) => {
     /** Generate Arabic TTS via Gemini 2.5 Flash, upload WAV to Storage.
      *  Returns public URL or null on any failure (best-effort). */
     async function generateAudio(
-      genAI: GoogleGenerativeAI,
       speakText: string,
       lessonId: string,
     ): Promise<string | null> {
       try {
-        const ttsModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const ttsGenAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
+        const ttsModel = ttsGenAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await (ttsModel as any).generateContent({
           contents: [{ role: 'user', parts: [{ text: speakText }] }],
           generationConfig: {
@@ -775,7 +775,7 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
           const audioJobs = insertedExercises
             .filter(e => e.type === 'listen_select' && e.correct_answer?.speak_text)
             .map(async e => {
-              const url = await generateAudio(genAI, e.correct_answer.speak_text, lessonRow.id);
+              const url = await generateAudio(e.correct_answer.speak_text, lessonRow.id);
               if (url) {
                 await supabase.from('exercises').update({ audio_url: url }).eq('id', e.id);
               }
