@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/exercise_model.dart';
 
@@ -72,8 +73,44 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
     if (_hasAudioUrl) {
       await _playUrl();
     } else {
-      await _initTtsAndSpeak();
+      // No stored audio — try to generate it on-demand (once per exercise).
+      await _generateAndPlay();
     }
+  }
+
+  /// Calls the generate-exercise-audio edge function to produce a WAV file,
+  /// stores the URL, then plays it. Falls back to TTS if generation fails.
+  Future<void> _generateAndPlay({bool slow = false}) async {
+    final ca = widget.exercise.correctAnswer;
+    final speakText = ca['speak_text'] as String? ?? _speakText;
+    final exerciseId = widget.exercise.id;
+    final lessonId = widget.exercise.lessonId;
+    if (speakText.isEmpty) { await _initTtsAndSpeak(slow: slow); return; }
+
+    setState(() => _speaking = true);
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'generate-exercise-audio',
+        body: { 'exercise_id': exerciseId, 'speak_text': speakText, 'lesson_id': lessonId },
+      );
+      final data = res.data as Map<String, dynamic>?;
+      final url = data?['audio_url'] as String?;
+      if (url != null && url.isNotEmpty && mounted) {
+        // Play immediately with the fresh URL
+        setState(() => _speaking = false);
+        await _player.setUrl(url);
+        await _player.setSpeed(slow ? 0.6 : 1.0);
+        setState(() => _speaking = true);
+        await _player.play();
+        await _player.processingStateStream
+            .firstWhere((s) => s == ProcessingState.completed || s == ProcessingState.idle);
+        if (mounted) setState(() => _speaking = false);
+        return;
+      }
+    } catch (_) {}
+    // Generation failed or rate-limited — fall back to browser TTS
+    if (mounted) setState(() => _speaking = false);
+    await _initTtsAndSpeak(slow: slow);
   }
 
   // ── URL-based playback ────────────────────────────────────────────────────
