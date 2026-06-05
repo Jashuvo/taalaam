@@ -33,8 +33,10 @@ dependencies:
   just_audio: ^0.9.42
   flutter_cache_manager: ^3.4.1
 
-  # Audio recording (speak_arabic exercises)
+  # Audio recording (speak_arabic exercises — mobile fallback)
   record: ^5.0.0
+  # Speech recognition — web uses Web Speech API, mobile uses device STT
+  speech_to_text: ^7.0.0
 
   # UI helpers
   gap: ^3.0.1

@@ -1,16 +1,13 @@
-import 'dart:async';
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:record/record.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/exercise_model.dart';
 
-enum _SpeakState { idle, recording, processing, done }
+enum _SpeakState { idle, listening, done }
 
-/// "কথা বলুন" exercise: shows an Arabic word, learner speaks it,
-/// Gemini transcribes and compares to the expected text.
+/// "কথা বলুন" exercise: learner speaks an Arabic word aloud.
+/// Uses the device/browser Speech Recognition API (Web Speech API on web,
+/// SpeechRecognizer on Android, SFSpeechRecognizer on iOS) — no Gemini call.
 ///
 /// correct_answer shape:
 /// { "expected_ar": "كِتَابٌ", "transliteration": "kitābun", "meaning_bn": "বই" }
@@ -29,131 +26,97 @@ class ExerciseSpeakArabic extends StatefulWidget {
 }
 
 class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
+  final SpeechToText _stt = SpeechToText();
   _SpeakState _state = _SpeakState.idle;
   bool? _isCorrect;
-  String? _transcription;
+  String _heard = '';
   String? _errorMsg;
-  int _secondsLeft = 5;
-
-  final _recorder = AudioRecorder();
-  final List<Uint8List> _chunks = [];
-  StreamSubscription<Uint8List>? _audioSub;
-  Timer? _countdownTimer;
+  bool _sttAvailable = false;
 
   String get _expectedAr =>
       (widget.exercise.correctAnswer['expected_ar'] as String?)?.trim() ??
-      widget.exercise.promptAr?.trim() ??
-      '';
+      widget.exercise.promptAr?.trim() ?? '';
   String get _transliteration =>
       (widget.exercise.correctAnswer['transliteration'] as String?)?.trim() ?? '';
   String get _meaningBn =>
       (widget.exercise.correctAnswer['meaning_bn'] as String?)?.trim() ?? '';
 
-  // Web → WebM/Opus; mobile → AAC-LC
-  RecordConfig get _config => kIsWeb
-      ? const RecordConfig(encoder: AudioEncoder.opus, sampleRate: 16000, numChannels: 1)
-      : const RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: 16000, numChannels: 1);
-  String get _mimeType => kIsWeb ? 'audio/webm' : 'audio/aac';
+  @override
+  void initState() {
+    super.initState();
+    _initStt();
+  }
 
   @override
   void dispose() {
-    _countdownTimer?.cancel();
-    _audioSub?.cancel();
-    _recorder.dispose();
+    _stt.stop();
     super.dispose();
   }
 
-  Future<void> _startRecording() async {
-    // Request mic permission explicitly — triggers browser dialog on first use.
-    // If previously denied, hasPermission() returns false immediately.
-    bool permitted = false;
-    try {
-      permitted = await _recorder.hasPermission();
-    } catch (_) {
-      permitted = false;
-    }
+  Future<void> _initStt() async {
+    final available = await _stt.initialize(
+      onError: (e) {
+        if (mounted) setState(() { _state = _SpeakState.idle; _errorMsg = 'ত্রুটি: ${e.errorMsg}'; });
+      },
+    );
+    if (mounted) setState(() => _sttAvailable = available);
+  }
 
-    if (!permitted) {
-      if (mounted) {
-        setState(() => _errorMsg =
-            'মাইক্রোফোন অনুমতি দরকার।\n'
-            'ব্রাউজারের অ্যাড্রেস বারে 🔒 আইকনে ক্লিক করে "মাইক্রোফোন → অনুমতি দিন" বেছে নিন।');
-      }
+  /// Strip harakat, tatweel, normalize alef/ta-marbuta/alef-maqsura for loose match.
+  String _normalize(String text) => text
+      .replaceAll(RegExp(r'[ً-ٟؐ-ؚٰ]'), '')
+      .replaceAll('ـ', '')
+      .replaceAll(RegExp(r'[أإآٱ]'), 'ا')
+      .replaceAll('ة', 'ه')
+      .replaceAll('ى', 'ي')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  Future<void> _startListening() async {
+    if (!_sttAvailable) {
+      setState(() => _errorMsg = 'ব্রাউজারে আরবি স্পিচ রিকগনিশন উপলব্ধ নেই।');
       return;
     }
-
     setState(() {
-      _state = _SpeakState.recording;
-      _secondsLeft = 5;
+      _state = _SpeakState.listening;
       _errorMsg = null;
-      _transcription = null;
+      _heard = '';
       _isCorrect = null;
     });
-    try {
-      _chunks.clear();
-      final stream = await _recorder.startStream(_config);
-      _audioSub = stream.listen(_chunks.add);
-      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-        if (!mounted) { t.cancel(); return; }
-        if (_secondsLeft <= 1) {
-          t.cancel();
-          _stopAndTranscribe();
-        } else {
-          setState(() => _secondsLeft--);
+
+    await _stt.listen(
+      listenOptions: SpeechListenOptions(
+        localeId: 'ar',
+        listenFor: const Duration(seconds: 6),
+        pauseFor: const Duration(seconds: 2),
+      ),
+      onResult: (result) {
+        if (!mounted) return;
+        final transcript = result.recognizedWords.trim();
+        if (result.finalResult && transcript.isNotEmpty) {
+          final correct = _normalize(transcript) == _normalize(_expectedAr);
+          setState(() {
+            _heard = transcript;
+            _isCorrect = correct;
+            _state = _SpeakState.done;
+          });
         }
+      },
+    );
+
+    // If stt stopped without a result (silence / timeout)
+    if (mounted && _state == _SpeakState.listening) {
+      setState(() {
+        _state = _SpeakState.idle;
+        _errorMsg = 'কিছু শুনতে পাইনি। আবার চেষ্টা করুন।';
       });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _state = _SpeakState.idle;
-          _errorMsg = 'রেকর্ডিং শুরু করতে পারিনি। আবার চেষ্টা করুন।';
-        });
-      }
     }
   }
 
-  Future<void> _stopAndTranscribe() async {
-    _countdownTimer?.cancel();
-    if (!mounted) return;
-    setState(() => _state = _SpeakState.processing);
-
-    try {
-      await _recorder.stop();
-      await Future.delayed(const Duration(milliseconds: 250)); // drain final chunk
-      await _audioSub?.cancel();
-      _audioSub = null;
-
-      if (_chunks.isEmpty) throw Exception('কোনো অডিও রেকর্ড হয়নি');
-
-      final allBytes = Uint8List.fromList(_chunks.expand((c) => c).toList());
-      final b64 = base64Encode(allBytes);
-
-      final res = await Supabase.instance.client.functions.invoke(
-        'transcribe-speech',
-        body: {
-          'audio_base64': b64,
-          'mime_type': _mimeType,
-          'expected_ar': _expectedAr,
-        },
-      );
-
-      final data = res.data as Map<String, dynamic>?;
-      if (data == null || data['error'] != null) {
-        throw Exception(data?['error']?.toString() ?? 'সার্ভার ত্রুটি');
-      }
-
-      setState(() {
-        _isCorrect = data['correct'] as bool? ?? false;
-        _transcription = data['transcription'] as String? ?? '';
-        _state = _SpeakState.done;
-      });
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMsg = 'ত্রুটি: $e';
-          _state = _SpeakState.idle;
-        });
-      }
+  Future<void> _stopListening() async {
+    await _stt.stop();
+    if (mounted && _state == _SpeakState.listening) {
+      setState(() { _state = _SpeakState.idle; });
     }
   }
 
@@ -173,7 +136,7 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
             ),
           ),
 
-        // Arabic word display card
+        // Arabic word card
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           decoration: BoxDecoration(
@@ -219,6 +182,7 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
         ),
         const SizedBox(height: 32),
 
+        // Mic button
         Center(child: _buildMicArea(theme)),
         const SizedBox(height: 16),
 
@@ -233,10 +197,10 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
           ),
 
         if (_state == _SpeakState.done && _isCorrect != null)
-          _ResultFeedback(
+          _ResultCard(
             isCorrect: _isCorrect!,
-            transcription: _transcription ?? '',
-            onRetry: _isCorrect! ? null : _startRecording,
+            heard: _heard,
+            onRetry: _isCorrect! ? null : _startListening,
           ),
 
         const SizedBox(height: 24),
@@ -253,18 +217,11 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
 
   Widget _buildMicArea(ThemeData theme) {
     switch (_state) {
-      case _SpeakState.processing:
-        return const SizedBox(
-          width: 88,
-          height: 88,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 3)),
-        );
-
-      case _SpeakState.recording:
+      case _SpeakState.listening:
         return Column(
           children: [
             GestureDetector(
-              onTap: _stopAndTranscribe,
+              onTap: _stopListening,
               child: Container(
                 width: 88,
                 height: 88,
@@ -273,15 +230,14 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
                   color: Colors.red.withValues(alpha: 0.1),
                   border: Border.all(color: Colors.red, width: 2.5),
                 ),
-                child:
-                    const Icon(Icons.stop_rounded, size: 42, color: Colors.red),
+                child: const Icon(Icons.stop_rounded, size: 42, color: Colors.red),
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'বলছেন... ($_secondsLeft)',
-              style: const TextStyle(
-                  color: Colors.red, fontWeight: FontWeight.w600),
+            const Text(
+              'শুনছি… (থামুন বা থামালে শেষ হবে)',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600, fontSize: 12),
+              textAlign: TextAlign.center,
             ),
           ],
         );
@@ -294,7 +250,7 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
         return Column(
           children: [
             GestureDetector(
-              onTap: _state == _SpeakState.idle ? _startRecording : null,
+              onTap: _state == _SpeakState.idle ? _startListening : null,
               child: Container(
                 width: 88,
                 height: 88,
@@ -306,9 +262,7 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
                 child: Icon(
                   _state == _SpeakState.idle
                       ? Icons.mic_rounded
-                      : (_isCorrect == true
-                          ? Icons.check_rounded
-                          : Icons.close_rounded),
+                      : (_isCorrect == true ? Icons.check_rounded : Icons.close_rounded),
                   size: 42,
                   color: color,
                 ),
@@ -327,30 +281,22 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
   }
 }
 
-class _ResultFeedback extends StatelessWidget {
+class _ResultCard extends StatelessWidget {
   final bool isCorrect;
-  final String transcription;
+  final String heard;
   final VoidCallback? onRetry;
-
-  const _ResultFeedback({
-    required this.isCorrect,
-    required this.transcription,
-    this.onRetry,
-  });
+  const _ResultCard({required this.isCorrect, required this.heard, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = isCorrect ? AppColors.correctBg : AppColors.wrongBg;
-    final bgColor =
-        (isCorrect ? AppColors.correctTile : AppColors.wrongTile)
-            .withValues(alpha: 0.1);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: (isCorrect ? AppColors.correctTile : AppColors.wrongTile)
+            .withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
@@ -360,20 +306,13 @@ class _ResultFeedback extends StatelessWidget {
           Row(
             children: [
               Icon(
-                isCorrect
-                    ? Icons.check_circle_rounded
-                    : Icons.cancel_rounded,
-                color: color,
-                size: 18,
-              ),
+                isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                color: color, size: 18),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   isCorrect ? 'সঠিক উচ্চারণ!' : 'ঠিক হয়নি — আবার চেষ্টা করুন',
-                  style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14),
+                  style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
               ),
               if (onRetry != null)
@@ -383,22 +322,18 @@ class _ResultFeedback extends StatelessWidget {
                   label: const Text('আবার', style: TextStyle(fontSize: 13)),
                   style: TextButton.styleFrom(
                     foregroundColor: color,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
             ],
           ),
-          if (transcription.isNotEmpty) ...[
+          if (heard.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(
-              'শুনেছি: $transcription',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+            Text('শুনেছি: $heard',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant)),
           ],
         ],
       ),
