@@ -40,33 +40,39 @@ final streakProvider = StreamProvider<Streak?>((ref) {
 });
 
 /// Due review cards (state > 0, interval expired) — capped at 20 for top-bar badge.
+/// Uses the same INNER JOIN as getReviewCards() so the count matches the session.
 final dueCountProvider = StreamProvider<int>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return Stream.value(0);
   final db = ref.watch(appDatabaseProvider);
   final now = DateTime.now();
-  return (db.select(db.srsCards)
-        ..where((t) =>
-            t.userId.equals(user.id) &
-            t.state.isBiggerThanValue(0) &
-            t.dueDate.isSmallerOrEqualValue(now)))
+  return (db.select(db.srsCards).join([
+        drift.innerJoin(db.vocabulary,
+            db.vocabulary.id.equalsExp(db.srsCards.vocabularyId)),
+      ])
+        ..where(db.srsCards.userId.equals(user.id) &
+            db.srsCards.state.isBiggerThanValue(0) &
+            db.srsCards.dueDate.isSmallerOrEqualValue(now)))
       .watch()
-      .map((cards) => cards.length.clamp(0, 20));
+      .map((rows) => rows.length.clamp(0, 20));
 });
 
 /// New cards (state == 0, never reviewed) — capped at 10 for মুখস্থ badge.
+/// Uses the same INNER JOIN as getNewCards() so the count matches the session.
 final newCardCountProvider = StreamProvider<int>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null) return Stream.value(0);
   final db = ref.watch(appDatabaseProvider);
   final now = DateTime.now();
-  return (db.select(db.srsCards)
-        ..where((t) =>
-            t.userId.equals(user.id) &
-            t.state.equals(0) &
-            t.dueDate.isSmallerOrEqualValue(now)))
+  return (db.select(db.srsCards).join([
+        drift.innerJoin(db.vocabulary,
+            db.vocabulary.id.equalsExp(db.srsCards.vocabularyId)),
+      ])
+        ..where(db.srsCards.userId.equals(user.id) &
+            db.srsCards.state.equals(0) &
+            db.srsCards.dueDate.isSmallerOrEqualValue(now)))
       .watch()
-      .map((cards) => cards.length.clamp(0, 10));
+      .map((rows) => rows.length.clamp(0, 10));
 });
 
 final trackBySlugProvider =
