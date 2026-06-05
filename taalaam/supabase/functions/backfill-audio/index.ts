@@ -2,7 +2,6 @@
 // Admin-only: generates Gemini TTS audio for all listen_select exercises
 // that currently have audio_url = null.
 
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 import { createClient } from 'npm:@supabase/supabase-js';
 
 const corsHeaders = {
@@ -27,6 +26,36 @@ function pcmToWav(pcmBytes: Uint8Array): Uint8Array {
   return new Uint8Array(buf);
 }
 
+/** Call Gemini TTS via direct REST (npm package strips unknown generationConfig fields). */
+async function geminiTts(speakText: string, apiKey: string): Promise<Uint8Array | null> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: speakText }] }],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafah' } },
+        },
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    console.error('Gemini TTS error', res.status, await res.text());
+    return null;
+  }
+
+  const data = await res.json();
+  const audioB64: string | undefined =
+    data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!audioB64) return null;
+
+  return Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -41,14 +70,12 @@ Deno.serve(async (req: Request) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  // Admin check
   const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
   if (authErr || user?.email !== 'jubayedsr@gmail.com') {
     return new Response(JSON.stringify({ error: 'Admin only' }),
       { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
 
-  // Fetch all listen_select exercises with no audio
   const { data: exercises, error: fetchErr } = await supabase
     .from('exercises')
     .select('id, lesson_id, correct_answer')
@@ -60,33 +87,23 @@ Deno.serve(async (req: Request) => {
       { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
 
-  const genAI = new GoogleGenerativeAI(Deno.env.get('GEMINI_API_KEY')!);
+  const apiKey = Deno.env.get('GEMINI_API_KEY')!;
   let done = 0, failed = 0;
   const succeededWords: string[] = [];
+  const failedWords: string[] = [];
 
-  // Process in batches of 5 to avoid rate limits
+  // Batches of 5 to stay within Gemini rate limits
   const batchSize = 5;
   for (let i = 0; i < (exercises ?? []).length; i += batchSize) {
     const batch = (exercises ?? []).slice(i, i + batchSize);
     await Promise.all(batch.map(async (ex) => {
       const speakText = ex.correct_answer?.speak_text as string | undefined;
-      if (!speakText) { failed++; return; }
+      if (!speakText) { failed++; failedWords.push('(no speak_text)'); return; }
 
       try {
-        const ttsModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-        const result = await (ttsModel as any).generateContent({
-          contents: [{ role: 'user', parts: [{ text: speakText }] }],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafah' } } },
-          },
-        });
+        const pcm = await geminiTts(speakText, apiKey);
+        if (!pcm) { failed++; failedWords.push(speakText); return; }
 
-        const audioB64: string | undefined =
-          result?.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!audioB64) { failed++; return; }
-
-        const pcm = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
         const wav = pcmToWav(pcm);
         const slug = speakText.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
         const path = `lessons/${ex.lesson_id}/${slug}_${ex.id.substring(0, 8)}.wav`;
@@ -94,20 +111,28 @@ Deno.serve(async (req: Request) => {
         const { error: upErr } = await supabase.storage
           .from('audio')
           .upload(path, wav, { contentType: 'audio/wav', upsert: true });
-        if (upErr) { failed++; return; }
+        if (upErr) { failed++; failedWords.push(speakText); return; }
 
         const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path);
         await supabase.from('exercises').update({ audio_url: publicUrl }).eq('id', ex.id);
         done++;
         succeededWords.push(speakText);
-      } catch {
+      } catch (e) {
+        console.error('backfill error for', speakText, e);
         failed++;
+        failedWords.push(speakText);
       }
     }));
   }
 
   return new Response(
-    JSON.stringify({ total: (exercises ?? []).length, done, failed, words: succeededWords }),
+    JSON.stringify({
+      total: (exercises ?? []).length,
+      done,
+      failed,
+      words: succeededWords,
+      failedWords,
+    }),
     { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
   );
 });
