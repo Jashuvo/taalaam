@@ -544,6 +544,61 @@ Deno.serve(async (req: Request) => {
       return btoa(binary);
     }
 
+    /** Wrap raw PCM bytes (16-bit / 24 kHz / mono) in a WAV container. */
+    function pcmToWav(pcmBytes: Uint8Array): Uint8Array {
+      const sampleRate = 24000, numCh = 1, bps = 16;
+      const byteRate = sampleRate * numCh * bps / 8;
+      const buf = new ArrayBuffer(44 + pcmBytes.length);
+      const v = new DataView(buf);
+      const enc = (s: string, off: number) => [...s].forEach((c, i) => v.setUint8(off + i, c.charCodeAt(0)));
+      enc('RIFF', 0); v.setUint32(4, 36 + pcmBytes.length, true); enc('WAVE', 8);
+      enc('fmt ', 12); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+      v.setUint16(22, numCh, true); v.setUint32(24, sampleRate, true);
+      v.setUint32(28, byteRate, true); v.setUint16(32, numCh * bps / 8, true);
+      v.setUint16(34, bps, true); enc('data', 36); v.setUint32(40, pcmBytes.length, true);
+      new Uint8Array(buf).set(pcmBytes, 44);
+      return new Uint8Array(buf);
+    }
+
+    /** Generate Arabic TTS via Gemini 2.5 Flash, upload WAV to Storage.
+     *  Returns public URL or null on any failure (best-effort). */
+    async function generateAudio(
+      genAI: GoogleGenerativeAI,
+      speakText: string,
+      lessonId: string,
+    ): Promise<string | null> {
+      try {
+        const ttsModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const result = await (ttsModel as any).generateContent({
+          contents: [{ role: 'user', parts: [{ text: speakText }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafah' } } },
+          },
+        });
+        const audioB64: string | undefined =
+          result?.response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (!audioB64) return null;
+
+        const pcm = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
+        const wav = pcmToWav(pcm);
+
+        // Sanitised filename: keep Arabic + alphanumeric chars, max 40
+        const slug = speakText.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
+        const path = `lessons/${lessonId}/${slug}_${Date.now()}.wav`;
+
+        const { error: upErr } = await supabase.storage
+          .from('audio')
+          .upload(path, wav, { contentType: 'audio/wav', upsert: true });
+        if (upErr) return null;
+
+        const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path);
+        return publicUrl;
+      } catch {
+        return null; // never fail the whole import because of TTS
+      }
+    }
+
     async function uploadToGeminiFileApi(bytes: Uint8Array, mimeType: string): Promise<string> {
       const apiKey = Deno.env.get('GEMINI_API_KEY')!;
       const boundary = `b${Date.now()}`;
@@ -698,19 +753,35 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
       if (lessonErr) throw lessonErr;
 
       if (lesson.exercises?.length) {
-        await supabase.from('exercises').insert(
-          lesson.exercises.map((ex: Record<string, unknown>, idx: number) => ({
-            lesson_id: lessonRow.id,
-            type: ex.type,
-            sort_order: (ex.sort_order as number) ?? (idx + 1),
-            prompt_bn: ex.prompt_bn,
-            prompt_ar: ex.prompt_ar ?? null,
-            correct_answer: ex.correct_answer,
-            distractors: ex.distractors ?? null,
-            grammar_note_bn: ex.grammar_note_bn ?? null,
-            difficulty: ex.difficulty ?? 1,
-          }))
-        );
+        const { data: insertedExercises } = await supabase
+          .from('exercises')
+          .insert(
+            lesson.exercises.map((ex: Record<string, unknown>, idx: number) => ({
+              lesson_id: lessonRow.id,
+              type: ex.type,
+              sort_order: (ex.sort_order as number) ?? (idx + 1),
+              prompt_bn: ex.prompt_bn,
+              prompt_ar: ex.prompt_ar ?? null,
+              correct_answer: ex.correct_answer,
+              distractors: ex.distractors ?? null,
+              grammar_note_bn: ex.grammar_note_bn ?? null,
+              difficulty: ex.difficulty ?? 1,
+            }))
+          )
+          .select('id, type, correct_answer');
+
+        // Generate TTS audio for listen_select exercises (best-effort, parallel)
+        if (insertedExercises) {
+          const audioJobs = insertedExercises
+            .filter(e => e.type === 'listen_select' && e.correct_answer?.speak_text)
+            .map(async e => {
+              const url = await generateAudio(genAI, e.correct_answer.speak_text, lessonRow.id);
+              if (url) {
+                await supabase.from('exercises').update({ audio_url: url }).eq('id', e.id);
+              }
+            });
+          await Promise.all(audioJobs);
+        }
       }
 
       if (lesson.vocabulary?.length) {

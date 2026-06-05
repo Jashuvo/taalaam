@@ -64,6 +64,24 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
   }
 
   Future<void> _startRecording() async {
+    // Request mic permission explicitly — triggers browser dialog on first use.
+    // If previously denied, hasPermission() returns false immediately.
+    bool permitted = false;
+    try {
+      permitted = await _recorder.hasPermission();
+    } catch (_) {
+      permitted = false;
+    }
+
+    if (!permitted) {
+      if (mounted) {
+        setState(() => _errorMsg =
+            'মাইক্রোফোন অনুমতি দরকার।\n'
+            'ব্রাউজারের অ্যাড্রেস বারে 🔒 আইকনে ক্লিক করে "মাইক্রোফোন → অনুমতি দিন" বেছে নিন।');
+      }
+      return;
+    }
+
     setState(() {
       _state = _SpeakState.recording;
       _secondsLeft = 5;
@@ -88,7 +106,7 @@ class _ExerciseSpeakArabicState extends State<ExerciseSpeakArabic> {
       if (mounted) {
         setState(() {
           _state = _SpeakState.idle;
-          _errorMsg = 'মাইক্রোফোন অ্যাক্সেস পেলাম না। ব্রাউজার অনুমতি দিন।';
+          _errorMsg = 'রেকর্ডিং শুরু করতে পারিনি। আবার চেষ্টা করুন।';
         });
       }
     }
