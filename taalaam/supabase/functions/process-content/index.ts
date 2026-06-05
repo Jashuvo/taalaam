@@ -560,36 +560,46 @@ Deno.serve(async (req: Request) => {
       return new Uint8Array(buf);
     }
 
-    /** Generate Arabic TTS via Gemini REST API (direct fetch — the npm package
-     *  strips unknown generationConfig fields like responseModalities).
+    /** Try 2.5 first, fall back to 3.1 on 429. Returns raw PCM bytes or null. */
+    async function ttsGenerate(text: string): Promise<Uint8Array | null> {
+      const models = ['gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview'];
+      for (const model of models) {
+        try {
+          const r = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${Deno.env.get('GEMINI_API_KEY')}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text }] }],
+                generationConfig: {
+                  responseModalities: ['AUDIO'],
+                  speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafat' } } },
+                },
+              }),
+            },
+          );
+          if (r.status === 429) continue;
+          if (!r.ok) continue;
+          const d = await r.json();
+          const b64: string | undefined = d?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (b64) return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        } catch { continue; }
+      }
+      return null;
+    }
+
+    /** Generate Arabic TTS (with 2.5→3.1 failsafe), upload WAV to Storage.
      *  Returns public URL or null on any failure (best-effort). */
     async function generateAudio(
       speakText: string,
       lessonId: string,
     ): Promise<string | null> {
       try {
-        const ttsRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${Deno.env.get('GEMINI_API_KEY')}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: speakText }] }],
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafat' } } },
-              },
-            }),
-          },
-        );
-        if (!ttsRes.ok) return null;
-        const ttsData = await ttsRes.json();
-        const audioB64: string | undefined =
-          ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!audioB64) return null;
+        const pcmBytes = await ttsGenerate(speakText);
+        if (!pcmBytes) return null;
 
-        const pcm = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
-        const wav = pcmToWav(pcm);
+        const wav = pcmToWav(pcmBytes);
 
         // Sanitised filename: keep Arabic + alphanumeric chars, max 40
         const slug = speakText.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);

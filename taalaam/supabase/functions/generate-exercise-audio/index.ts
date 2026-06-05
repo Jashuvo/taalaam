@@ -27,6 +27,35 @@ function pcmToWav(pcmBytes: Uint8Array): Uint8Array {
   return new Uint8Array(buf);
 }
 
+/** Try 2.5 first, fall back to 3.1 on 429. Returns raw PCM bytes or null. */
+async function geminiTts(text: string, apiKey: string): Promise<Uint8Array | null> {
+  const models = ['gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview'];
+  for (const model of models) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text }] }],
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafat' } } },
+            },
+          }),
+        },
+      );
+      if (res.status === 429) { console.warn(`${model} rate-limited, trying next`); continue; }
+      if (!res.ok) continue;
+      const data = await res.json();
+      const b64: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (b64) return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    } catch { continue; }
+  }
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -65,39 +94,14 @@ Deno.serve(async (req: Request) => {
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
 
-  // Generate TTS via Gemini
+  // Generate TTS — try 2.5 first, fall back to 3.1 on 429
   const apiKey = Deno.env.get('GEMINI_API_KEY')!;
-  const ttsRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: speak_text }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafat' } } },
-        },
-      }),
-    },
-  );
-
-  if (!ttsRes.ok) {
-    const err = await ttsRes.json();
-    // Return 429 so Flutter knows to retry later
-    return new Response(JSON.stringify({ error: err?.error?.message ?? 'TTS failed', retry: true }),
-      { status: ttsRes.status, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  const pcm = await geminiTts(speak_text, apiKey);
+  if (!pcm) {
+    return new Response(JSON.stringify({ error: 'TTS unavailable (rate limited on both models)', retry: true }),
+      { status: 429, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
 
-  const ttsData = await ttsRes.json();
-  const audioB64: string | undefined =
-    ttsData?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!audioB64) {
-    return new Response(JSON.stringify({ error: 'No audio in response' }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-  }
-
-  const pcm = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
   const wav = pcmToWav(pcm);
   const slug = speak_text.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
   const path = `lessons/${lesson_id}/${slug}_${exercise_id.substring(0, 8)}.wav`;
