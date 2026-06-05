@@ -28,7 +28,7 @@ function pcmToWav(pcmBytes: Uint8Array): Uint8Array {
 
 /** Call Gemini TTS via direct REST (npm package strips unknown generationConfig fields). */
 async function geminiTts(speakText: string, apiKey: string): Promise<Uint8Array | null> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -37,7 +37,7 @@ async function geminiTts(speakText: string, apiKey: string): Promise<Uint8Array 
       generationConfig: {
         responseModalities: ['AUDIO'],
         speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafah' } },
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafat' } },
         },
       },
     }),

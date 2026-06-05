@@ -569,7 +569,7 @@ Deno.serve(async (req: Request) => {
     ): Promise<string | null> {
       try {
         const ttsRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${Deno.env.get('GEMINI_API_KEY')}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${Deno.env.get('GEMINI_API_KEY')}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -577,7 +577,7 @@ Deno.serve(async (req: Request) => {
               contents: [{ parts: [{ text: speakText }] }],
               generationConfig: {
                 responseModalities: ['AUDIO'],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafah' } } },
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Sulafat' } } },
               },
             }),
           },
