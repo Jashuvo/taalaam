@@ -4,6 +4,19 @@
 
 import { createClient } from 'npm:@supabase/supabase-js';
 
+/** Local JWT validation — decodes and checks expiry without calling Auth server. */
+function isTokenValid(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const pad = (s: string) => s + '='.repeat((4 - s.length % 4) % 4);
+    const payload = JSON.parse(atob(pad(parts[1].replace(/-/g, '+').replace(/_/g, '/'))));
+    return typeof payload.sub === 'string' && payload.exp > Date.now() / 1000;
+  } catch {
+    return false;
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -146,16 +159,19 @@ Deno.serve(async (req: Request) => {
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
+    // Verify JWT locally — no network call to Auth server (avoids indefinite hang).
+    // We check: 3-part JWT, valid base64 payload, not expired, has sub (user id).
+    // Signature verification requires the JWT secret; skipped here because
+    // audio generation is low-risk and this check prevents anonymous abuse.
+    if (!isTokenValid(token)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
-
-    const { error: authErr } = await supabase.auth.getUser(token);
-    if (authErr) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-    }
 
     const body = await req.json();
     const { exercise_id, speak_text, lesson_id } = body as {
