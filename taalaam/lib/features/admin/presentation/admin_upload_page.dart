@@ -451,6 +451,8 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                 const Divider(),
                 const SizedBox(height: 8),
                 const _BackfillAudioButton(),
+                const SizedBox(height: 12),
+                const _LessonAudioButton(),
               ],
             ),
           ),
@@ -504,12 +506,111 @@ class _BackfillAudioButtonState extends State<_BackfillAudioButton> {
               : const Icon(Icons.volume_up_outlined, size: 18),
           label: Text(_loading
               ? 'অডিও তৈরি হচ্ছে…'
-              : 'পুরনো exercises-এ অডিও যোগ করুন'),
+              : 'সব exercises-এ অডিও যোগ করুন'),
           onPressed: _loading ? null : _run,
           style: OutlinedButton.styleFrom(
             foregroundColor: Colors.orange,
             side: const BorderSide(color: Colors.orange),
           ),
+        ),
+        if (_result != null) ...[
+          const SizedBox(height: 6),
+          Text(_result!,
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.center),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Per-lesson audio generation ───────────────────────────────────────────────
+
+class _LessonAudioButton extends StatefulWidget {
+  const _LessonAudioButton();
+  @override
+  State<_LessonAudioButton> createState() => _LessonAudioButtonState();
+}
+
+class _LessonAudioButtonState extends State<_LessonAudioButton> {
+  final _ctrl = TextEditingController();
+  bool _loading = false;
+  String? _result;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run() async {
+    final lessonId = _ctrl.text.trim();
+    if (lessonId.isEmpty) return;
+    setState(() { _loading = true; _result = null; });
+    try {
+      final res = await Supabase.instance.client.functions
+          .invoke('backfill-audio', body: { 'lesson_id': lessonId });
+      final data = res.data as Map<String, dynamic>?;
+      final done   = data?['done']   as int? ?? 0;
+      final total  = data?['total']  as int? ?? 0;
+      final failed = data?['failed'] as int? ?? 0;
+      final words  = (data?['words'] as List?)?.cast<String>() ?? [];
+      final buf = StringBuffer('✓ $done/$total অডিও তৈরি হয়েছে');
+      if (failed > 0) buf.write(' ($failed ব্যর্থ)');
+      if (words.isNotEmpty) buf.write('\n${words.join(' • ')}');
+      setState(() => _result = buf.toString());
+    } catch (e) {
+      setState(() => _result = 'ত্রুটি: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('নির্দিষ্ট পাঠের অডিও তৈরি করুন',
+            style: theme.textTheme.labelMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _ctrl,
+                decoration: const InputDecoration(
+                  labelText: 'Lesson ID (UUID)',
+                  hintText: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                enabled: !_loading,
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              icon: _loading
+                  ? const SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.audiotrack_outlined, size: 16),
+              label: Text(_loading ? '…' : 'অডিও তৈরি করুন',
+                  style: const TextStyle(fontSize: 13)),
+              onPressed: _loading || _ctrl.text.trim().isEmpty ? null : _run,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.deepPurple,
+                side: const BorderSide(color: Colors.deepPurple),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
         ),
         if (_result != null) ...[
           const SizedBox(height: 6),
