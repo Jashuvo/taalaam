@@ -22,6 +22,10 @@ class ExerciseListenSelect extends StatefulWidget {
 }
 
 class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
+  // In-memory cache: exercise_id → audio URL (lives for the app session).
+  // Prevents duplicate edge-function calls when the user revisits the same exercise.
+  static final Map<String, String> _urlCache = {};
+
   // URL-based player (just_audio) — used when audio_url is set
   final _player = AudioPlayer();
 
@@ -73,10 +77,18 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
   /// when the user taps play. Does NOT call play() — that requires a user gesture.
   Future<void> _prefetchAudio() async {
     if (_hasAudioUrl || _fetchedAudioUrl != null || !mounted) return;
+    final exerciseId = widget.exercise.id;
+
+    // Hit the session cache first — avoids redundant edge-function calls.
+    final cached = _urlCache[exerciseId];
+    if (cached != null) {
+      if (mounted) setState(() => _fetchedAudioUrl = cached);
+      return;
+    }
+
     try {
       final ca = widget.exercise.correctAnswer;
       final speakText = ca['speak_text'] as String? ?? _speakText;
-      final exerciseId = widget.exercise.id;
       final lessonId = widget.exercise.lessonId;
       if (speakText.isEmpty) return;
       final res = await Supabase.instance.client.functions.invoke(
@@ -89,8 +101,9 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
       );
       final data = res.data as Map<String, dynamic>?;
       final url = data?['audio_url'] as String?;
-      if (url != null && url.isNotEmpty && mounted) {
-        setState(() => _fetchedAudioUrl = url);
+      if (url != null && url.isNotEmpty) {
+        _urlCache[exerciseId] = url;
+        if (mounted) setState(() => _fetchedAudioUrl = url);
       }
     } catch (_) {
       // Silent — user falls back to flutter_tts on tap
@@ -114,8 +127,9 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
       );
       final data = res.data as Map<String, dynamic>?;
       final url = data?['audio_url'] as String?;
-      if (url != null && url.isNotEmpty && mounted) {
-        setState(() => _fetchedAudioUrl = url);
+      if (url != null && url.isNotEmpty) {
+        _urlCache[widget.exercise.id] = url;
+        if (mounted) setState(() => _fetchedAudioUrl = url);
         await _playUrl(url, slow: slow);
         return;
       }

@@ -193,6 +193,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false } },
     );
 
     const body = await req.json();
@@ -229,13 +230,14 @@ Deno.serve(async (req: Request) => {
     const slug = speak_text.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
     const path = `lessons/${lesson_id}/${slug}_${exercise_id.substring(0, 8)}.${audio.ext}`;
 
+    const blob = new Blob([audio.bytes], { type: audio.contentType });
     const { error: upErr } = await supabase.storage
       .from('audio')
-      .upload(path, audio.bytes, { contentType: audio.contentType, upsert: true });
+      .upload(path, blob, { upsert: true });
     if (upErr) {
-      console.error('Storage upload failed:', upErr.message);
+      console.error('Storage upload failed:', upErr.message, 'path:', path);
       return new Response(JSON.stringify({ error: `Upload failed: ${upErr.message}` }),
-        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+        { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path);

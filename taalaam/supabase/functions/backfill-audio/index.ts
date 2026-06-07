@@ -140,6 +140,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false } },
     );
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
@@ -186,9 +187,10 @@ Deno.serve(async (req: Request) => {
         const slug = speakText.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
         const path = `lessons/${ex.lesson_id}/${slug}_${ex.id.substring(0, 8)}.${audio.ext}`;
 
+        const blob = new Blob([audio.bytes], { type: audio.contentType });
         const { error: upErr } = await supabase.storage
           .from('audio')
-          .upload(path, audio.bytes, { contentType: audio.contentType, upsert: true });
+          .upload(path, blob, { upsert: true });
         if (upErr) { failed++; failedWords.push(speakText); continue; }
 
         const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path);
