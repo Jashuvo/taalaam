@@ -124,9 +124,12 @@ class GrammarNoteSheet extends StatelessWidget {
           ],
           if (grammarNote != null && grammarNote!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(
-              grammarNote!,
-              style: theme.textTheme.bodyMedium?.copyWith(color: color),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Text(
+                grammarNote!,
+                style: theme.textTheme.bodyMedium?.copyWith(color: color),
+              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -152,6 +155,24 @@ class GrammarNoteSheet extends StatelessWidget {
         if (sentence is String && sentence.isNotEmpty) {
           return sentence.split(' ').where((w) => w.isNotEmpty).toList();
         }
+      case ExerciseType.multipleChoice:
+        final opts = ca['options'];
+        final idx = ca['correct_index'] as int?;
+        if (opts is List && idx != null && idx >= 0 && idx < opts.length) {
+          final w = opts[idx]?.toString();
+          if (w != null && w.isNotEmpty) return [w];
+        }
+      case ExerciseType.listenSelect:
+        final speakText = ca['speak_text']?.toString();
+        final opts = ca['options'];
+        final idx = ca['correct_index'] as int?;
+        final result = <String>[];
+        if (speakText != null && speakText.isNotEmpty) result.add(speakText);
+        if (opts is List && idx != null && idx >= 0 && idx < opts.length) {
+          final w = opts[idx]?.toString();
+          if (w != null && w.isNotEmpty && w != speakText) result.add(w);
+        }
+        return result;
       default:
         break;
     }
@@ -181,9 +202,13 @@ class _CorrectWordTile extends StatelessWidget {
     this.meaningBn,
   });
 
+  static final _arabicRe = RegExp(r'[؀-ۿ]');
+  bool get _isArabic => _arabicRe.hasMatch(word);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isAr = _isArabic;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -197,11 +222,13 @@ class _CorrectWordTile extends StatelessWidget {
           ),
           child: Text(
             word,
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
             style: TextStyle(
-              fontFamily: 'NotoNaskhArabic',
-              fontSize: 20,
-              height: 1.6,
+              fontFamily: isAr ? 'NotoNaskhArabic' : null,
+              fontSize: isAr ? 20 : 16,
+              height: isAr ? 1.6 : 1.4,
               color: color,
+              fontWeight: isAr ? FontWeight.normal : FontWeight.w600,
             ),
           ),
         ),
