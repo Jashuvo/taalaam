@@ -471,23 +471,35 @@ class _BackfillAudioButton extends StatefulWidget {
 class _BackfillAudioButtonState extends State<_BackfillAudioButton> {
   bool _loading = false;
   String? _result;
+  int _totalDone = 0;
 
+  // Runs batches of 5 until no exercises remain.
   Future<void> _run() async {
-    setState(() { _loading = true; _result = null; });
+    setState(() { _loading = true; _result = null; _totalDone = 0; });
     try {
-      final res = await Supabase.instance.client.functions
-          .invoke('backfill-audio', body: {});
-      final data = res.data as Map<String, dynamic>?;
-      final done    = data?['done']    as int? ?? 0;
-      final total   = data?['total']   as int? ?? 0;
-      final failed  = data?['failed']  as int? ?? 0;
-      final words   = (data?['words']  as List?)?.cast<String>() ?? [];
-      final buf = StringBuffer('✓ $done/$total অডিও তৈরি হয়েছে');
-      if (failed > 0) buf.write(' ($failed ব্যর্থ)');
-      if (words.isNotEmpty) buf.write('\n${words.join(' • ')}');
-      setState(() => _result = buf.toString());
+      while (true) {
+        final res = await Supabase.instance.client.functions
+            .invoke('backfill-audio', body: { 'batch': 5 });
+        final data = res.data as Map<String, dynamic>?;
+        final done      = data?['done']      as int? ?? 0;
+        final failed    = data?['failed']    as int? ?? 0;
+        final remaining = data?['remaining'] as int? ?? 0;
+        _totalDone += done;
+
+        if (!mounted) return;
+        setState(() {
+          final buf = StringBuffer('✓ $_totalDone তৈরি হয়েছে');
+          if (remaining > 0) buf.write(' — $remaining বাকি…');
+          if (failed > 0) buf.write(' ($failed ব্যর্থ)');
+          _result = buf.toString();
+        });
+
+        // Stop if nothing was processed this batch or nothing left.
+        if (remaining == 0 || done == 0) break;
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
     } catch (e) {
-      setState(() => _result = 'ত্রুটি: $e');
+      if (mounted) setState(() => _result = 'ত্রুটি: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

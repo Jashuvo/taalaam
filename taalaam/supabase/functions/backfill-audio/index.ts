@@ -61,7 +61,7 @@ async function googleTts(
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/mpeg'; ext: 'mp3' } | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(
       'https://texttospeech.googleapis.com/v1/text:synthesize',
@@ -99,7 +99,7 @@ async function geminiTts(
   const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-tts'];
   for (const model of models) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -164,14 +164,17 @@ Deno.serve(async (req: Request) => {
       { auth: { persistSession: false } },
     );
 
-    const body = await req.json().catch(() => ({})) as { lesson_id?: string };
+    const body = await req.json().catch(() => ({})) as { lesson_id?: string; batch?: number };
     const targetLessonId = body.lesson_id ?? null;
+    // Cap per-call to avoid Supabase 60s free-tier timeout.
+    const batchSize = Math.min(body.batch ?? 5, 10);
 
     let query = supabase
       .from('exercises')
       .select('id, lesson_id, correct_answer')
       .eq('type', 'listen_select')
-      .is('audio_url', null);
+      .is('audio_url', null)
+      .limit(batchSize);
     if (targetLessonId) {
       query = query.eq('lesson_id', targetLessonId) as typeof query;
     }
@@ -181,6 +184,17 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: fetchErr.message }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
+
+    // Count total remaining BEFORE processing (for progress display)
+    let totalQuery = supabase
+      .from('exercises')
+      .select('id', { count: 'exact', head: true })
+      .eq('type', 'listen_select')
+      .is('audio_url', null);
+    if (targetLessonId) {
+      totalQuery = totalQuery.eq('lesson_id', targetLessonId) as typeof totalQuery;
+    }
+    const { count: totalRemaining } = await totalQuery;
 
     const googleKey = Deno.env.get('GOOGLE_TTS_API_KEY') ?? '';
 
@@ -219,8 +233,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const remaining = Math.max(0, (totalRemaining ?? 0) - done);
     return new Response(
-      JSON.stringify({ total: (exercises ?? []).length, done, failed, words: succeededWords, failedWords }),
+      JSON.stringify({ total: (exercises ?? []).length, done, failed, remaining, words: succeededWords, failedWords }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     );
 
