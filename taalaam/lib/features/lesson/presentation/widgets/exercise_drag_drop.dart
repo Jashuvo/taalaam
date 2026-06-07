@@ -6,8 +6,10 @@ import '../../domain/exercise_model.dart';
 class ExerciseDragDrop extends StatefulWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
+  final void Function(List<Map<String, String>> wrongPairs)? onWrongPairs;
   const ExerciseDragDrop(
-      {required this.exercise, required this.onAnswered, super.key});
+      {required this.exercise, required this.onAnswered,
+       this.onWrongPairs, super.key});
 
   @override
   State<ExerciseDragDrop> createState() => _ExerciseDragDropState();
@@ -198,6 +200,16 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
               ? null
               : () {
                   setState(() => _answered = true);
+                  // Report which pairs the user got wrong before calling onAnswered
+                  if (widget.onWrongPairs != null) {
+                    final wrong = <Map<String, String>>[];
+                    for (var i = 0; i < _pairs.length; i++) {
+                      if (!_isPairCorrect(i)) {
+                        wrong.add({'ar': _pairs[i]['ar']!, 'bn': _pairs[i]['bn']!});
+                      }
+                    }
+                    widget.onWrongPairs!(wrong);
+                  }
                   widget.onAnswered(_checkAnswer());
                 },
           child: const Text('জমা দিন'),

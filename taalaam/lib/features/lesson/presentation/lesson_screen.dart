@@ -115,6 +115,7 @@ class _LessonBody extends ConsumerStatefulWidget {
 class _LessonBodyState extends ConsumerState<_LessonBody> {
   late final AutoDisposeStateNotifierProvider<LessonSessionNotifier,
       LessonSessionState> _sessionProvider;
+  List<Map<String, String>>? _lastWrongPairs;
 
   @override
   void initState() {
@@ -352,6 +353,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
                         extraWords: exerciseWords,
                         onAnswered: (correct) =>
                             ref.read(_sessionProvider.notifier).answer(correct),
+                        onWrongPairs: (pairs) =>
+                            setState(() => _lastWrongPairs = pairs),
                       ),
                     ),
                   ),
@@ -375,8 +378,11 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
                       grammarNote: exercise.grammarNoteBn,
                       exercise: exercise,
                       vocab: vocab,
-                      onNext: () =>
-                          ref.read(_sessionProvider.notifier).next(),
+                      wrongPairs: _lastWrongPairs,
+                      onNext: () {
+                        setState(() => _lastWrongPairs = null);
+                        ref.read(_sessionProvider.notifier).next();
+                      },
                     )
                   : const SizedBox.shrink(),
             ),

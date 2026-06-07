@@ -10,12 +10,15 @@ class GrammarNoteSheet extends StatelessWidget {
   final ExerciseModel? exercise;
   final List<VocabularyModel> vocab;
 
+  final List<Map<String, String>>? wrongPairs;
+
   const GrammarNoteSheet({
     required this.correct,
     required this.onNext,
     this.grammarNote,
     this.exercise,
     this.vocab = const [],
+    this.wrongPairs,
     super.key,
   });
 
@@ -179,6 +182,8 @@ class GrammarNoteSheet extends StatelessWidget {
 
   List<Map<String, String>> _resolveCorrectPairs() {
     if (correct || exercise?.type != ExerciseType.dragDrop) return [];
+    // If caller provided only the wrong pairs, show just those
+    if (wrongPairs != null) return wrongPairs!;
     final pairs = exercise!.correctAnswer['pairs'];
     if (pairs is! List) return [];
     return pairs

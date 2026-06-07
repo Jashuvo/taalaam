@@ -15,10 +15,12 @@ import 'exercise_word_scramble.dart';
 class ExerciseEngine extends StatelessWidget {
   final ExerciseModel exercise;
   final void Function(bool isCorrect) onAnswered;
+  final void Function(List<Map<String, String>>)? onWrongPairs;
   final List<VocabularyModel> vocab;
   final List<String> extraWords;
   const ExerciseEngine(
       {required this.exercise, required this.onAnswered,
+       this.onWrongPairs,
        this.vocab = const [], this.extraWords = const [], super.key});
 
   @override
@@ -34,7 +36,8 @@ class ExerciseEngine extends StatelessWidget {
         ExerciseFillBlank(exercise: exercise, onAnswered: onAnswered,
             vocab: vocab, extraWords: extraWords),
       ExerciseType.dragDrop =>
-        ExerciseDragDrop(exercise: exercise, onAnswered: onAnswered),
+        ExerciseDragDrop(exercise: exercise, onAnswered: onAnswered,
+            onWrongPairs: onWrongPairs),
       ExerciseType.wordScramble =>
         ExerciseWordScramble(exercise: exercise, onAnswered: onAnswered),
       ExerciseType.trueFalse =>
