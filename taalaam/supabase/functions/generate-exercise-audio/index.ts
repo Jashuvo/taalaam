@@ -1,10 +1,14 @@
 // supabase/functions/generate-exercise-audio/index.ts
 // On-demand TTS for a single listen_select exercise.
-// Priority: Google Cloud TTS (primary) → Gemini 2.5 Flash TTS → Gemini 3.1 Flash TTS
+// Priority: Google Cloud TTS → Gemini 2.5 Flash TTS → Gemini 3.1 Flash TTS
+// Uses Supabase REST API directly (no supabase-js) to avoid 500 crashes in Deno.
 
-import { createClient } from 'npm:@supabase/supabase-js';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
-/** Local JWT validation — decodes and checks expiry without calling Auth server. */
 function isTokenValid(token: string): boolean {
   try {
     const parts = token.split('.');
@@ -16,14 +20,6 @@ function isTokenValid(token: string): boolean {
     return false;
   }
 }
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-// ── WAV wrapper (used only for Gemini PCM fallback) ──────────────────────────
 
 function downsample24kTo16k(pcm24: Uint8Array): Uint8Array {
   const inSamples = pcm24.length / 2;
@@ -55,73 +51,47 @@ function pcmToWav(pcmBytes: Uint8Array): Uint8Array {
   return new Uint8Array(buf);
 }
 
-// ── Google Cloud TTS ─────────────────────────────────────────────────────────
-// Free tier: 1,000,000 characters/month for WaveNet voices (300 RPM limit)
-// Voice: ar-XA-Wavenet-B — clear male Modern Standard Arabic pronunciation
-
 async function googleTts(
   text: string,
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/mpeg'; ext: 'mp3' } | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(
-      'https://texttospeech.googleapis.com/v1/text:synthesize',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          input: { text },
-          voice: {
-            languageCode: 'ar-XA',
-            name: 'ar-XA-Wavenet-B',
-            ssmlGender: 'MALE',
-          },
-          audioConfig: {
-            audioEncoding: 'MP3',
-            speakingRate: 0.9,
-          },
-        }),
-        signal: controller.signal,
-      },
-    );
+    const res = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode: 'ar-XA', name: 'ar-XA-Wavenet-B', ssmlGender: 'MALE' },
+        audioConfig: { audioEncoding: 'MP3', speakingRate: 0.9 },
+      }),
+      signal: controller.signal,
+    });
     clearTimeout(timeoutId);
     if (!res.ok) {
-      const errText = await res.text().catch(() => '(no body)');
-      console.error(`Google TTS error ${res.status}:`, errText);
+      console.error(`Google TTS ${res.status}:`, await res.text().catch(() => ''));
       return null;
     }
     const data = await res.json();
     const b64 = data.audioContent as string | undefined;
-    if (!b64) { console.warn('Google TTS returned no audioContent'); return null; }
-    return {
-      bytes: Uint8Array.from(atob(b64), c => c.charCodeAt(0)),
-      contentType: 'audio/mpeg',
-      ext: 'mp3',
-    };
+    if (!b64) return null;
+    return { bytes: Uint8Array.from(atob(b64), c => c.charCodeAt(0)), contentType: 'audio/mpeg', ext: 'mp3' };
   } catch (e: unknown) {
     clearTimeout(timeoutId);
-    const isAbort = e instanceof Error && e.name === 'AbortError';
-    console.warn(isAbort ? 'Google TTS timed out after 25s' : `Google TTS fetch error: ${e}`);
+    console.warn(e instanceof Error && e.name === 'AbortError' ? 'Google TTS timeout' : `Google TTS: ${e}`);
     return null;
   }
 }
-
-// ── Gemini TTS fallback ──────────────────────────────────────────────────────
-// Free tier: 3 RPM / 10 RPD (2.5 Flash) + 3 RPM / 10 RPD (3.1 Flash)
 
 async function geminiTts(
   text: string,
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/wav'; ext: 'wav' } | null> {
-  const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-tts'];
+  const models = ['gemini-2.5-flash-tts', 'gemini-3.1-flash-tts-preview'];
   for (const model of models) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -140,61 +110,47 @@ async function geminiTts(
       );
       clearTimeout(timeoutId);
       if (res.status === 429) { console.warn(`${model} rate-limited`); continue; }
-      if (!res.ok) {
-        console.error(`${model} error ${res.status}:`, await res.text().catch(() => ''));
-        continue;
-      }
+      if (!res.ok) { console.error(`${model} ${res.status}`); continue; }
       const data = await res.json();
       const b64: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (b64) {
         const pcm = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
         return { bytes: pcmToWav(downsample24kTo16k(pcm)), contentType: 'audio/wav', ext: 'wav' };
       }
-      console.warn(`${model} returned no audio data`);
     } catch (e: unknown) {
       clearTimeout(timeoutId);
-      const isAbort = e instanceof Error && e.name === 'AbortError';
-      console.warn(isAbort ? `${model} timed out` : `${model} error: ${e}`);
+      console.warn(e instanceof Error && e.name === 'AbortError' ? `${model} timeout` : `${model}: ${e}`);
       continue;
     }
   }
   return null;
 }
 
-// ── Handler ──────────────────────────────────────────────────────────────────
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const geminiKey = Deno.env.get('GEMINI_API_KEY');
-  if (!geminiKey) {
-    return new Response(
-      JSON.stringify({ error: 'config_error', message: 'GEMINI_API_KEY not set' }),
-      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
-    );
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const GEMINI_KEY   = Deno.env.get('GEMINI_API_KEY');
+  const GOOGLE_KEY   = Deno.env.get('GOOGLE_TTS_API_KEY') ?? '';
+
+  if (!GEMINI_KEY) {
+    return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not set' }),
+      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
+
+  const dbHeaders = {
+    'Authorization': `Bearer ${SERVICE_KEY}`,
+    'apikey': SERVICE_KEY,
+    'Content-Type': 'application/json',
+  };
 
   try {
     const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
-    if (!token) {
+    if (!token || !isTokenValid(token)) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
-
-    // Verify JWT locally — no network call to Auth server (avoids indefinite hang).
-    // We check: 3-part JWT, valid base64 payload, not expired, has sub (user id).
-    // Signature verification requires the JWT secret; skipped here because
-    // audio generation is low-risk and this check prevents anonymous abuse.
-    if (!isTokenValid(token)) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-    }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { auth: { persistSession: false } },
-    );
 
     const body = await req.json();
     const { exercise_id, speak_text, lesson_id } = body as {
@@ -205,52 +161,85 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
-    // Race-condition guard
-    const { data: existing } = await supabase
-      .from('exercises').select('audio_url').eq('id', exercise_id).single();
-    if (existing?.audio_url) {
-      return new Response(JSON.stringify({ audio_url: existing.audio_url }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    // Race-condition guard: return existing URL if already generated
+    const checkRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/exercises?id=eq.${encodeURIComponent(exercise_id)}&select=audio_url`,
+      { headers: dbHeaders },
+    ).catch(() => null);
+    if (checkRes?.ok) {
+      const rows = await checkRes.json().catch(() => []);
+      const existing = rows[0]?.audio_url as string | undefined;
+      if (existing) {
+        return new Response(JSON.stringify({ audio_url: existing }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+      }
     }
 
-    // Try Google Cloud TTS first, then Gemini fallbacks
-    const googleKey = Deno.env.get('GOOGLE_TTS_API_KEY') ?? '';
-
-    const audio = googleKey
-      ? (await googleTts(speak_text, googleKey) ?? await geminiTts(speak_text, geminiKey))
-      : await geminiTts(speak_text, geminiKey);
+    // TTS
+    const audio = GOOGLE_KEY
+      ? (await googleTts(speak_text, GOOGLE_KEY) ?? await geminiTts(speak_text, GEMINI_KEY))
+      : await geminiTts(speak_text, GEMINI_KEY);
 
     if (!audio) {
-      return new Response(
-        JSON.stringify({ error: 'tts_unavailable', retry: true }),
-        { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
-      );
+      return new Response(JSON.stringify({ error: 'tts_unavailable', retry: true }),
+        { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     const slug = speak_text.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
     const path = `lessons/${lesson_id}/${slug}_${exercise_id.substring(0, 8)}.${audio.ext}`;
 
-    const blob = new Blob([audio.bytes], { type: audio.contentType });
-    const { error: upErr } = await supabase.storage
-      .from('audio')
-      .upload(path, blob, { upsert: true });
-    if (upErr) {
-      console.error('Storage upload failed:', upErr.message, 'path:', path);
-      return new Response(JSON.stringify({ error: `Upload failed: ${upErr.message}` }),
+    // Upload to Supabase Storage via REST API
+    const uploadCtrl = new AbortController();
+    const uploadTimer = setTimeout(() => uploadCtrl.abort(), 15000);
+    let uploadOk = false;
+    try {
+      const upRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/audio/${path}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${SERVICE_KEY}`,
+            'Content-Type': audio.contentType,
+            'x-upsert': 'true',
+          },
+          body: audio.bytes,
+          signal: uploadCtrl.signal,
+        },
+      );
+      clearTimeout(uploadTimer);
+      if (!upRes.ok) {
+        console.error('Storage upload failed:', upRes.status, await upRes.text().catch(() => ''));
+      } else {
+        uploadOk = true;
+      }
+    } catch (upErr) {
+      clearTimeout(uploadTimer);
+      console.error('Storage upload error:', upErr);
+    }
+
+    if (!uploadOk) {
+      return new Response(JSON.stringify({ error: 'upload_failed' }),
         { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
-    const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path);
-    await supabase.from('exercises').update({ audio_url: publicUrl }).eq('id', exercise_id);
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/audio/${path}`;
+
+    // Update exercise record
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/exercises?id=eq.${encodeURIComponent(exercise_id)}`,
+      {
+        method: 'PATCH',
+        headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ audio_url: publicUrl }),
+      },
+    ).catch(e => console.error('DB update error:', e));
 
     return new Response(JSON.stringify({ audio_url: publicUrl }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
 
   } catch (err) {
     console.error('unhandled error:', err);
-    return new Response(
-      JSON.stringify({ error: 'internal', detail: String(err) }),
-      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
-    );
+    return new Response(JSON.stringify({ error: 'internal', detail: String(err) }),
+      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
 });
