@@ -478,10 +478,16 @@ const ADMIN_EMAIL = 'jubayedsr@gmail.com';
 async function checkAdmin(req: Request): Promise<Response | null> {
   const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
   if (!token) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-  const { data: { user }, error } = await createClient(
-    Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!
-  ).auth.getUser(token);
-  if (error || user?.email !== ADMIN_EMAIL) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  const email = (() => {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const pad = (s: string) => s + '='.repeat((4 - s.length % 4) % 4);
+      const p = JSON.parse(atob(pad(parts[1].replace(/-/g, '+').replace(/_/g, '/'))));
+      return typeof p.sub === 'string' && p.exp > Date.now() / 1000 ? (p.email as string ?? null) : null;
+    } catch { return null; }
+  })();
+  if (email !== ADMIN_EMAIL) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   return null;
 }
 

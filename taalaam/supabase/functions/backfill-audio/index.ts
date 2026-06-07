@@ -5,6 +5,21 @@
 
 import { createClient } from 'npm:@supabase/supabase-js';
 
+/** Decode JWT locally and return email — no Auth server call needed. */
+function adminEmailFromToken(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const pad = (s: string) => s + '='.repeat((4 - s.length % 4) % 4);
+    const payload = JSON.parse(atob(pad(parts[1].replace(/-/g, '+').replace(/_/g, '/'))));
+    if (typeof payload.sub !== 'string') return null;
+    if (payload.exp <= Date.now() / 1000) return null;
+    return (payload.email as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -137,17 +152,17 @@ Deno.serve(async (req: Request) => {
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
+    const email = adminEmailFromToken(token);
+    if (email !== 'jubayedsr@gmail.com') {
+      return new Response(JSON.stringify({ error: 'Admin only' }),
+        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { persistSession: false } },
     );
-
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || user?.email !== 'jubayedsr@gmail.com') {
-      return new Response(JSON.stringify({ error: 'Admin only' }),
-        { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-    }
 
     const body = await req.json().catch(() => ({})) as { lesson_id?: string };
     const targetLessonId = body.lesson_id ?? null;

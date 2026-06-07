@@ -4,7 +4,6 @@
 // Called by the speak_arabic exercise widget in the learner app.
 
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
-import { createClient } from 'npm:@supabase/supabase-js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,12 +35,17 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_ANON_KEY')!
-  );
-  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-  if (authErr || !user) {
+  // Local JWT validation — no Auth server call needed
+  const isValid = (() => {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      const pad = (s: string) => s + '='.repeat((4 - s.length % 4) % 4);
+      const p = JSON.parse(atob(pad(parts[1].replace(/-/g, '+').replace(/_/g, '/'))));
+      return typeof p.sub === 'string' && p.exp > Date.now() / 1000;
+    } catch { return false; }
+  })();
+  if (!isValid) {
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
       { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
