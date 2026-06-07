@@ -1,0 +1,30 @@
+-- MANUAL STEP — do not execute via db push.
+-- pg_cron and pg_net must be enabled first (Dashboard → Extensions).
+--
+-- To schedule nightly audio backfill at 2am UTC:
+-- Run in SQL Editor (replace <YOUR_SERVICE_ROLE_KEY>):
+--
+-- select cron.schedule(
+--   'nightly-backfill-audio',
+--   '0 2 * * *',
+--   $$
+--   select net.http_post(
+--     url     := 'https://xborpnxbdvstiabtevix.supabase.co/functions/v1/backfill-audio',
+--     headers := jsonb_build_object(
+--       'Content-Type',  'application/json',
+--       'Authorization', 'Bearer <YOUR_SERVICE_ROLE_KEY>'
+--     ),
+--     body    := '{}'::jsonb
+--   ) as request_id;
+--   $$
+-- );
+--
+-- To verify it was scheduled:
+--   select jobid, jobname, schedule, command from cron.job;
+--
+-- To remove the schedule:
+--   select cron.unschedule('nightly-backfill-audio');
+--
+-- Alternatively: Supabase Dashboard → Edge Functions → backfill-audio → Schedules → Add → 0 2 * * *
+
+SELECT 1; -- no-op placeholder so db push records this migration as applied

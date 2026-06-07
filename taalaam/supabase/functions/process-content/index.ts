@@ -560,9 +560,9 @@ Deno.serve(async (req: Request) => {
       return new Uint8Array(buf);
     }
 
-    /** Try 2.5 first, fall back to 3.1 on 429. Returns raw PCM bytes or null. */
+    /** Try 3.1 first, fall back to 2.5 on 429. Returns raw PCM bytes or null. */
     async function ttsGenerate(text: string): Promise<Uint8Array | null> {
-      const models = ['gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview'];
+      const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
       for (const model of models) {
         try {
           const r = await fetch(

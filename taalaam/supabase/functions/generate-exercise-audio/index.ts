@@ -25,8 +25,22 @@ const corsHeaders = {
 
 // ── WAV wrapper (used only for Gemini PCM fallback) ──────────────────────────
 
+function downsample24kTo16k(pcm24: Uint8Array): Uint8Array {
+  const inSamples = pcm24.length / 2;
+  const outSamples = Math.floor(inSamples * 16000 / 24000);
+  const out = new Int16Array(outSamples);
+  const inp = new Int16Array(pcm24.buffer, pcm24.byteOffset, inSamples);
+  for (let i = 0; i < outSamples; i++) {
+    const pos = i * 1.5;
+    const lo = Math.floor(pos);
+    const frac = pos - lo;
+    out[i] = Math.round((inp[lo] ?? 0) + frac * ((inp[lo + 1] ?? 0) - (inp[lo] ?? 0)));
+  }
+  return new Uint8Array(out.buffer);
+}
+
 function pcmToWav(pcmBytes: Uint8Array): Uint8Array {
-  const sampleRate = 24000, numCh = 1, bps = 16;
+  const sampleRate = 16000, numCh = 1, bps = 16;
   const byteRate = sampleRate * numCh * bps / 8;
   const buf = new ArrayBuffer(44 + pcmBytes.length);
   const v = new DataView(buf);
@@ -104,7 +118,7 @@ async function geminiTts(
   text: string,
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/wav'; ext: 'wav' } | null> {
-  const models = ['gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview'];
+  const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
   for (const model of models) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -134,7 +148,7 @@ async function geminiTts(
       const b64: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (b64) {
         const pcm = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-        return { bytes: pcmToWav(pcm), contentType: 'audio/wav', ext: 'wav' };
+        return { bytes: pcmToWav(downsample24kTo16k(pcm)), contentType: 'audio/wav', ext: 'wav' };
       }
       console.warn(`${model} returned no audio data`);
     } catch (e: unknown) {
