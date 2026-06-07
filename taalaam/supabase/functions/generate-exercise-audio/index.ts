@@ -118,7 +118,7 @@ async function geminiTts(
   text: string,
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/wav'; ext: 'wav' } | null> {
-  const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
+  const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-tts'];
   for (const model of models) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -166,6 +166,14 @@ async function geminiTts(
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const geminiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!geminiKey) {
+    return new Response(
+      JSON.stringify({ error: 'config_error', message: 'GEMINI_API_KEY not set' }),
+      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+    );
+  }
+
   try {
     const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
     if (!token) {
@@ -206,7 +214,6 @@ Deno.serve(async (req: Request) => {
 
     // Try Google Cloud TTS first, then Gemini fallbacks
     const googleKey = Deno.env.get('GOOGLE_TTS_API_KEY') ?? '';
-    const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
 
     const audio = googleKey
       ? (await googleTts(speak_text, googleKey) ?? await geminiTts(speak_text, geminiKey))
@@ -214,8 +221,8 @@ Deno.serve(async (req: Request) => {
 
     if (!audio) {
       return new Response(
-        JSON.stringify({ error: 'All TTS providers failed or timed out', retry: true }),
-        { status: 429, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+        JSON.stringify({ error: 'tts_unavailable', retry: true }),
+        { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
       );
     }
 
@@ -237,9 +244,11 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ audio_url: publicUrl }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } });
 
-  } catch (e) {
-    console.error('Unhandled error:', e);
-    return new Response(JSON.stringify({ error: `Internal error: ${e}` }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  } catch (err) {
+    console.error('unhandled error:', err);
+    return new Response(
+      JSON.stringify({ error: 'internal', detail: String(err) }),
+      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+    );
   }
 });

@@ -34,6 +34,7 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
   late final List<String> _options;
   late final int _correctIdx;
   late final String _speakText;
+  String? _fetchedAudioUrl;
 
   bool get _hasAudioUrl =>
       (widget.exercise.audioUrl ?? '').isNotEmpty;
@@ -58,7 +59,7 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
     });
     _tts.setSpeechRate(0.45);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initAndPlay());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prefetchAudio());
   }
 
   @override
@@ -68,18 +69,36 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
     super.dispose();
   }
 
-  Future<void> _initAndPlay() async {
-    if (!mounted) return;
-    if (_hasAudioUrl) {
-      await _playUrl();
-    } else {
-      // No stored audio — try to generate it on-demand (once per exercise).
-      await _generateAndPlay();
+  /// Silently pre-fetches the audio URL in the background so it is ready
+  /// when the user taps play. Does NOT call play() — that requires a user gesture.
+  Future<void> _prefetchAudio() async {
+    if (_hasAudioUrl || _fetchedAudioUrl != null || !mounted) return;
+    try {
+      final ca = widget.exercise.correctAnswer;
+      final speakText = ca['speak_text'] as String? ?? _speakText;
+      final exerciseId = widget.exercise.id;
+      final lessonId = widget.exercise.lessonId;
+      if (speakText.isEmpty) return;
+      final res = await Supabase.instance.client.functions.invoke(
+        'generate-exercise-audio',
+        body: {
+          'exercise_id': exerciseId,
+          'speak_text': speakText,
+          'lesson_id': lessonId,
+        },
+      );
+      final data = res.data as Map<String, dynamic>?;
+      final url = data?['audio_url'] as String?;
+      if (url != null && url.isNotEmpty && mounted) {
+        setState(() => _fetchedAudioUrl = url);
+      }
+    } catch (_) {
+      // Silent — user falls back to flutter_tts on tap
     }
   }
 
-  /// Calls the generate-exercise-audio edge function to produce a WAV file,
-  /// stores the URL, then plays it. Falls back to TTS if generation fails.
+  /// Called from user-gesture buttons only. Generates audio on-demand if the
+  /// pre-fetch hasn't finished yet, then plays immediately.
   Future<void> _generateAndPlay({bool slow = false}) async {
     final ca = widget.exercise.correctAnswer;
     final speakText = ca['speak_text'] as String? ?? _speakText;
@@ -96,38 +115,30 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
       final data = res.data as Map<String, dynamic>?;
       final url = data?['audio_url'] as String?;
       if (url != null && url.isNotEmpty && mounted) {
-        // Play immediately with the fresh URL
-        setState(() => _speaking = false);
-        await _player.setUrl(url);
-        await _player.setSpeed(slow ? 0.6 : 1.0);
-        setState(() => _speaking = true);
-        await _player.play();
-        await _player.processingStateStream
-            .firstWhere((s) => s == ProcessingState.completed || s == ProcessingState.idle);
-        if (mounted) setState(() => _speaking = false);
+        setState(() => _fetchedAudioUrl = url);
+        await _playUrl(url, slow: slow);
         return;
       }
-    } catch (_) {}
-    // Generation failed or rate-limited — fall back to browser TTS
+    } on FunctionException catch (_) {
+      // Edge function returned error (503/429) — fall through to TTS
+    } catch (_) {
+      // Network error — fall through to TTS
+    }
     if (mounted) setState(() => _speaking = false);
     await _initTtsAndSpeak(slow: slow);
   }
 
   // ── URL-based playback ────────────────────────────────────────────────────
 
-  Future<void> _playUrl({bool slow = false}) async {
-    if (_speaking) {
-      await _player.stop();
-    }
+  Future<void> _playUrl(String url, {bool slow = false}) async {
     setState(() => _speaking = true);
     try {
-      await _player.setUrl(widget.exercise.audioUrl!);
+      await _player.setUrl(url);
       await _player.setSpeed(slow ? 0.6 : 1.0);
       await _player.play();
       await _player.processingStateStream
           .firstWhere((s) => s == ProcessingState.completed || s == ProcessingState.idle);
     } catch (_) {
-      // URL playback failed — fall through to TTS
       await _initTtsAndSpeak(slow: slow);
       return;
     }
@@ -163,11 +174,18 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
   // ── Unified play entry point (called by buttons) ─────────────────────────
 
   Future<void> _play({bool slow = false}) async {
-    if (_hasAudioUrl) {
-      await _playUrl(slow: slow);
-    } else {
-      await _speakTts(slow: slow);
+    if (_speaking) {
+      await _player.stop();
+      await _tts.stop();
     }
+    final urlToPlay = (widget.exercise.audioUrl?.isNotEmpty == true)
+        ? widget.exercise.audioUrl
+        : _fetchedAudioUrl;
+    if (urlToPlay != null && urlToPlay.isNotEmpty) {
+      await _playUrl(urlToPlay, slow: slow);
+      return;
+    }
+    await _generateAndPlay(slow: slow);
   }
 
   bool get _canCheck => _selected != null;

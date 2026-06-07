@@ -81,7 +81,7 @@ async function geminiTts(
   text: string,
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/wav'; ext: 'wav' } | null> {
-  const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
+  const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-tts'];
   for (const model of models) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -122,6 +122,14 @@ async function geminiTts(
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const geminiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!geminiKey) {
+    return new Response(
+      JSON.stringify({ error: 'config_error', message: 'GEMINI_API_KEY not set' }),
+      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+    );
+  }
+
   try {
     const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
     if (!token) {
@@ -159,7 +167,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const googleKey = Deno.env.get('GOOGLE_TTS_API_KEY') ?? '';
-    const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
 
     let done = 0, failed = 0;
     const succeededWords: string[] = [];
@@ -200,9 +207,11 @@ Deno.serve(async (req: Request) => {
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     );
 
-  } catch (e) {
-    console.error('Unhandled error:', e);
-    return new Response(JSON.stringify({ error: `Internal error: ${e}` }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+  } catch (err) {
+    console.error('unhandled error:', err);
+    return new Response(
+      JSON.stringify({ error: 'internal', detail: String(err) }),
+      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+    );
   }
 });
