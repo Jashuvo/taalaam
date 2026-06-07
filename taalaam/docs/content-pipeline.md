@@ -6,7 +6,7 @@
 Admin uploads file
   → Supabase Storage (raw-content/)
   → Edge Function: process-content (Deno)
-  → Gemini API: gemini-3.5-flash (free tier, reads PDF/image natively)
+  → Gemini API: gemini-2.5-flash (free tier, reads PDF/image natively)
   → Structured JSON → DB (status=draft)
   → Admin reviews → edits → publishes
 ```
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
   
   const genAI = new GoogleGenerativeAI(Deno.env.get("GEMINI_API_KEY")!);
   const model = genAI.getGenerativeModel({
-    model: "gemini-3.5-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: SYSTEM_PROMPT,
   });
 
@@ -123,7 +123,7 @@ Pass the file as `inlineData` alongside the text prompt:
   ```
 This replaces the need for `syncfusion_flutter_pdf` entirely.
 
-## Cost (gemini-3.5-flash free tier)
+## Cost (gemini-2.5-flash free tier)
 - **Free**: 1,500 requests/day — no credit card, no billing
 - Processing all 200–300 lessons across every source book = well under limit
 - This is a one-time admin operation, not per-learner

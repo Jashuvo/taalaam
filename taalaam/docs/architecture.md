@@ -21,7 +21,7 @@
              ▼
 ┌─────────────────────────────────────────────────────────┐
 │  GOOGLE GEMINI API                                       │
-│  Model: gemini-3.5-flash  (free: 1,500 req/day)          │
+│  Model: gemini-2.5-flash  (free: 1,500 req/day)          │
 │  Purpose: Parse source material → structured lesson JSON │
 │  Bonus: reads PDFs and images natively                   │
 └─────────────────────────────────────────────────────────┘

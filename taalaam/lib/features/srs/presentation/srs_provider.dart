@@ -9,16 +9,18 @@ final srsLocalSourceProvider = Provider<SrsLocalSource>((ref) {
 
 // ── Badge counts (capped at daily limits) ────────────────────────────────────
 
-/// New (never-seen) words — drives the مُخَسْث badge. Cap: kDailyNewLimit.
+/// New (never-seen) words — drives the মুখস্থ badge. Cap: kDailyNewLimit.
+/// StreamProvider so the badge auto-refreshes when Drift data changes.
 final newCardCountProvider =
-    FutureProvider.family<int, String>((ref, userId) async {
-  return ref.read(srsLocalSourceProvider).countNewCards(userId);
+    StreamProvider.family<int, String>((ref, userId) {
+  return ref.read(srsLocalSourceProvider).watchNewCards(userId);
 });
 
 /// Seen-but-interval-expired cards — drives the review badge. Cap: kDailyReviewLimit.
+/// StreamProvider so the badge auto-refreshes when Drift data changes.
 final reviewCardCountProvider =
-    FutureProvider.family<int, String>((ref, userId) async {
-  return ref.read(srsLocalSourceProvider).countReviewCards(userId);
+    StreamProvider.family<int, String>((ref, userId) {
+  return ref.read(srsLocalSourceProvider).watchReviewCards(userId);
 });
 
 /// Legacy alias — callers that haven't been updated yet.

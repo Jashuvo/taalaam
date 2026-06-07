@@ -103,6 +103,7 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
       final url = data?['audio_url'] as String?;
       if (url != null && url.isNotEmpty) {
         _urlCache[exerciseId] = url;
+        if (_urlCache.length > 60) _urlCache.remove(_urlCache.keys.first);
         if (mounted) setState(() => _fetchedAudioUrl = url);
       }
     } catch (_) {

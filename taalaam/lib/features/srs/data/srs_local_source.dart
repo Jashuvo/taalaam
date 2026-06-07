@@ -37,6 +37,34 @@ class SrsLocalSource {
     return (await q.get()).length.clamp(0, kDailyReviewLimit);
   }
 
+  // ── Live-count streams (for auto-refreshing badges) ──────────────────────────
+
+  /// Live count of new (never-reviewed) cards — emits on every Drift write.
+  Stream<int> watchNewCards(String userId) {
+    return (_db.select(_db.srsCards).join([
+          innerJoin(_db.vocabulary,
+              _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+        ])
+          ..where(_db.srsCards.userId.equals(userId) &
+              _db.srsCards.state.equals(0) &
+              _db.srsCards.dueDate.isSmallerOrEqualValue(DateTime.now())))
+        .watch()
+        .map((rows) => rows.length.clamp(0, kDailyNewLimit));
+  }
+
+  /// Live count of due review cards — emits on every Drift write.
+  Stream<int> watchReviewCards(String userId) {
+    return (_db.select(_db.srsCards).join([
+          innerJoin(_db.vocabulary,
+              _db.vocabulary.id.equalsExp(_db.srsCards.vocabularyId)),
+        ])
+          ..where(_db.srsCards.userId.equals(userId) &
+              _db.srsCards.state.isBiggerThanValue(0) &
+              _db.srsCards.dueDate.isSmallerOrEqualValue(DateTime.now())))
+        .watch()
+        .map((rows) => rows.length.clamp(0, kDailyReviewLimit));
+  }
+
   // ── Card queues ───────────────────────────────────────────────────────────────
 
   /// New (never reviewed) words — for the Memorize screen.
