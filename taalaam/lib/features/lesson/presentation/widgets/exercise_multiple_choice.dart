@@ -19,6 +19,7 @@ class ExerciseMultipleChoice extends StatefulWidget {
 
 class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
   int? _selected;
+  bool _checked = false;
   late final List<String> _options;
   late final int _correctIdx;
 
@@ -34,7 +35,12 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
     _correctIdx = raw.indexOf(correctAnswer);
   }
 
-  bool get _canCheck => _selected != null;
+  bool get _canCheck => _selected != null && !_checked;
+
+  void _check() {
+    setState(() => _checked = true);
+    widget.onAnswered(_selected == _correctIdx);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,10 +51,9 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
         if (widget.exercise.promptBn != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 24),
-            child: Text(
+            child: _PromptWithArabicWord(
               widget.exercise.promptBn!,
-              style: theme.textTheme.titleMedium,
-              textAlign: TextAlign.center,
+              baseStyle: theme.textTheme.titleMedium,
             ),
           ),
         if (widget.exercise.promptAr != null)
@@ -64,18 +69,23 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
             ),
           ),
         ...List.generate(_options.length, (i) {
-          final selected = _selected == i;
-          final correct = i == _correctIdx;
+          final isSelected = _selected == i;
+          final isCorrect = i == _correctIdx;
           Color? tileColor;
           Color? textColor;
-          if (_selected != null) {
-            if (correct) {
+          if (_checked) {
+            // Only reveal correct/wrong AFTER check is pressed
+            if (isCorrect) {
               tileColor = AppColors.correctTile.withValues(alpha: 0.15);
               textColor = AppColors.correctBg;
-            } else if (selected) {
+            } else if (isSelected) {
               tileColor = AppColors.wrongTile.withValues(alpha: 0.15);
               textColor = AppColors.wrongBg;
             }
+          } else if (isSelected) {
+            // Selection highlight only — no spoiler
+            tileColor = theme.colorScheme.primaryContainer.withValues(alpha: 0.5);
+            textColor = theme.colorScheme.primary;
           }
           return TweenAnimationBuilder<double>(
             key: ValueKey(i),
@@ -96,9 +106,8 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: _selected != null
-                      ? null
-                      : () => setState(() => _selected = i),
+                  // Allow changing selection until Check is pressed
+                  onTap: _checked ? null : () => setState(() => _selected = i),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         vertical: 16, horizontal: 20),
@@ -119,11 +128,63 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
         }),
         const SizedBox(height: 8),
         FilledButton(
-          onPressed: _canCheck
-              ? () => widget.onAnswered(_selected == _correctIdx)
-              : null,
+          onPressed: _canCheck ? _check : null,
           child: const Text('যাচাই করুন'),
         ),
+      ],
+    );
+  }
+}
+
+/// Renders Bengali prompt text that may contain «Arabic word» markers.
+/// The Arabic portion is extracted and displayed as a prominent styled block.
+class _PromptWithArabicWord extends StatelessWidget {
+  final String text;
+  final TextStyle? baseStyle;
+  const _PromptWithArabicWord(this.text, {this.baseStyle});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final style = baseStyle ?? theme.textTheme.titleMedium;
+    final match = RegExp(r'«([^»]+)»').firstMatch(text);
+    if (match == null) {
+      return Text(text, style: style, textAlign: TextAlign.center);
+    }
+    final before = text.substring(0, match.start).trim();
+    final arabicWord = match.group(1)!.trim();
+    final after = text.substring(match.end).trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (before.isNotEmpty)
+          Text(before, style: style, textAlign: TextAlign.center),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+          ),
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Text(
+              arabicWord,
+              style: const TextStyle(
+                fontFamily: 'NotoNaskhArabic',
+                fontSize: 28,
+                height: 1.8,
+                fontWeight: FontWeight.bold,
+                color: AppColors.gold,
+              ),
+            ),
+          ),
+        ),
+        if (after.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(after, style: style, textAlign: TextAlign.center),
+        ],
       ],
     );
   }
