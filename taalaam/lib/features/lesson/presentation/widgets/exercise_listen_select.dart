@@ -267,6 +267,7 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
                 icon: _speaking ? Icons.volume_up : Icons.volume_up_outlined,
                 label: 'বাজান',
                 color: AppColors.teal,
+                speaking: _speaking,
                 onTap: () => _play(),
               ),
               const SizedBox(width: 16),
@@ -274,6 +275,7 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
                 icon: Icons.slow_motion_video_rounded,
                 label: 'ধীরে',
                 color: theme.colorScheme.secondary,
+                speaking: false,
                 onTap: () => _play(slow: true),
               ),
             ],
@@ -365,38 +367,133 @@ class _ExerciseListenSelectState extends State<ExerciseListenSelect> {
   }
 }
 
-class _AudioButton extends StatelessWidget {
+class _AudioButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final bool speaking;
+
   const _AudioButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    required this.speaking,
   });
+
+  @override
+  State<_AudioButton> createState() => _AudioButtonState();
+}
+
+class _AudioButtonState extends State<_AudioButton>
+    with TickerProviderStateMixin {
+  late AnimationController _ring1;
+  late AnimationController _ring2;
+
+  @override
+  void initState() {
+    super.initState();
+    _ring1 = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200));
+    _ring2 = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200));
+    if (widget.speaking) _startRings();
+  }
+
+  @override
+  void didUpdateWidget(_AudioButton old) {
+    super.didUpdateWidget(old);
+    if (widget.speaking && !old.speaking) {
+      _startRings();
+    } else if (!widget.speaking && old.speaking) {
+      _stopRings();
+    }
+  }
+
+  void _startRings() {
+    _ring1.repeat();
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _ring2.repeat();
+    });
+  }
+
+  void _stopRings() {
+    _ring1
+      ..stop()
+      ..value = 0;
+    _ring2
+      ..stop()
+      ..value = 0;
+  }
+
+  @override
+  void dispose() {
+    _ring1.dispose();
+    _ring2.dispose();
+    super.dispose();
+  }
+
+  Widget _ring(AnimationController ctrl) {
+    return AnimatedBuilder(
+      animation: ctrl,
+      builder: (_, __) {
+        final scale = 0.8 + ctrl.value * 0.8;
+        final opacity = (0.5 * (1 - ctrl.value)).clamp(0.0, 1.0);
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.teal.withValues(alpha: opacity),
+                width: 2,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
+      onTap: widget.onTap,
+      child: SizedBox(
         width: 80,
         height: 80,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 2),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+            if (widget.speaking) ...[
+              _ring(_ring1),
+              _ring(_ring2),
+            ],
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: widget.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: widget.color.withValues(alpha: 0.4), width: 2),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(widget.icon, color: widget.color, size: 32),
+                  const SizedBox(height: 4),
+                  Text(widget.label,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: widget.color,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
           ],
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/widgets/shimmer_skeleton.dart';
 import 'home_provider.dart';
 
 // ── Path geometry ─────────────────────────────────────────────────────────────
@@ -101,7 +102,7 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
               child: unitsAsync.hasError
                   ? Text('পাঠ লোড হচ্ছে না।',
                       style: TextStyle(color: theme.colorScheme.error))
-                  : const CircularProgressIndicator(),
+                  : const TrackDetailSkeleton(),
             ),
           ),
         ]),
@@ -1047,6 +1048,7 @@ class _LessonNode extends ConsumerWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
+                if (isCurrent) _PulsingGlow(glowColor: tierColors[0]),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeOutCubic,
@@ -1678,6 +1680,59 @@ class _TrophyNode extends StatelessWidget {
             color: isComplete
                 ? AppColors.brightGreen
                 : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Pulsing glow ring for the current lesson node ─────────────────────────────
+
+class _PulsingGlow extends StatefulWidget {
+  final Color glowColor;
+  const _PulsingGlow({required this.glowColor});
+
+  @override
+  State<_PulsingGlow> createState() => _PulsingGlowState();
+}
+
+class _PulsingGlowState extends State<_PulsingGlow>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (_, __) => Container(
+          width: _nodeSize,
+          height: _nodeSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: widget.glowColor.withValues(alpha: 0.5),
+                blurRadius: 14.0 + _ctrl.value * 14.0,
+                spreadRadius: 2.0 + _ctrl.value * 4.0,
+              ),
+            ],
           ),
         ),
       ),

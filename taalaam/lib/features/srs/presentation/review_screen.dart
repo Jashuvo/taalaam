@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/services/progression_service.dart';
 import '../../../shared/widgets/arabic_audio_button.dart';
+import '../../../shared/widgets/shimmer_skeleton.dart';
 import '../../auth/presentation/auth_provider.dart';
 import 'srs_provider.dart';
 
@@ -51,7 +52,7 @@ class _ReviewBody extends ConsumerWidget {
         ),
       ),
       body: sessionAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const ReviewSkeleton(),
         error: (e, _) => Center(child: Text('$e')),
         data: (_) {
           final card = notifier.currentCard;

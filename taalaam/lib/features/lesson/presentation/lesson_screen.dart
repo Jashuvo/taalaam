@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/services/gamification_service.dart';
 import '../../../shared/widgets/arabic_audio_button.dart';
+import '../../../shared/widgets/xp_toast.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../srs/data/srs_local_source.dart';
 import '../domain/exercise_model.dart';
@@ -145,6 +146,9 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
           !(prev?.showMilestone ?? false)) {
         if (next.lastCorrect == true) {
           HapticFeedback.lightImpact();
+          if (!next.showFeedback) {
+            XpToast.show(context, AppConstants.xpPerExercise);
+          }
         } else {
           HapticFeedback.mediumImpact();
         }
