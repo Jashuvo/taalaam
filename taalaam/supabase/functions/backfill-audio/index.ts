@@ -1,11 +1,16 @@
 // supabase/functions/backfill-audio/index.ts
 // Admin-only: generate TTS audio for all (or one lesson's) listen_select exercises.
 // Priority: Google Cloud TTS → Gemini 2.5 Flash TTS → Gemini 3.1 Flash TTS
-// Optional body: { lesson_id: "uuid" } to restrict to one lesson.
+// Uses Supabase REST API directly (no supabase-js npm dep) to avoid Deno hangs.
 
-import { createClient } from 'npm:@supabase/supabase-js';
+const ADMIN_EMAIL = 'jubayedsr@gmail.com';
 
-/** Decode JWT locally and return email — no Auth server call needed. */
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 function adminEmailFromToken(token: string): string | null {
   try {
     const parts = token.split('.');
@@ -19,12 +24,6 @@ function adminEmailFromToken(token: string): string | null {
     return null;
   }
 }
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
 
 function downsample24kTo16k(pcm24: Uint8Array): Uint8Array {
   const inSamples = pcm24.length / 2;
@@ -61,7 +60,7 @@ async function googleTts(
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/mpeg'; ext: 'mp3' } | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
   try {
     const res = await fetch(
       'https://texttospeech.googleapis.com/v1/text:synthesize',
@@ -96,10 +95,10 @@ async function geminiTts(
   text: string,
   apiKey: string,
 ): Promise<{ bytes: Uint8Array; contentType: 'audio/wav'; ext: 'wav' } | null> {
-  const models = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-tts'];
+  const models = ['gemini-2.5-flash-tts', 'gemini-3.1-flash-tts-preview'];
   for (const model of models) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -137,13 +136,22 @@ async function geminiTts(
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const geminiKey = Deno.env.get('GEMINI_API_KEY');
-  if (!geminiKey) {
-    return new Response(
-      JSON.stringify({ error: 'config_error', message: 'GEMINI_API_KEY not set' }),
-      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
-    );
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+  const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY');
+  const GOOGLE_KEY = Deno.env.get('GOOGLE_TTS_API_KEY') ?? '';
+
+  if (!GEMINI_KEY) {
+    return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not set' }),
+      { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   }
+
+  const authHeader = (extra?: Record<string, string>) => ({
+    'Authorization': `Bearer ${SERVICE_KEY}`,
+    'apikey': SERVICE_KEY,
+    'Content-Type': 'application/json',
+    ...extra,
+  });
 
   try {
     const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
@@ -152,78 +160,87 @@ Deno.serve(async (req: Request) => {
         { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
-    const email = adminEmailFromToken(token);
-    if (email !== 'jubayedsr@gmail.com') {
+    if (adminEmailFromToken(token) !== ADMIN_EMAIL) {
       return new Response(JSON.stringify({ error: 'Admin only' }),
         { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-      { auth: { persistSession: false } },
-    );
-
     const body = await req.json().catch(() => ({})) as { lesson_id?: string; batch?: number };
     const targetLessonId = body.lesson_id ?? null;
-    // Cap per-call to avoid Supabase 60s free-tier timeout.
     const batchSize = Math.min(body.batch ?? 5, 10);
 
-    let query = supabase
-      .from('exercises')
-      .select('id, lesson_id, correct_answer')
-      .eq('type', 'listen_select')
-      .is('audio_url', null)
-      .limit(batchSize);
-    if (targetLessonId) {
-      query = query.eq('lesson_id', targetLessonId) as typeof query;
-    }
+    // Fetch exercises via REST API
+    let exerciseUrl = `${SUPABASE_URL}/rest/v1/exercises?select=id,lesson_id,correct_answer&type=eq.listen_select&audio_url=is.null&order=id.asc&limit=${batchSize}`;
+    if (targetLessonId) exerciseUrl += `&lesson_id=eq.${encodeURIComponent(targetLessonId)}`;
 
-    const { data: exercises, error: fetchErr } = await query;
-    if (fetchErr) {
-      return new Response(JSON.stringify({ error: fetchErr.message }),
+    const exRes = await fetch(exerciseUrl, { headers: authHeader() });
+    if (!exRes.ok) {
+      return new Response(JSON.stringify({ error: 'DB query failed', detail: await exRes.text() }),
         { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
-
-    // Count total remaining BEFORE processing (for progress display)
-    let totalQuery = supabase
-      .from('exercises')
-      .select('id', { count: 'exact', head: true })
-      .eq('type', 'listen_select')
-      .is('audio_url', null);
-    if (targetLessonId) {
-      totalQuery = totalQuery.eq('lesson_id', targetLessonId) as typeof totalQuery;
-    }
-    const { count: totalRemaining } = await totalQuery;
-
-    const googleKey = Deno.env.get('GOOGLE_TTS_API_KEY') ?? '';
+    const exercises = await exRes.json() as Array<{ id: string; lesson_id: string; correct_answer: Record<string, unknown> }>;
 
     let done = 0, failed = 0;
     const succeededWords: string[] = [];
     const failedWords: string[] = [];
 
-    for (const ex of (exercises ?? [])) {
+    for (const ex of exercises) {
       const speakText = ex.correct_answer?.speak_text as string | undefined;
       if (!speakText) { failed++; failedWords.push('(no speak_text)'); continue; }
 
       try {
-        const audio = googleKey
-          ? (await googleTts(speakText, googleKey) ?? await geminiTts(speakText, geminiKey))
-          : await geminiTts(speakText, geminiKey);
+        const audio = GOOGLE_KEY
+          ? (await googleTts(speakText, GOOGLE_KEY) ?? await geminiTts(speakText, GEMINI_KEY))
+          : await geminiTts(speakText, GEMINI_KEY);
 
         if (!audio) { failed++; failedWords.push(speakText); continue; }
 
         const slug = speakText.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
         const path = `lessons/${ex.lesson_id}/${slug}_${ex.id.substring(0, 8)}.${audio.ext}`;
 
-        const blob = new Blob([audio.bytes], { type: audio.contentType });
-        const { error: upErr } = await supabase.storage
-          .from('audio')
-          .upload(path, blob, { upsert: true });
-        if (upErr) { failed++; failedWords.push(speakText); continue; }
+        // Upload to Supabase Storage via REST API
+        const uploadCtrl = new AbortController();
+        const uploadTimer = setTimeout(() => uploadCtrl.abort(), 15000);
+        let uploadOk = false;
+        try {
+          const upRes = await fetch(
+            `${SUPABASE_URL}/storage/v1/object/audio/${path}`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${SERVICE_KEY}`,
+                'Content-Type': audio.contentType,
+                'x-upsert': 'true',
+              },
+              body: audio.bytes,
+              signal: uploadCtrl.signal,
+            },
+          );
+          clearTimeout(uploadTimer);
+          if (!upRes.ok) {
+            console.error('Upload failed', upRes.status, await upRes.text().catch(() => ''));
+          } else {
+            uploadOk = true;
+          }
+        } catch (upErr) {
+          clearTimeout(uploadTimer);
+          console.error('Upload error:', upErr);
+        }
 
-        const { data: { publicUrl } } = supabase.storage.from('audio').getPublicUrl(path);
-        await supabase.from('exercises').update({ audio_url: publicUrl }).eq('id', ex.id);
+        if (!uploadOk) { failed++; failedWords.push(speakText); continue; }
+
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/audio/${path}`;
+
+        // Update exercise record
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/exercises?id=eq.${encodeURIComponent(ex.id)}`,
+          {
+            method: 'PATCH',
+            headers: authHeader({ 'Prefer': 'return=minimal' }),
+            body: JSON.stringify({ audio_url: publicUrl }),
+          },
+        ).catch(e => console.error('DB update error:', e));
+
         done++;
         succeededWords.push(speakText);
       } catch (e) {
@@ -233,9 +250,11 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const remaining = Math.max(0, (totalRemaining ?? 0) - done);
+    // remaining: if we got a full batch, there are likely more; otherwise done.
+    const remaining = exercises.length === batchSize ? Math.max(1, batchSize - done) : 0;
+
     return new Response(
-      JSON.stringify({ total: (exercises ?? []).length, done, failed, remaining, words: succeededWords, failedWords }),
+      JSON.stringify({ total: exercises.length, done, failed, remaining, words: succeededWords, failedWords }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     );
 
