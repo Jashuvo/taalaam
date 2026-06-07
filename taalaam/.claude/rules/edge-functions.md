@@ -27,8 +27,10 @@ paths:
 
 ## Storage
 - Bucket: 'audio' (public)
-- Path pattern: lessons/${lesson_id}/${slug}_${exercise_id.substring(0,8)}.${ext}
-- slug = speak_text.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40)
+- Path pattern: lessons/${lesson_id}/tts_${exercise_id.replace(/-/g,'')}.${ext}
+- ASCII-only paths — NEVER put Arabic chars in the fetch URL (storage rejects non-encoded unicode)
+- Upload body must be a Blob, not a raw Uint8Array, so Content-Type is derived from the Blob type
+- Headers: Authorization + apikey (both SERVICE_KEY), x-upsert: true — do NOT set Content-Type manually
 - upsert: true on all uploads
 
 ## CORS headers (required on every response including errors)

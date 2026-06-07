@@ -195,30 +195,29 @@ Deno.serve(async (req: Request) => {
 
         if (!audio) { failed++; failedWords.push(speakText); continue; }
 
-        const slug = speakText.replace(/[^؀-ۿa-zA-Z0-9]/g, '_').substring(0, 40);
-        const path = `lessons/${ex.lesson_id}/${slug}_${ex.id.substring(0, 8)}.${audio.ext}`;
+        // ASCII-only path: no Arabic chars in URL to avoid storage rejections
+        const path = `lessons/${ex.lesson_id}/tts_${ex.id.replace(/-/g, '')}.${audio.ext}`;
+        const uploadUrl = `${SUPABASE_URL}/storage/v1/object/audio/${path}`;
 
-        // Upload to Supabase Storage via REST API
+        // Upload to Supabase Storage via REST API (Blob body so Content-Type is set correctly)
         const uploadCtrl = new AbortController();
         const uploadTimer = setTimeout(() => uploadCtrl.abort(), 15000);
         let uploadOk = false;
         try {
-          const upRes = await fetch(
-            `${SUPABASE_URL}/storage/v1/object/audio/${path}`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${SERVICE_KEY}`,
-                'Content-Type': audio.contentType,
-                'x-upsert': 'true',
-              },
-              body: audio.bytes,
-              signal: uploadCtrl.signal,
+          const blob = new Blob([audio.bytes], { type: audio.contentType });
+          const upRes = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${SERVICE_KEY}`,
+              'apikey': SERVICE_KEY,
+              'x-upsert': 'true',
             },
-          );
+            body: blob,
+            signal: uploadCtrl.signal,
+          });
           clearTimeout(uploadTimer);
           if (!upRes.ok) {
-            console.error('Upload failed', upRes.status, await upRes.text().catch(() => ''));
+            console.error(`Upload failed ${upRes.status}:`, await upRes.text().catch(() => ''));
           } else {
             uploadOk = true;
           }
