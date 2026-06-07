@@ -471,32 +471,75 @@ class _BackfillAudioButton extends StatefulWidget {
 class _BackfillAudioButtonState extends State<_BackfillAudioButton> {
   bool _loading = false;
   String? _result;
-  int _totalDone = 0;
 
-  // Runs batches of 5 until no exercises remain.
+  // Queries exercises directly from Supabase, then calls generate-exercise-audio
+  // one at a time. Avoids long-running edge function loops (ERR_CONNECTION_CLOSED).
   Future<void> _run() async {
-    setState(() { _loading = true; _result = null; _totalDone = 0; });
+    setState(() { _loading = true; _result = null; });
     try {
-      while (true) {
-        final res = await Supabase.instance.client.functions
-            .invoke('backfill-audio', body: { 'batch': 5 });
-        final data = res.data as Map<String, dynamic>?;
-        final done      = data?['done']      as int? ?? 0;
-        final failed    = data?['failed']    as int? ?? 0;
-        final remaining = data?['remaining'] as int? ?? 0;
-        _totalDone += done;
+      final rows = await Supabase.instance.client
+          .from('exercises')
+          .select('id, lesson_id, correct_answer')
+          .eq('type', 'listen_select')
+          .isFilter('audio_url', null);
 
-        if (!mounted) return;
+      final exercises = (rows as List).cast<Map<String, dynamic>>();
+      final total = exercises.length;
+
+      if (total == 0) {
+        if (mounted) setState(() => _result = 'সব exercises-এ অডিও আছে ✓');
+        return;
+      }
+
+      if (mounted) setState(() => _result = '0 / $total প্রস্তুত হচ্ছে…');
+
+      int done = 0, failed = 0;
+
+      for (final ex in exercises) {
+        if (!mounted) break;
+
+        final ca = ex['correct_answer'] as Map<String, dynamic>?;
+        final speakText = ca?['speak_text'] as String?;
+        final lessonId  = ex['lesson_id']  as String?;
+        final exId      = ex['id']         as String?;
+
+        if (speakText == null || speakText.isEmpty || lessonId == null || exId == null) {
+          failed++;
+          continue;
+        }
+
+        try {
+          final res = await Supabase.instance.client.functions.invoke(
+            'generate-exercise-audio',
+            body: { 'exercise_id': exId, 'speak_text': speakText, 'lesson_id': lessonId },
+          );
+          final data = res.data as Map<String, dynamic>?;
+          final url = data?['audio_url'] as String?;
+          if (url != null && url.isNotEmpty) { done++; } else { failed++; }
+        } on FunctionException catch (_) {
+          failed++;
+        } catch (_) {
+          failed++;
+        }
+
+        if (mounted) {
+          setState(() {
+            final buf = StringBuffer('$done / $total তৈরি হয়েছে');
+            if (failed > 0) buf.write(' ($failed ব্যর্থ)');
+            _result = buf.toString();
+          });
+        }
+
+        if (done + failed < total) {
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+      }
+
+      if (mounted) {
         setState(() {
-          final buf = StringBuffer('✓ $_totalDone তৈরি হয়েছে');
-          if (remaining > 0) buf.write(' — $remaining বাকি…');
-          if (failed > 0) buf.write(' ($failed ব্যর্থ)');
-          _result = buf.toString();
+          final buf = StringBuffer('সম্পন্ন: $done / $total');
+          _result = failed == 0 ? '$buf ✓' : '$buf ($failed ব্যর্থ)';
         });
-
-        // Stop if nothing was processed this batch or nothing left.
-        if (remaining == 0 || done == 0) break;
-        await Future.delayed(const Duration(milliseconds: 500));
       }
     } catch (e) {
       if (mounted) setState(() => _result = 'ত্রুটি: $e');
@@ -560,19 +603,66 @@ class _LessonAudioButtonState extends State<_LessonAudioButton> {
     if (lessonId.isEmpty) return;
     setState(() { _loading = true; _result = null; });
     try {
-      final res = await Supabase.instance.client.functions
-          .invoke('backfill-audio', body: { 'lesson_id': lessonId });
-      final data = res.data as Map<String, dynamic>?;
-      final done   = data?['done']   as int? ?? 0;
-      final total  = data?['total']  as int? ?? 0;
-      final failed = data?['failed'] as int? ?? 0;
-      final words  = (data?['words'] as List?)?.cast<String>() ?? [];
+      final rows = await Supabase.instance.client
+          .from('exercises')
+          .select('id, lesson_id, correct_answer')
+          .eq('type', 'listen_select')
+          .eq('lesson_id', lessonId)
+          .isFilter('audio_url', null);
+
+      final exercises = (rows as List).cast<Map<String, dynamic>>();
+      final total = exercises.length;
+
+      if (total == 0) {
+        setState(() => _result = 'এই পাঠে কোনো listen_select exercise নেই / সব তৈরি আছে ✓');
+        return;
+      }
+
+      int done = 0, failed = 0;
+      final words = <String>[];
+
+      for (final ex in exercises) {
+        if (!mounted) break;
+        final ca        = ex['correct_answer'] as Map<String, dynamic>?;
+        final speakText = ca?['speak_text'] as String?;
+        final exId      = ex['id'] as String?;
+
+        if (speakText == null || speakText.isEmpty || exId == null) {
+          failed++;
+          continue;
+        }
+
+        try {
+          final res = await Supabase.instance.client.functions.invoke(
+            'generate-exercise-audio',
+            body: { 'exercise_id': exId, 'speak_text': speakText, 'lesson_id': lessonId },
+          );
+          final data = res.data as Map<String, dynamic>?;
+          final url = data?['audio_url'] as String?;
+          if (url != null && url.isNotEmpty) {
+            done++;
+            words.add(speakText);
+          } else {
+            failed++;
+          }
+        } on FunctionException catch (_) {
+          failed++;
+        } catch (_) {
+          failed++;
+        }
+
+        if (mounted) setState(() => _result = '$done / $total…');
+        if (done + failed < total) {
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+      }
+
       final buf = StringBuffer('✓ $done/$total অডিও তৈরি হয়েছে');
       if (failed > 0) buf.write(' ($failed ব্যর্থ)');
       if (words.isNotEmpty) buf.write('\n${words.join(' • ')}');
-      setState(() => _result = buf.toString());
+      if (mounted) setState(() => _result = buf.toString());
     } catch (e) {
-      setState(() => _result = 'ত্রুটি: $e');
+      if (mounted) setState(() => _result = 'ত্রুটি: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
