@@ -29,6 +29,7 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
   bool _sorting = false;
   bool _generatingExam = false;
   final _regenVocabLoading = <String>{};
+  final _generatingAudioLessons = <String>{};
 
   @override
   void initState() {
@@ -596,6 +597,41 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
     );
   }
 
+  Future<void> _generateLessonAudio(String lessonId) async {
+    final exercises = _exercisesMap[lessonId] ?? [];
+    final missing = exercises
+        .where((e) => e['type'] == 'listen_select' && e['audio_url'] == null)
+        .toList();
+    if (missing.isEmpty) return;
+    setState(() => _generatingAudioLessons.add(lessonId));
+    int done = 0, failed = 0;
+    for (final ex in missing) {
+      final exId = ex['id'] as String?;
+      final ca = ex['correct_answer'];
+      final speakText = (ca is Map ? ca['speak_text'] : null) as String?;
+      if (exId == null || speakText == null) { failed++; continue; }
+      try {
+        final res = await Supabase.instance.client.functions.invoke(
+          'generate-exercise-audio',
+          body: {'exercise_id': exId, 'speak_text': speakText, 'lesson_id': lessonId},
+        );
+        final url = (res.data as Map<String, dynamic>?)?['audio_url'] as String?;
+        if (url != null && url.isNotEmpty) { done++; } else { failed++; }
+      } catch (_) {
+        failed++;
+      }
+    }
+    await _load();
+    if (!mounted) return;
+    setState(() => _generatingAudioLessons.remove(lessonId));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(failed == 0
+          ? '$done টি অডিও তৈরি হয়েছে ✓'
+          : '$done ✓ · $failed ব্যর্থ'),
+      backgroundColor: failed == 0 ? Colors.green : Colors.orange,
+    ));
+  }
+
   Future<void> _deleteExercise(String exerciseId) async {
     final confirm = await showConfirmDialog(
       context,
@@ -749,7 +785,10 @@ class _AdminUnitReviewPageState extends State<AdminUnitReviewPage> {
                             onUploadVocabAudio: (id) => _uploadVocabAudio(id),
                             onRegenVocab: (id) => _regenVocab(id),
                             onMoveLesson: _moveLesson,
+                            onGenerateAudio: _generateLessonAudio,
                             regenVocabLoading: _regenVocabLoading
+                                .contains(e.value['id'] as String),
+                            generatingAudio: _generatingAudioLessons
                                 .contains(e.value['id'] as String),
                           )),
                       const SizedBox(height: 16),
@@ -1019,7 +1058,9 @@ class _LessonSection extends StatefulWidget {
   final Future<void> Function(String) onUploadVocabAudio;
   final Future<void> Function(String) onRegenVocab;
   final Future<void> Function(String lessonId, String lessonTitle) onMoveLesson;
+  final Future<void> Function(String lessonId)? onGenerateAudio;
   final bool regenVocabLoading;
+  final bool generatingAudio;
 
   const _LessonSection({
     required this.lesson,
@@ -1033,7 +1074,9 @@ class _LessonSection extends StatefulWidget {
     required this.onUploadVocabAudio,
     required this.onRegenVocab,
     required this.onMoveLesson,
+    this.onGenerateAudio,
     this.regenVocabLoading = false,
+    this.generatingAudio = false,
   });
 
   @override
@@ -1129,11 +1172,14 @@ class _LessonSectionState extends State<_LessonSection> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (widget.exercises.isNotEmpty) ...[
-                    Text('Exercises',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        )),
+                    _ExercisesHeader(
+                      exercises: widget.exercises,
+                      generatingAudio: widget.generatingAudio,
+                      onGenerateAudio: widget.onGenerateAudio == null
+                          ? null
+                          : () => widget.onGenerateAudio!(
+                              widget.lesson['id'] as String),
+                    ),
                     const SizedBox(height: 6),
                     ...widget.exercises.asMap().entries.map((e) => _ExerciseRow(
                           exercise: e.value,
@@ -1216,6 +1262,68 @@ class _LessonSectionState extends State<_LessonSection> {
   }
 }
 
+class _ExercisesHeader extends StatelessWidget {
+  final List<Map<String, dynamic>> exercises;
+  final bool generatingAudio;
+  final VoidCallback? onGenerateAudio;
+  const _ExercisesHeader({
+    required this.exercises,
+    required this.generatingAudio,
+    this.onGenerateAudio,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final listenTotal = exercises.where((e) => e['type'] == 'listen_select').length;
+    final listenMissing = exercises
+        .where((e) => e['type'] == 'listen_select' && e['audio_url'] == null)
+        .length;
+
+    return Row(
+      children: [
+        Text(
+          'Exercises',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const Spacer(),
+        if (listenTotal > 0)
+          generatingAudio
+              ? const SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : listenMissing > 0
+                  ? TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: Colors.orange.shade700,
+                      ),
+                      icon: const Icon(Icons.volume_off_rounded, size: 14),
+                      label: Text(
+                        '$listenMissing অডিও নেই',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onPressed: onGenerateAudio,
+                    )
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.volume_up_rounded,
+                          size: 14, color: Colors.green.shade600),
+                      const SizedBox(width: 4),
+                      Text(
+                        'অডিও ✓',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.green.shade600),
+                      ),
+                    ]),
+      ],
+    );
+  }
+}
+
 class _ExerciseRow extends StatelessWidget {
   final Map<String, dynamic> exercise;
   final int index;
@@ -1235,6 +1343,7 @@ class _ExerciseRow extends StatelessWidget {
     final theme = Theme.of(context);
     final type = exercise['type'] as String? ?? '';
     final promptBn = exercise['prompt_bn'] as String? ?? '';
+    final hasAudio = exercise['audio_url'] != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -1260,6 +1369,14 @@ class _ExerciseRow extends StatelessWidget {
               ),
             ),
           ),
+          if (type == 'listen_select') ...[
+            const SizedBox(width: 4),
+            Icon(
+              hasAudio ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+              size: 13,
+              color: hasAudio ? Colors.green.shade600 : Colors.orange.shade700,
+            ),
+          ],
           const SizedBox(width: 8),
           Expanded(
             child: Text(
