@@ -977,7 +977,7 @@ class _PathPainter extends CustomPainter {
 
 // ── Individual lesson node ────────────────────────────────────────────────────
 
-class _LessonNode extends StatelessWidget {
+class _LessonNode extends ConsumerWidget {
   final Lesson lesson;
   final bool isDone;
   final bool isCurrent;
@@ -991,8 +991,11 @@ class _LessonNode extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final accuracyMap =
+        ref.watch(lessonAccuracyMapProvider).valueOrNull ?? {};
+    final accuracy = isDone ? accuracyMap[lesson.id] : null;
     final isDark = theme.brightness == Brightness.dark;
 
     final Color bg;
@@ -1041,21 +1044,51 @@ class _LessonNode extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOutCubic,
-              width:  _nodeSize,
-              height: _nodeSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: bg,
-                border: Border.all(
-                  color: borderColor,
-                  width: isCurrent ? 3.0 : 1.8,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  width:  _nodeSize,
+                  height: _nodeSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: bg,
+                    border: Border.all(
+                      color: borderColor,
+                      width: isCurrent ? 3.0 : 1.8,
+                    ),
+                    boxShadow: shadows,
+                  ),
+                  child: Center(child: nodeIcon),
                 ),
-                boxShadow: shadows,
-              ),
-              child: Center(child: nodeIcon),
+                if (accuracy != null)
+                  Positioned(
+                    bottom: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: accuracy >= 80
+                            ? AppColors.brightGreen
+                            : theme.colorScheme.error,
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Colors.white, width: 1.2),
+                      ),
+                      child: Text(
+                        '$accuracy%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 5),
             SizedBox(

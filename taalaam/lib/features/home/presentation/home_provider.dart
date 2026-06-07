@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/services/gamification_service.dart';
 import '../../../shared/services/sync_service.dart';
 import '../../auth/presentation/auth_provider.dart';
 
@@ -210,6 +211,39 @@ class TrackProgress {
   const TrackProgress({required this.total, required this.completed});
   double get fraction => total == 0 ? 0 : completed / total;
 }
+
+/// Weekly XP earned in the current Mon–Sun window (SharedPreferences-backed).
+final weeklyXpProvider = FutureProvider<int>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return 0;
+  return GamificationService.getWeeklyXp(user.id);
+});
+
+/// Count of SRS cards the user has mastered (state >= 2).
+final masteredWordCountProvider = StreamProvider<int>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value(0);
+  final db = ref.watch(appDatabaseProvider);
+  return (db.select(db.srsCards).join([
+        drift.innerJoin(db.vocabulary,
+            db.vocabulary.id.equalsExp(db.srsCards.vocabularyId)),
+      ])
+        ..where(db.srsCards.userId.equals(user.id) &
+            db.srsCards.state.isBiggerOrEqualValue(2)))
+      .watch()
+      .map((rows) => rows.length);
+});
+
+/// Maps lessonId → accuracy percentage (0–100) from the user's progress rows.
+final lessonAccuracyMapProvider = StreamProvider<Map<String, int>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value({});
+  final db = ref.watch(appDatabaseProvider);
+  return (db.select(db.userProgress)
+        ..where((t) => t.userId.equals(user.id)))
+      .watch()
+      .map((rows) => {for (final r in rows) r.lessonId: r.accuracyPct});
+});
 
 final trackProgressProvider =
     FutureProvider.family<TrackProgress, String>((ref, trackId) async {

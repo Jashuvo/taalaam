@@ -78,6 +78,10 @@ class LessonCompleteScreen extends ConsumerStatefulWidget {
   final int totalCount;
   final int xpEarned;
   final int gemReward;
+  final int perfectBonus;
+  final int firstDayBonus;
+  final int totalXpAfter;
+  final String? weakHint;
 
   const LessonCompleteScreen({
     required this.lessonId,
@@ -86,6 +90,10 @@ class LessonCompleteScreen extends ConsumerStatefulWidget {
     required this.totalCount,
     required this.xpEarned,
     this.gemReward = 0,
+    this.perfectBonus = 0,
+    this.firstDayBonus = 0,
+    this.totalXpAfter = 0,
+    this.weakHint,
     super.key,
   });
 
@@ -209,6 +217,24 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                                 value: '+${widget.xpEarned} XP',
                                 color: AppColors.gold,
                               ),
+                              if (widget.perfectBonus > 0) ...[
+                                const Divider(height: 20),
+                                _StatRow(
+                                  icon: Icons.workspace_premium_rounded,
+                                  label: 'পারফেক্ট বোনাস',
+                                  value: '+${widget.perfectBonus} XP',
+                                  color: AppColors.gold,
+                                ),
+                              ],
+                              if (widget.firstDayBonus > 0) ...[
+                                const Divider(height: 20),
+                                _StatRow(
+                                  icon: Icons.wb_sunny_rounded,
+                                  label: 'প্রথম পাঠ বোনাস',
+                                  value: '+${widget.firstDayBonus} XP',
+                                  color: AppColors.brightGreen,
+                                ),
+                              ],
                               if (widget.gemReward > 0) ...[
                                 const Divider(height: 20),
                                 _StatRow(
@@ -235,9 +261,47 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                                     '${widget.correctCount} / ${widget.totalCount}',
                                 color: theme.colorScheme.primary,
                               ),
+                              if (widget.totalXpAfter > 0) ...[
+                                const Divider(height: 20),
+                                _StatRow(
+                                  icon: Icons.trending_up_rounded,
+                                  label: 'মোট XP',
+                                  value: '${widget.totalXpAfter} XP',
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ],
                             ],
                           ),
                         ),
+                        if (widget.weakHint != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.errorContainer
+                                  .withValues(alpha: 0.3),
+                              borderRadius: AppRadius.lgBorder,
+                              border: Border.all(
+                                  color: theme.colorScheme.error
+                                      .withValues(alpha: 0.25)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.lightbulb_outline_rounded,
+                                    color: theme.colorScheme.error, size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    widget.weakHint!,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onErrorContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 24),
                         // Du'aa
                         Container(

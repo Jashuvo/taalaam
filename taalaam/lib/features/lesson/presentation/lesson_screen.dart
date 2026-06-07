@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/services/gamification_service.dart';
 import '../../../shared/widgets/arabic_audio_button.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../srs/data/srs_local_source.dart';
@@ -116,6 +117,10 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
   late final AutoDisposeStateNotifierProvider<LessonSessionNotifier,
       LessonSessionState> _sessionProvider;
   List<Map<String, String>>? _lastWrongPairs;
+  int _perfectBonus = 0;
+  int _firstBonus = 0;
+  int _totalXpAfter = 0;
+  String? _weakHint;
 
   @override
   void initState() {
@@ -179,6 +184,41 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
 
         _updateStreak(db, user.id, xp, now);
 
+        // Compute gamification bonuses asynchronously so they're ready
+        // before the user interacts with the complete screen.
+        () async {
+          int perfectBonus = 0;
+          int firstBonus = 0;
+
+          if (pct == 100) {
+            perfectBonus = GamificationService.perfectBonusXp;
+          }
+          final isFirst =
+              await GamificationService.claimFirstLessonBonus(user.id);
+          if (isFirst) firstBonus = GamificationService.firstLessonBonusXp;
+
+          await GamificationService.addWeeklyXp(
+              user.id, xp + perfectBonus + firstBonus);
+
+          final streakRow = await (db.select(db.streaks)
+                ..where((t) => t.userId.equals(user.id)))
+              .getSingleOrNull();
+          final totalXpAfter =
+              (streakRow?.totalXp ?? 0) + xp + perfectBonus + firstBonus;
+
+          final String? weakHint =
+              pct < 70 ? 'নির্ভুলতা বাড়াতে এই পাঠটি আবার চেষ্টা করুন।' : null;
+
+          if (mounted) {
+            setState(() {
+              _perfectBonus = perfectBonus;
+              _firstBonus = firstBonus;
+              _totalXpAfter = totalXpAfter;
+              _weakHint = weakHint;
+            });
+          }
+        }();
+
         final srs = SrsLocalSource(db);
         if (vocab.isNotEmpty) {
           for (final v in vocab) {
@@ -203,6 +243,10 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         totalCount: session.exercises.length,
         xpEarned: xp,
         gemReward: widget.lesson.gemReward as int? ?? 0,
+        perfectBonus: _perfectBonus,
+        firstDayBonus: _firstBonus,
+        totalXpAfter: _totalXpAfter,
+        weakHint: _weakHint,
       );
     }
 

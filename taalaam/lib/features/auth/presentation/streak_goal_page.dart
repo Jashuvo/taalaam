@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/services/gamification_service.dart';
 import 'auth_provider.dart';
 
 class StreakGoalPage extends ConsumerStatefulWidget {
@@ -34,6 +35,7 @@ class _StreakGoalPageState extends ConsumerState<StreakGoalPage> {
         await (db.update(db.streaks)
               ..where((t) => t.userId.equals(user.id)))
             .write(StreaksCompanion(streakGoal: drift.Value(_selected)));
+        await GamificationService.resetGoalReward(user.id);
         Supabase.instance.client.from('streaks').upsert({
           'user_id': user.id,
           'streak_goal': _selected,

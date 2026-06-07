@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/services/gamification_service.dart';
+import '../../../shared/utils/xp_level.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../auth/presentation/onboarding_page.dart';
 import '../../../shared/widgets/progress_share_card.dart';
 import 'home_provider.dart';
+import 'widgets/streak_goal_completion_dialog.dart';
+import 'widgets/streak_goal_progress_widget.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -21,6 +25,21 @@ class HomePage extends ConsumerWidget {
       }
     });
     final user = ref.watch(currentUserProvider);
+    // Show streak goal completion dialog once when goal is reached.
+    ref.listen<AsyncValue<Streak?>>(streakProvider, (_, next) {
+      final streakData = next.valueOrNull;
+      final userId = user?.id;
+      if (streakData == null || userId == null) return;
+      final goal = streakData.streakGoal;
+      if (goal == null) return;
+      GamificationService.claimGoalRewardIfDue(
+              userId, streakData.currentStreak, goal)
+          .then((awarded) {
+        if (awarded && context.mounted) {
+          showStreakGoalCompletionDialog(context, goal);
+        }
+      });
+    });
     final tracks = ref.watch(tracksProvider);
     final streak = ref.watch(streakProvider);
     final dueCount = ref.watch(dueCountProvider);
@@ -102,6 +121,23 @@ class HomePage extends ConsumerWidget {
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                      child: _WeeklyXpCard(),
+                    ),
+                  ),
+                  if ((streak.valueOrNull?.streakGoal ?? 0) > 0)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                        child: StreakGoalProgressWidget(
+                          currentStreak:
+                              streak.valueOrNull?.currentStreak ?? 0,
+                          streakGoal: streak.valueOrNull!.streakGoal!,
+                        ),
+                      ),
+                    ),
+                  SliverToBoxAdapter(
+                    child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                       child: _QuickAccessRow(),
                     ),
@@ -170,10 +206,13 @@ class _StreakXpCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final streakData = streak.valueOrNull;
     final currentStreak = streakData?.currentStreak ?? 0;
+    final longestStreak = streakData?.longestStreak ?? 0;
     final totalXp = streakData?.totalXp ?? 0;
     final freezeCount = streakData?.freezeCount ?? 0;
     final isAnon = user?.isAnonymous == true;
     final userId = user?.id as String?;
+    final mastered = ref.watch(masteredWordCountProvider).valueOrNull ?? 0;
+    final level = XpLevel.forXp(totalXp);
 
     return Container(
       decoration: BoxDecoration(
@@ -218,20 +257,35 @@ class _StreakXpCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(width: 16),
-            // XP + freeze badges
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Badge(label: '✨ $totalXp XP', color: Colors.white24),
-                if (freezeCount > 0) ...[
-                  const SizedBox(height: 6),
+            // XP / level / streak / mastered badges
+            Expanded(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _Badge(label: '✨ $totalXp XP', color: Colors.white24),
                   _Badge(
+                    label: '${level.nameAr} Lv.${level.level}',
+                    color: AppColors.gold.withValues(alpha: 0.35),
+                  ),
+                  if (longestStreak > 0)
+                    _Badge(
+                      label: '🏆 $longestStreak সর্বোচ্চ',
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
+                  if (mastered > 0)
+                    _Badge(
+                      label: '📖 $mastered মুখস্থ',
+                      color: AppColors.brightGreen.withValues(alpha: 0.3),
+                    ),
+                  if (freezeCount > 0)
+                    _Badge(
                       label: '❄️ $freezeCount ফ্রিজ',
-                      color: Colors.lightBlue.withValues(alpha: 0.25)),
+                      color: Colors.lightBlue.withValues(alpha: 0.25),
+                    ),
                 ],
-              ],
+              ),
             ),
-            const Spacer(),
             if (isAnon)
               OutlinedButton(
                 onPressed: () => context.go('/login'),
@@ -291,6 +345,102 @@ class _Badge extends StatelessWidget {
       child: Text(label,
           style: const TextStyle(
               color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+// ── Weekly XP card ────────────────────────────────────────────────────────────
+
+class _WeeklyXpCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final weeklyXp = ref.watch(weeklyXpProvider).valueOrNull ?? 0;
+    const weeklyGoal = 200;
+    final pct = (weeklyXp / weeklyGoal).clamp(0.0, 1.0);
+    final dayLabels = ['সো', 'মং', 'বু', 'বৃ', 'শু', 'শ', 'র'];
+    final today = DateTime.now().weekday; // 1=Mon … 7=Sun
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: AppRadius.lgBorder,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'এই সপ্তাহ',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '$weeklyXp / $weeklyGoal XP',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.gold,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct,
+              minHeight: 6,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(7, (i) {
+              final dayNum = i + 1;
+              final isPast = dayNum < today;
+              final isToday = dayNum == today;
+              return Column(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isPast
+                          ? AppColors.brightGreen
+                          : isToday
+                              ? AppColors.gold
+                              : theme.colorScheme.surfaceContainerHighest,
+                    ),
+                    child: Icon(
+                      isPast ? Icons.check : isToday ? Icons.star : null,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    dayLabels[i],
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isToday ? FontWeight.bold : FontWeight.w400,
+                      color: isToday
+                          ? AppColors.gold
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 }
