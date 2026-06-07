@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
-import 'arabic_word_tooltip.dart' show ArabicSentenceWithTooltips;
+import 'arabic_word_tooltip.dart' show ArabicSentenceWithTooltips, ArabicWordTooltip;
 
 class ExerciseMultipleChoice extends StatefulWidget {
   final ExerciseModel exercise;
@@ -54,6 +54,7 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
             child: _PromptWithArabicWord(
               widget.exercise.promptBn!,
               baseStyle: theme.textTheme.titleMedium,
+              vocabMap: widget.vocabMap,
             ),
           ),
         // Only show promptAr if promptBn doesn't already embed the Arabic word via «»
@@ -163,7 +164,8 @@ class _OptionText extends StatelessWidget {
 class _PromptWithArabicWord extends StatelessWidget {
   final String text;
   final TextStyle? baseStyle;
-  const _PromptWithArabicWord(this.text, {this.baseStyle});
+  final Map<String, VocabularyModel> vocabMap;
+  const _PromptWithArabicWord(this.text, {this.baseStyle, this.vocabMap = const {}});
 
   @override
   Widget build(BuildContext context) {
@@ -181,6 +183,13 @@ class _PromptWithArabicWord extends StatelessWidget {
     }
     final before = text.substring(0, match.start).trim();
     final after = text.substring(match.end).trim();
+    const arabicStyle = TextStyle(
+      fontFamily: 'NotoNaskhArabic',
+      fontSize: 28,
+      height: 1.8,
+      fontWeight: FontWeight.bold,
+      color: AppColors.gold,
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -194,18 +203,10 @@ class _PromptWithArabicWord extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
           ),
-          child: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Text(
-              arabicWord,
-              style: const TextStyle(
-                fontFamily: 'NotoNaskhArabic',
-                fontSize: 28,
-                height: 1.8,
-                fontWeight: FontWeight.bold,
-                color: AppColors.gold,
-              ),
-            ),
+          child: ArabicWordTooltip(
+            word: arabicWord,
+            vocabMap: vocabMap,
+            style: arabicStyle,
           ),
         ),
         if (after.isNotEmpty) ...[

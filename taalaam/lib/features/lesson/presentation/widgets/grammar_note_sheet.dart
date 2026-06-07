@@ -124,7 +124,7 @@ class GrammarNoteSheet extends StatelessWidget {
             Directionality(
               textDirection: TextDirection.ltr,
               child: Text(
-                grammarNote!,
+                grammarNote!.replaceAll('«', '').replaceAll('»', ''),
                 style: theme.textTheme.bodyMedium?.copyWith(color: color),
               ),
             ),
@@ -161,15 +161,16 @@ class GrammarNoteSheet extends StatelessWidget {
         }
       case ExerciseType.listenSelect:
         final speakText = ca['speak_text']?.toString();
+        // Only show the Arabic speak_text tile; vocabMap provides its meaning below
+        if (speakText != null && speakText.isNotEmpty) return [speakText];
+        // Fallback: show the correct option if no speak_text
         final opts = ca['options'];
         final idx = ca['correct_index'] as int?;
-        final result = <String>[];
-        if (speakText != null && speakText.isNotEmpty) result.add(speakText);
         if (opts is List && idx != null && idx >= 0 && idx < opts.length) {
           final w = opts[idx]?.toString();
-          if (w != null && w.isNotEmpty && w != speakText) result.add(w);
+          if (w != null && w.isNotEmpty) return [w];
         }
-        return result;
+        return [];
       default:
         break;
     }
