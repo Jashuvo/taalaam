@@ -53,28 +53,25 @@ class GrammarNoteSheet extends StatelessWidget {
               ),
             ],
           ),
-          if (!correct && correctWords.isNotEmpty) ...[
+          if (correctWords.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
-              'সঠিক উত্তর:',
+              correct ? 'শব্দের অর্থ:' : 'সঠিক উত্তর:',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: color, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            Directionality(
-              textDirection: TextDirection.rtl,
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: correctWords.map((word) {
-                  final entry = vocabMap[word];
-                  return _CorrectWordTile(
-                    word: word,
-                    meaningBn: entry?.meaningBn,
-                    color: color,
-                  );
-                }).toList(),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: correctWords.map((word) {
+                final entry = vocabMap[word];
+                return _CorrectWordTile(
+                  word: word,
+                  meaningBn: entry?.meaningBn,
+                  color: color,
+                );
+              }).toList(),
             ),
           ],
           if (!correct && correctPairs.isNotEmpty) ...[
@@ -144,7 +141,7 @@ class GrammarNoteSheet extends StatelessWidget {
   }
 
   List<String> _resolveCorrectWords() {
-    if (correct || exercise == null) return [];
+    if (exercise == null) return [];
     final ca = exercise!.correctAnswer;
     switch (exercise!.type) {
       case ExerciseType.tapToBuild:

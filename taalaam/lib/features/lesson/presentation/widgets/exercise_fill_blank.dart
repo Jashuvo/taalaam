@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+import 'prompt_bn_widget.dart';
 
 class ExerciseFillBlank extends StatefulWidget {
   final ExerciseModel exercise;
@@ -89,9 +90,7 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
         if (widget.exercise.promptBn != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: Text(widget.exercise.promptBn!,
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center),
+            child: PromptBn(widget.exercise.promptBn!, style: theme.textTheme.titleMedium),
           ),
         // Sentence with blank
         Padding(

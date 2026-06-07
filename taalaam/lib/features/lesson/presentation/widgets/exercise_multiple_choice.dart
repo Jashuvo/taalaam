@@ -56,7 +56,9 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
               baseStyle: theme.textTheme.titleMedium,
             ),
           ),
-        if (widget.exercise.promptAr != null)
+        // Only show promptAr if promptBn doesn't already embed the Arabic word via «»
+        if (widget.exercise.promptAr != null &&
+            !RegExp(r'«[^»]+»').hasMatch(widget.exercise.promptBn ?? ''))
           Padding(
             padding: const EdgeInsets.only(bottom: 24),
             child: Center(
@@ -111,14 +113,9 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         vertical: 16, horizontal: 20),
-                    child: Text(
+                    child: _OptionText(
                       _options[i],
-                      style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 20,
-                          height: 1.8,
-                          color: textColor ?? theme.colorScheme.onSurface),
-                      textDirection: TextDirection.rtl,
+                      color: textColor ?? theme.colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -138,6 +135,31 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
 
 /// Renders Bengali prompt text that may contain «Arabic word» markers.
 /// The Arabic portion is extracted and displayed as a prominent styled block.
+/// Renders a single option tile text, auto-detecting Arabic vs Bengali script.
+class _OptionText extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _OptionText(this.text, {required this.color});
+
+  static final _arabicRe = RegExp(r'[؀-ۿ]');
+
+  @override
+  Widget build(BuildContext context) {
+    final isAr = _arabicRe.hasMatch(text);
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+      style: TextStyle(
+        fontFamily: isAr ? 'NotoNaskhArabic' : null,
+        fontSize: isAr ? 20 : 17,
+        height: 1.8,
+        color: color,
+      ),
+    );
+  }
+}
+
 class _PromptWithArabicWord extends StatelessWidget {
   final String text;
   final TextStyle? baseStyle;
@@ -151,8 +173,13 @@ class _PromptWithArabicWord extends StatelessWidget {
     if (match == null) {
       return Text(text, style: style, textAlign: TextAlign.center);
     }
-    final before = text.substring(0, match.start).trim();
     final arabicWord = match.group(1)!.trim();
+    // Only render gold block when the content is actually Arabic
+    if (!RegExp(r'[؀-ۿ]').hasMatch(arabicWord)) {
+      final stripped = text.replaceAll('«', '').replaceAll('»', '').trim();
+      return Text(stripped, style: style, textAlign: TextAlign.center);
+    }
+    final before = text.substring(0, match.start).trim();
     final after = text.substring(match.end).trim();
     return Column(
       mainAxisSize: MainAxisSize.min,

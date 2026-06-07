@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
 import 'arabic_word_tooltip.dart';
+import 'prompt_bn_widget.dart';
 
 class ExerciseTapToBuild extends StatefulWidget {
   final ExerciseModel exercise;
@@ -53,9 +54,7 @@ class _ExerciseTapToBuildState extends State<ExerciseTapToBuild> {
         if (widget.exercise.promptBn != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: Text(widget.exercise.promptBn!,
-                style: theme.textTheme.titleMedium,
-                textAlign: TextAlign.center),
+            child: PromptBn(widget.exercise.promptBn!, style: theme.textTheme.titleMedium),
           ),
         // Answer area
         Container(
