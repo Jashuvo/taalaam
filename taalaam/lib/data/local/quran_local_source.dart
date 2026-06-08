@@ -10,7 +10,7 @@ int _toInt(dynamic v) => (v as num).toInt();
 // pipeline (Uthmani filter, basmala strip, ayah-marker filter, etc.).
 // On version mismatch, the local Drift cache is wiped and re-fetched so
 // users always get the corrected data without needing to clear browser storage.
-const _kQuranDataVersion = 2;
+const _kQuranDataVersion = 3;
 bool _dataVersionChecked = false;
 
 class QuranLocalSource {
@@ -24,10 +24,14 @@ class QuranLocalSource {
       final prefs = await SharedPreferences.getInstance();
       final stored = prefs.getInt('quran_data_version') ?? 0;
       if (stored < _kQuranDataVersion) {
-        await (_db.delete(_db.quranWords)).go();
+        // Use raw SQL for a guaranteed full-table wipe on all platforms
+        await _db.customStatement('DELETE FROM quran_words');
+        await _db.customStatement('DELETE FROM quran_surahs');
         await prefs.setInt('quran_data_version', _kQuranDataVersion);
       }
-    } catch (_) {}
+    } catch (_) {
+      _dataVersionChecked = false; // retry next call if something failed
+    }
   }
 
   Future<List<QuranSurah>> getAllSurahs() async {

@@ -34,7 +34,7 @@ dependencies:
   flutter_cache_manager: ^3.4.1
 
   # Audio recording (speak_arabic exercises)
-  record: ^5.0.0
+  record: ^6.0.0
 
   # UI helpers
   gap: ^3.0.1
