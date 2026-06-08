@@ -205,7 +205,7 @@ ${wordList}`;
     }
 
     // 9. Insert vocabulary
-    const vocabRows = enrichedWords.map((w, i) => {
+    const vocabRows = enrichedWords.map((w) => {
       const key = `${surahNumber}:${w.ayah}`;
       return {
         lesson_id: lessonId,
@@ -215,14 +215,13 @@ ${wordList}`;
         transliteration: w.transliteration,
         grammar_note_bn: w.grammar_note_bn,
         word_type: 'noun',
-        sort_order: i + 1,
         context_snippet_ar: ayahTexts.get(key) ?? null,
         context_snippet_bn: tafsirSnippets.get(key) ?? null,
       };
     });
     if (vocabRows.length > 0) {
       const { error: vErr } = await supabase.from('vocabulary').insert(vocabRows);
-      if (vErr) console.warn('Vocabulary insert error:', vErr.message);
+      if (vErr) throw new Error(`Vocabulary insert failed: ${vErr.message}`);
     }
 
     // 10. Gemini: generate 8 exercises

@@ -197,7 +197,7 @@ async function insertContent(
   ayahTexts: Map<string, string>,
   tafsirSnippets: Map<string, string>,
 ): Promise<{ vocab: number; exercises: number }> {
-  const vocabRows = words.map((w, i) => {
+  const vocabRows = words.map((w) => {
     const key = `${w.surah}:${w.ayah}`;
     const e = enrichMap.get(w.arabic);
     return {
@@ -208,7 +208,6 @@ async function insertContent(
       transliteration: e?.transliteration ?? null,
       grammar_note_bn: e?.grammar_note_bn ?? null,
       word_type: 'noun',
-      sort_order: i + 1,
       context_snippet_ar: ayahTexts.get(key) ?? null,
       context_snippet_bn: tafsirSnippets.get(key) ?? null,
     };
