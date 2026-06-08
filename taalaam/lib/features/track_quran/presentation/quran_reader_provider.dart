@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/local/database.dart';
 import '../../../data/local/quran_local_source.dart';
+
+const _kLastSurah = 'quran_last_surah';
+const _kLastAyah = 'quran_last_ayah';
 
 class QuranNavState {
   final int surah;
@@ -32,22 +35,41 @@ class QuranNavState {
 class QuranNavNotifier extends StateNotifier<QuranNavState> {
   QuranNavNotifier() : super(const QuranNavState());
 
-  void goToSurah(int s) => state = QuranNavState(surah: s, ayah: 1);
-  void goToAyah(int a) => state = state.copyWith(ayah: a, clearWord: true);
+  void restore(int surah, int ayah) {
+    state = QuranNavState(surah: surah, ayah: ayah);
+  }
+
+  void goToSurah(int s) {
+    state = QuranNavState(surah: s, ayah: 1);
+    _persist(s, 1);
+  }
+
   void selectWord(int p) => state = state.copyWith(selectedWord: p);
   void clearWord() => state = state.copyWith(clearWord: true);
   void toggleTafsir() =>
       state = state.copyWith(showTafsir: !state.showTafsir);
+
   void previousAyah() {
     if (state.ayah > 1) {
-      state = state.copyWith(ayah: state.ayah - 1, clearWord: true);
+      final next = state.copyWith(ayah: state.ayah - 1, clearWord: true);
+      state = next;
+      _persist(next.surah, next.ayah);
     }
   }
 
   void nextAyah(int ayahCount) {
     if (state.ayah < ayahCount) {
-      state = state.copyWith(ayah: state.ayah + 1, clearWord: true);
+      final next = state.copyWith(ayah: state.ayah + 1, clearWord: true);
+      state = next;
+      _persist(next.surah, next.ayah);
     }
+  }
+
+  void _persist(int surah, int ayah) {
+    SharedPreferences.getInstance().then((p) {
+      p.setInt(_kLastSurah, surah);
+      p.setInt(_kLastAyah, ayah);
+    });
   }
 }
 
@@ -67,17 +89,3 @@ final quranTafsirProvider =
     FutureProvider.family<QuranTafsirData?, ({int surah, int ayah})>(
         (ref, a) =>
             ref.watch(quranLocalSourceProvider).getTafsir(a.surah, a.ayah));
-
-final quranAudioPlayerProvider = Provider<AudioPlayer>((ref) {
-  final p = AudioPlayer();
-  ref.onDispose(p.dispose);
-  return p;
-});
-
-final quranIsPlayingProvider = StateProvider<bool>((_) => false);
-
-String afasyAudioUrl(int surah, int ayah) {
-  final s = surah.toString().padLeft(3, '0');
-  final a = ayah.toString().padLeft(3, '0');
-  return 'https://cdn.islamic.network/quran/audio/128/ar.alafasy/$s$a.mp3';
-}
