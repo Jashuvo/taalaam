@@ -662,28 +662,9 @@ class _AudioBar extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const Directionality(
-            textDirection: TextDirection.rtl,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'مشاري راشد العفاسي',
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    fontSize: 14,
-                    height: 1.6,
-                    color: AppColors.gold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
           Text(
-            'মিশারী আল-আফাসী',
-            style: theme.textTheme.bodySmall?.copyWith(
+            'তিলাওয়াত',
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
