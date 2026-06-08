@@ -30,17 +30,20 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
 async function geminiGenerate(apiKey: string, prompt: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
   let lastErr: unknown;
   for (const modelName of GEMINI_MODELS) {
-    try {
-      const m = genAI.getGenerativeModel({ model: modelName });
-      const result = await m.generateContent(prompt);
-      return result.response.text();
-    } catch (err) { lastErr = err; }
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 4000));
+      try {
+        const m = genAI.getGenerativeModel({ model: modelName });
+        const result = await m.generateContent(prompt);
+        return result.response.text();
+      } catch (err) { lastErr = err; }
+    }
   }
   throw new Error(`All Gemini models failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
 }
@@ -235,7 +238,8 @@ ${wordList}`;
       if (vErr) throw new Error(`Vocabulary insert failed: ${vErr.message}`);
     }
 
-    // 10. Gemini: generate exercises with full schema prompt
+    // 10. Gemini: generate exercises — brief pause so enrichment quota clears
+    await new Promise(r => setTimeout(r, 6000));
     let exerciseCount = 0;
     let exerciseError: string | null = null;
     const exWords = enrichedWords.slice(0, 15);
