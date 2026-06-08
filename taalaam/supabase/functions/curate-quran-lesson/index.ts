@@ -351,6 +351,9 @@ Deno.serve(async (req: Request) => {
       if (words.length < 4) return new Response(JSON.stringify({ error: 'Too few Names found in this passage — check quran_words table' }), {
         status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
+      // Pause before enrichment — fetchAttributeWords already called Gemini,
+      // so two back-to-back calls without a gap reliably hits rate limits.
+      await new Promise(r => setTimeout(r, 4000));
 
     } else if (unitType === 'verbs') {
       verbRoots = await fetchVerbRoots(sb, lessonIndex);

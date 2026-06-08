@@ -342,6 +342,17 @@ class _SalahUnitControlsState extends State<_SalahUnitControls> {
     (number: 103, nameBn: 'আল-আসর'),
   ];
   int? _busy;
+  Set<int> _existingOrders = {};
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final unit = await Supabase.instance.client.from('units').select('id').eq('slug', 'salah-vocabulary').maybeSingle();
+    if (unit == null || !mounted) return;
+    final rows = await Supabase.instance.client.from('lessons').select('sort_order').eq('unit_id', unit['id'] as String) as List;
+    if (mounted) setState(() => _existingOrders = rows.map((r) => r['sort_order'] as int).toSet());
+  }
 
   Future<void> _curate(int surahNumber, String nameBn) async {
     setState(() => _busy = surahNumber);
@@ -350,6 +361,7 @@ class _SalahUnitControlsState extends State<_SalahUnitControls> {
       body: {'unit_type': 'salah', 'surah_number': surahNumber},
       successMsg: 'সূরা $nameBn পাঠ তৈরি হয়েছে ✓',
     );
+    await _loadExisting();
     if (mounted) setState(() => _busy = null);
   }
 
@@ -357,17 +369,30 @@ class _SalahUnitControlsState extends State<_SalahUnitControls> {
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 8, runSpacing: 8,
-      children: _salahs.map((s) => FilledButton.tonal(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 36),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        onPressed: _busy != null ? null : () => _curate(s.number, s.nameBn),
-        child: _busy == s.number
-            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-            : Text(s.nameBn, style: const TextStyle(fontSize: 13)),
-      )).toList(),
+      children: _salahs.map((s) {
+        final exists = _existingOrders.contains(s.number);
+        if (exists) {
+          return Chip(
+            avatar: const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
+            label: Text(s.nameBn, style: const TextStyle(fontSize: 12)),
+            backgroundColor: Colors.green.withValues(alpha: 0.08),
+            side: const BorderSide(color: Colors.green, width: 0.5),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+          );
+        }
+        return FilledButton.tonal(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: _busy != null ? null : () => _curate(s.number, s.nameBn),
+          child: _busy == s.number
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(s.nameBn, style: const TextStyle(fontSize: 13)),
+        );
+      }).toList(),
     );
   }
 }
@@ -381,6 +406,17 @@ class _FrequentWordsControls extends StatefulWidget {
 
 class _FrequentWordsControlsState extends State<_FrequentWordsControls> {
   int? _busyIndex;
+  Set<int> _existingOrders = {};
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final unit = await Supabase.instance.client.from('units').select('id').eq('slug', 'frequent-words').maybeSingle();
+    if (unit == null || !mounted) return;
+    final rows = await Supabase.instance.client.from('lessons').select('sort_order').eq('unit_id', unit['id'] as String) as List;
+    if (mounted) setState(() => _existingOrders = rows.map((r) => r['sort_order'] as int).toSet());
+  }
 
   Future<void> _curate(int lessonIndex) async {
     setState(() => _busyIndex = lessonIndex);
@@ -391,6 +427,7 @@ class _FrequentWordsControlsState extends State<_FrequentWordsControls> {
       body: {'unit_type': 'frequent', 'lesson_index': lessonIndex},
       successMsg: 'পাঠ ${lessonIndex + 1} ($start–$end) তৈরি হয়েছে ✓',
     );
+    await _loadExisting();
     if (mounted) setState(() => _busyIndex = null);
   }
 
@@ -399,7 +436,18 @@ class _FrequentWordsControlsState extends State<_FrequentWordsControls> {
     return Wrap(
       spacing: 8, runSpacing: 8,
       children: List.generate(5, (i) {
-        final label = 'পাঠ ${i + 1} (${i * 20 + 1}–${i * 20 + 20})';
+        final exists = _existingOrders.contains(i + 1);
+        final label  = 'পাঠ ${i + 1} (${i * 20 + 1}–${i * 20 + 20})';
+        if (exists) {
+          return Chip(
+            avatar: const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
+            label: Text(label, style: const TextStyle(fontSize: 11)),
+            backgroundColor: Colors.green.withValues(alpha: 0.08),
+            side: const BorderSide(color: Colors.green, width: 0.5),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+          );
+        }
         return FilledButton.tonal(
           style: FilledButton.styleFrom(
             minimumSize: const Size(0, 36),
@@ -643,6 +691,17 @@ class _VerbsControls extends StatefulWidget {
 
 class _VerbsControlsState extends State<_VerbsControls> {
   int? _busyIndex;
+  Set<int> _existingOrders = {};
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final unit = await Supabase.instance.client.from('units').select('id').eq('slug', 'quranic-verbs').maybeSingle();
+    if (unit == null || !mounted) return;
+    final rows = await Supabase.instance.client.from('lessons').select('sort_order').eq('unit_id', unit['id'] as String) as List;
+    if (mounted) setState(() => _existingOrders = rows.map((r) => r['sort_order'] as int).toSet());
+  }
 
   Future<void> _curate(int lessonIndex) async {
     setState(() => _busyIndex = lessonIndex);
@@ -651,6 +710,7 @@ class _VerbsControlsState extends State<_VerbsControls> {
       body: {'unit_type': 'verbs', 'lesson_index': lessonIndex},
       successMsg: 'ক্রিয়া পাঠ ${lessonIndex + 1} তৈরি হয়েছে ✓',
     );
+    await _loadExisting();
     if (mounted) setState(() => _busyIndex = null);
   }
 
@@ -674,17 +734,30 @@ class _VerbsControlsState extends State<_VerbsControls> {
         ),
         Wrap(
           spacing: 8, runSpacing: 8,
-          children: List.generate(5, (i) => FilledButton.tonal(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            onPressed: _busyIndex != null ? null : () => _curate(i),
-            child: _busyIndex == i
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text('ক্রিয়া পাঠ ${i + 1}', style: const TextStyle(fontSize: 12)),
-          )),
+          children: List.generate(5, (i) {
+            final exists = _existingOrders.contains(i + 1);
+            if (exists) {
+              return Chip(
+                avatar: const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
+                label: Text('ক্রিয়া পাঠ ${i + 1}', style: const TextStyle(fontSize: 11)),
+                backgroundColor: Colors.green.withValues(alpha: 0.08),
+                side: const BorderSide(color: Colors.green, width: 0.5),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+              );
+            }
+            return FilledButton.tonal(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: _busyIndex != null ? null : () => _curate(i),
+              child: _busyIndex == i
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text('ক্রিয়া পাঠ ${i + 1}', style: const TextStyle(fontSize: 12)),
+            );
+          }),
         ),
       ],
     );

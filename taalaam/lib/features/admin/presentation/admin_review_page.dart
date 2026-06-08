@@ -720,10 +720,11 @@ class _UnitCardState extends State<_UnitCard> {
               children: [
                 _TrackChip(slug: trackSlug),
                 const SizedBox(width: 4),
-                _TierChip(
-                  tier: _currentTier,
-                  onTap: _busy ? null : _showTierPicker,
-                ),
+                if (trackSlug != 'quranic')
+                  _TierChip(
+                    tier: _currentTier,
+                    onTap: _busy ? null : _showTierPicker,
+                  ),
                 const SizedBox(width: 4),
                 _SeqChip(order: widget.unit['sequence_order'] as int? ?? 0),
                 const Spacer(),
