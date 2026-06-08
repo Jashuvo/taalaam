@@ -488,14 +488,14 @@ class _WordView extends ConsumerWidget {
         words.where((w) => w.position == nav.selectedWord).firstOrNull;
     final fullAyah = words.map((w) => w.arabic).join(' ');
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Full ayah header ───────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Full ayah header ─────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: AppColors.gradientQuranic,
@@ -504,7 +504,8 @@ class _WordView extends ConsumerWidget {
               ),
               borderRadius: AppRadius.lgBorder,
             ),
-            child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Directionality(
                   textDirection: TextDirection.rtl,
@@ -519,123 +520,127 @@ class _WordView extends ConsumerWidget {
                     textAlign: TextAlign.justify,
                   ),
                 ),
-                // Ayah number badge bottom-right
-                Positioned(
-                  bottom: 0,
-                  left: 0,
+                Align(
+                  alignment: Alignment.centerLeft,
                   child: Container(
+                    margin: const EdgeInsets.only(top: 6),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       'আয়াত ${nav.ayah}',
                       style: const TextStyle(
-                        fontSize: 11,
-                        color: Colors.white70,
-                      ),
+                          fontSize: 11, color: Colors.white70),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+        ),
 
-          // ── Instruction ────────────────────────────────────────────
-          Text(
-            'শব্দে ট্যাপ করে অর্থ দেখুন',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
+        // ── Scrollable chips + detail ────────────────────────────────
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Instruction
+                Text(
+                  'শব্দে ট্যাপ করে অর্থ দেখুন',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
 
-          // ── Word chips ─────────────────────────────────────────────
-          Directionality(
-            textDirection: TextDirection.rtl,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 10,
-              alignment: WrapAlignment.center,
-              children: words.map((word) {
-                final isSelected = word.position == nav.selectedWord;
-                return GestureDetector(
-                  onTap: () {
-                    if (isSelected) {
-                      ref.read(quranNavProvider.notifier).clearWord();
-                    } else {
-                      ref
-                          .read(quranNavProvider.notifier)
-                          .selectWord(word.position);
-                    }
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.gold.withValues(alpha: 0.12)
-                          : theme.colorScheme.surfaceContainer,
-                      border: Border.all(
-                        color: isSelected
-                            ? AppColors.gold
-                            : theme.colorScheme.outlineVariant,
-                        width: isSelected ? 1.5 : 0.8,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          word.arabic,
-                          style: TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 22,
-                            height: 1.7,
+                // Word chips
+                Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: words.map((word) {
+                      final isSelected = word.position == nav.selectedWord;
+                      return GestureDetector(
+                        onTap: () {
+                          if (isSelected) {
+                            ref.read(quranNavProvider.notifier).clearWord();
+                          } else {
+                            ref
+                                .read(quranNavProvider.notifier)
+                                .selectWord(word.position);
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
                             color: isSelected
-                                ? AppColors.gold
-                                : theme.colorScheme.onSurface,
+                                ? AppColors.gold.withValues(alpha: 0.12)
+                                : theme.colorScheme.surfaceContainer,
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.gold
+                                  : theme.colorScheme.outlineVariant,
+                              width: isSelected ? 1.5 : 0.8,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                word.arabic,
+                                style: TextStyle(
+                                  fontFamily: 'NotoNaskhArabic',
+                                  fontSize: 24,
+                                  height: 1.7,
+                                  color: isSelected
+                                      ? AppColors.gold
+                                      : theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                word.meaningBn ?? '—',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  height: 1.3,
+                                  color: isSelected
+                                      ? AppColors.gold.withValues(alpha: 0.85)
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                textDirection: TextDirection.ltr,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ),
-                        if (word.meaningBn != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            word.meaningBn!,
-                            style: TextStyle(
-                              fontSize: 10,
-                              height: 1.3,
-                              color: isSelected
-                                  ? AppColors.gold.withValues(alpha: 0.85)
-                                  : theme.colorScheme.onSurfaceVariant,
-                            ),
-                            textDirection: TextDirection.ltr,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
-                    ),
+                      );
+                    }).toList(),
                   ),
-                );
-              }).toList(),
+                ),
+
+                // Selected word detail
+                if (selectedWord != null) ...[
+                  const SizedBox(height: 20),
+                  _WordDetailCard(word: selectedWord),
+                ],
+              ],
             ),
           ),
-
-          // ── Selected word detail ───────────────────────────────────
-          if (selectedWord != null) ...[
-            const SizedBox(height: 20),
-            _WordDetailCard(word: selectedWord),
-          ],
-          const SizedBox(height: 8),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -649,47 +654,61 @@ class _WordDetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasMeaning = word.meaningBn != null;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(
+          horizontal: 20, vertical: hasMeaning ? 20 : 14),
       decoration: BoxDecoration(
         color: AppColors.gold.withValues(alpha: 0.08),
         borderRadius: AppRadius.lgBorder,
         border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
       ),
-      child: Column(
+      child: Row(
         children: [
+          // Arabic word (large)
           Directionality(
             textDirection: TextDirection.rtl,
             child: Text(
               word.arabic,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 42,
+                fontSize: hasMeaning ? 46 : 32,
                 color: AppColors.gold,
                 height: 1.8,
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          if (word.meaningBn != null)
-            Text(
-              word.meaningBn!,
-              style: theme.textTheme.titleMedium?.copyWith(height: 1.5),
-              textAlign: TextAlign.center,
-            )
-          else
-            Text(
-              'শব্দের অর্থ পাওয়া যায়নি',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          const SizedBox(height: 6),
-          Text(
-            'শব্দ ${word.position}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(width: 16),
+          // Meaning + position
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasMeaning)
+                  Text(
+                    word.meaningBn!,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      height: 1.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  )
+                else
+                  Text(
+                    'অর্থ পাওয়া যায়নি',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Text(
+                  'শব্দ ${word.position}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
