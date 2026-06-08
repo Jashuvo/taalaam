@@ -224,40 +224,83 @@ ${wordList}`;
       if (vErr) throw new Error(`Vocabulary insert failed: ${vErr.message}`);
     }
 
-    // 10. Gemini: generate 8 exercises
+    // 10. Gemini: generate exercises with full schema prompt
     let exerciseCount = 0;
-    try {
-      const wordPairs = enrichedWords.slice(0, 20).map(w => `${w.arabic}=${w.meaning_bn}`).join(', ');
-      const exPrompt = `You are making Quranic Arabic exercises for Bengali-speaking Muslims learning সূরা ${surahRow.name_bn} (Surah ${surahNumber}).
+    const exWords = enrichedWords.slice(0, 15);
+    if (exWords.length >= 2) {
+      try {
+        const wordList = exWords.map((w, i) =>
+          `${i + 1}. ${w.arabic} (${w.transliteration ?? '?'}) = ${w.meaning_bn}`
+        ).join('\n');
 
-Available words (arabic=Bengali meaning): ${wordPairs}
+        const exSystemPrompt = `You are a Quranic Arabic curriculum designer for Bengali-speaking Muslims.
+Create gamified micro-exercises teaching words from সূরা ${surahRow.name_bn}.
 
-Generate exactly 8 exercises as a JSON array. Include these types:
-- 3 multipleChoice: {"type":"multipleChoice","sort_order":N,"prompt_bn":"«WORD» শব্দের অর্থ কী?","prompt_ar":"WORD","correct_answer":{"options":["correct","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":1}
-- 2 dragDrop: {"type":"dragDrop","sort_order":N,"prompt_bn":"আরবি শব্দের সাথে বাংলা অর্থ মেলাও:","correct_answer":{"pairs":[{"ar":"word","bn":"meaning"},{"ar":"word2","bn":"meaning2"}]},"grammar_note_bn":"...","difficulty":2}
-- 1 tapToBuild: {"type":"tapToBuild","sort_order":N,"prompt_bn":"এই আয়াতের শব্দগুলো সাজাও:","correct_answer":{"words":["word1","word2","word3"],"order_matters":true,"distractor_words":["wrong1","wrong2"]},"grammar_note_bn":"...","difficulty":4}
-- 1 fillInBlank: {"type":"fillInBlank","sort_order":N,"prompt_bn":"শূন্যস্থান পূরণ করো:","correct_answer":{"sentence":"Arabic sentence with ___","blank_index":0,"answer":"word"},"distractors":{"options":["wrong1","wrong2"]},"grammar_note_bn":"...","difficulty":3}
-- 1 speakArabic: {"type":"speakArabic","sort_order":N,"prompt_bn":"এই আরবি শব্দটি বলুন:","correct_answer":{"expected_ar":"word with harakat","transliteration":"...","meaning_bn":"..."},"grammar_note_bn":"...","difficulty":2}
+EXERCISE TYPE SCHEMAS (use exact field names):
 
-RULES: ONLY use words from the provided list. Full harakat (تشكيل) on all Arabic text. Return JSON array only, no markdown.`;
+[multiple_choice] — Arabic word shown, learner picks Bengali meaning
+  {"type":"multiple_choice","sort_order":N,"prompt_bn":"«WORD» শব্দের অর্থ কী?","prompt_ar":"WORD","correct_answer":{"options":["correct","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":1}
+  Rules: exactly 4 options, correct_index 0–3, distractors from lesson words only.
 
-      const exercises = JSON.parse(stripFences(await geminiGenerate(geminiKey, exPrompt))) as Array<Record<string, unknown>>;
-      const { data: inserted } = await supabase.from('exercises').insert(
-        exercises.map((ex, idx) => ({
-          lesson_id: lessonId,
-          type: ex.type,
-          sort_order: (ex.sort_order as number) ?? (idx + 1),
-          prompt_bn: ex.prompt_bn,
-          prompt_ar: (ex.prompt_ar as string | undefined) ?? null,
-          correct_answer: ex.correct_answer,
-          distractors: (ex.distractors as unknown) ?? null,
-          grammar_note_bn: (ex.grammar_note_bn as string | undefined) ?? null,
-          difficulty: (ex.difficulty as number) ?? 1,
-        }))
-      ).select('id');
-      exerciseCount = inserted?.length ?? 0;
-    } catch (e) {
-      console.warn('Exercise generation failed:', (e as Error).message);
+[drag_drop] — match 3–4 Arabic words to Bengali meanings
+  {"type":"drag_drop","sort_order":N,"prompt_bn":"আরবি শব্দের সাথে বাংলা অর্থ মেলাও:","correct_answer":{"pairs":[{"ar":"WORD","bn":"meaning"},{"ar":"WORD2","bn":"meaning2"},{"ar":"WORD3","bn":"meaning3"}]},"grammar_note_bn":"...","difficulty":2}
+  Rules: 3–4 pairs only, use words from lesson word list.
+
+[true_false] — is this translation correct?
+  {"type":"true_false","sort_order":N,"prompt_bn":"অনুবাদটি কি সঠিক?","correct_answer":{"statement_ar":"ARABIC","statement_bn":"Bengali translation","is_true":true},"grammar_note_bn":"...","difficulty":2}
+  Rules: half true half false, false = swap one word with a wrong word from lesson.
+
+[fill_in_blank] — one missing word in short Arabic phrase
+  {"type":"fill_in_blank","sort_order":N,"prompt_bn":"শূন্যস্থানে সঠিক শব্দ বসাও (অর্থ: HINT):","correct_answer":{"sentence":"ARABIC ___ REST","blank_index":N,"answer":"WORD"},"distractors":{"options":["wrong1","wrong2"]},"grammar_note_bn":"...","difficulty":3}
+  Rules: sentence uses 2–4 words from lesson, blank_index is 0-based position, distractors from lesson words.
+
+[tap_to_build] — tap tiles to assemble an Arabic phrase
+  {"type":"tap_to_build","sort_order":N,"prompt_bn":"সঠিক ক্রমে সাজাও: «Bengali meaning»","correct_answer":{"words":["WORD1","WORD2","WORD3"],"order_matters":true,"distractor_words":["WRONG1","WRONG2"]},"distractors":null,"grammar_note_bn":"...","difficulty":4}
+  Rules: words = individual Arabic words (one per element), 2–4 words, distractor_words from lesson only.
+
+[speak_arabic] — learner pronounces a word aloud
+  {"type":"speak_arabic","sort_order":N,"prompt_bn":"এই আরবি শব্দটি বলুন:","correct_answer":{"expected_ar":"WORD_WITH_HARAKAT","transliteration":"latin","meaning_bn":"Bengali"},"grammar_note_bn":"...","difficulty":2}
+  Rules: one per lesson, most important word.
+
+ABSOLUTE RULES:
+- ALL Arabic must have full harakat (تشكيل) — never bare Arabic
+- ONLY use words from the provided lesson word list for answers, distractors, and pairs
+- grammar_note_bn: one line explaining the Arabic grammar point (not just the meaning)
+- sort_order: sequential integers starting at 1
+- Return ONLY a valid JSON array — no markdown, no explanation, no code fences`;
+
+        const exUserPrompt = `Lesson word list (arabic · transliteration = Bengali):
+${wordList}
+
+Generate: 3×multiple_choice, 2×drag_drop, 1×true_false, 1×fill_in_blank, 1×tap_to_build, 1×speak_arabic
+= 9 exercises total (sort_order 1–9).
+Return valid JSON array only.`;
+
+        const rawEx = stripFences(await geminiGenerate(geminiKey, `${exSystemPrompt}\n\n${exUserPrompt}`));
+        const exercises = JSON.parse(rawEx) as Array<Record<string, unknown>>;
+
+        if (!Array.isArray(exercises) || exercises.length === 0) {
+          throw new Error('Gemini returned empty or non-array exercise response');
+        }
+
+        const { data: inserted, error: exErr } = await supabase.from('exercises').insert(
+          exercises.map((ex, idx) => ({
+            lesson_id: lessonId,
+            type: ex.type,
+            sort_order: (ex.sort_order as number) ?? (idx + 1),
+            prompt_bn: ex.prompt_bn,
+            prompt_ar: (ex.prompt_ar as string | undefined) ?? null,
+            correct_answer: ex.correct_answer,
+            distractors: (ex.distractors as unknown) ?? null,
+            grammar_note_bn: (ex.grammar_note_bn as string | undefined) ?? null,
+            difficulty: (ex.difficulty as number) ?? 1,
+          }))
+        ).select('id');
+        if (exErr) throw new Error(`Exercise insert failed: ${exErr.message}`);
+        exerciseCount = inserted?.length ?? 0;
+      } catch (e) {
+        console.error('Exercise generation failed:', (e as Error).message);
+      }
     }
 
     return new Response(

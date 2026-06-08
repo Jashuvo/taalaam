@@ -26,6 +26,7 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
   List<Map<String, dynamic>>? _localOrder;
   bool _reordering = false;
   bool _sorting = false;
+  String? _selectedTrack; // null=all, 'conversational', 'quranic'
 
   @override
   void initState() {
@@ -242,6 +243,43 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
     }
   }
 
+  Future<void> _sortQuranicBySurah() async {
+    final all = _localOrder ?? ref.read(_allUnitsProvider).valueOrNull ?? [];
+    final quranic = all
+        .where((u) => (u['tracks'] as Map?)?['slug'] == 'quranic')
+        .toList()
+      ..sort((a, b) => ((a['sort_order'] as int?) ?? 0)
+          .compareTo((b['sort_order'] as int?) ?? 0));
+    if (quranic.isEmpty) return;
+
+    setState(() => _sorting = true);
+    try {
+      final sb = Supabase.instance.client;
+      for (int i = 0; i < quranic.length; i++) {
+        await sb
+            .from('units')
+            .update({'sort_order': i + 1, 'sequence_order': i + 1}).eq(
+                'id', quranic[i]['id']);
+      }
+      _refresh();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('সূরা নম্বর অনুযায়ী ইউনিট সাজানো হয়েছে ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _sorting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final allUnits = ref.watch(_allUnitsProvider);
@@ -261,6 +299,12 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (_selectedTrack == 'quranic')
+            IconButton(
+              icon: const Icon(Icons.sort_outlined),
+              tooltip: 'সূরা নম্বর অনুযায়ী সাজাও',
+              onPressed: _sortQuranicBySurah,
             )
           else
             IconButton(
@@ -286,25 +330,71 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (fetched) {
           final all = _localOrder ?? fetched;
-          final drafts =
-              all.where((u) => u['status'] == 'draft').toList();
-          final published =
-              all.where((u) => u['status'] == 'published').toList();
+          final filtered = _selectedTrack == null
+              ? all
+              : all.where((u) {
+                  final slug =
+                      (u['tracks'] as Map?)?['slug'] as String? ?? '';
+                  return slug == _selectedTrack;
+                }).toList();
 
-          return TabBarView(
-            controller: _tabs,
+          final drafts =
+              filtered.where((u) => u['status'] == 'draft').toList();
+          final published =
+              filtered.where((u) => u['status'] == 'published').toList();
+
+          return Column(
             children: [
-              _UnitList(
-                units: drafts,
-                isDraft: true,
-                onRefresh: _refresh,
-                onReorder: (old, next) => _onReorder(drafts, old, next),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                child: Row(
+                  children: [
+                    _TrackFilterChip(
+                      label: 'সব',
+                      selected: _selectedTrack == null,
+                      onTap: () => setState(() => _selectedTrack = null),
+                    ),
+                    const SizedBox(width: 6),
+                    _TrackFilterChip(
+                      label: 'কথোপকথন',
+                      selected: _selectedTrack == 'conversational',
+                      color: const Color(0xFF1565C0),
+                      icon: Icons.record_voice_over,
+                      onTap: () =>
+                          setState(() => _selectedTrack = 'conversational'),
+                    ),
+                    const SizedBox(width: 6),
+                    _TrackFilterChip(
+                      label: 'কুরআন',
+                      selected: _selectedTrack == 'quranic',
+                      color: const Color(0xFF2E7D32),
+                      icon: Icons.menu_book,
+                      onTap: () =>
+                          setState(() => _selectedTrack = 'quranic'),
+                    ),
+                  ],
+                ),
               ),
-              _UnitList(
-                units: published,
-                isDraft: false,
-                onRefresh: _refresh,
-                onReorder: (old, next) => _onReorder(published, old, next),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabs,
+                  children: [
+                    _UnitList(
+                      units: drafts,
+                      isDraft: true,
+                      onRefresh: _refresh,
+                      onReorder: (old, next) =>
+                          _onReorder(drafts, old, next),
+                    ),
+                    _UnitList(
+                      units: published,
+                      isDraft: false,
+                      onRefresh: _refresh,
+                      onReorder: (old, next) =>
+                          _onReorder(published, old, next),
+                    ),
+                  ],
+                ),
               ),
             ],
           );
@@ -854,6 +944,65 @@ class _TrackChip extends StatelessWidget {
               style: TextStyle(
                   fontSize: 10, fontWeight: FontWeight.bold, color: fg)),
         ],
+      ),
+    );
+  }
+}
+
+class _TrackFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color? color;
+  final IconData? icon;
+  final VoidCallback onTap;
+
+  const _TrackFilterChip({
+    required this.label,
+    required this.selected,
+    this.color,
+    this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final activeColor = color ?? cs.primary;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected
+              ? activeColor.withValues(alpha: 0.12)
+              : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? activeColor.withValues(alpha: 0.6)
+                : cs.outlineVariant.withValues(alpha: 0.6),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 13,
+                  color: selected ? activeColor : cs.onSurfaceVariant),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight:
+                    selected ? FontWeight.w600 : FontWeight.normal,
+                color: selected ? activeColor : cs.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
