@@ -49,6 +49,17 @@ function stripFences(s: string): string {
   return s.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 }
 
+function extractJsonArray(s: string): string {
+  const stripped = stripFences(s);
+  // Gemini sometimes adds preamble text before the JSON — find the first [ to last ]
+  const start = stripped.indexOf('[');
+  const end = stripped.lastIndexOf(']');
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error(`No JSON array found in Gemini response. Got: ${stripped.slice(0, 300)}`);
+  }
+  return stripped.slice(start, end + 1);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const denied = await checkAdmin(req);
@@ -226,6 +237,7 @@ ${wordList}`;
 
     // 10. Gemini: generate exercises with full schema prompt
     let exerciseCount = 0;
+    let exerciseError: string | null = null;
     const exWords = enrichedWords.slice(0, 15);
     if (exWords.length >= 2) {
       try {
@@ -276,7 +288,7 @@ Generate: 3×multiple_choice, 2×drag_drop, 1×true_false, 1×fill_in_blank, 1×
 = 9 exercises total (sort_order 1–9).
 Return valid JSON array only.`;
 
-        const rawEx = stripFences(await geminiGenerate(geminiKey, `${exSystemPrompt}\n\n${exUserPrompt}`));
+        const rawEx = extractJsonArray(await geminiGenerate(geminiKey, `${exSystemPrompt}\n\n${exUserPrompt}`));
         const exercises = JSON.parse(rawEx) as Array<Record<string, unknown>>;
 
         if (!Array.isArray(exercises) || exercises.length === 0) {
@@ -299,7 +311,8 @@ Return valid JSON array only.`;
         if (exErr) throw new Error(`Exercise insert failed: ${exErr.message}`);
         exerciseCount = inserted?.length ?? 0;
       } catch (e) {
-        console.error('Exercise generation failed:', (e as Error).message);
+        exerciseError = (e as Error).message;
+        console.error('Exercise generation failed:', exerciseError);
       }
     }
 
@@ -310,6 +323,7 @@ Return valid JSON array only.`;
         surah: surahRow.name_bn,
         vocab_count: vocabRows.length,
         exercise_count: exerciseCount,
+        ...(exerciseError ? { exercise_error: exerciseError } : {}),
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     );
