@@ -39,17 +39,19 @@ const UNIT_CONFIG: Record<UnitType, { slug: string; title_bn: string; title_ar: 
   verbs:      { slug: 'quranic-verbs',   title_bn: 'কুরআনের ক্রিয়াপদ',        title_ar: 'الأَفْعَالُ القُرْآنِيَّة',       sort_order: 5 },
 };
 
-// 4 Quranic passages that contain the densest clusters of Allah's Names.
-// Source: Quran directly — no invented groupings, no theological categories.
-// Lesson 0: Al-Fatiha (1:1–7)         — الله، الرحمن، الرحيم، رب، مالك
-// Lesson 1: Ayatul Kursi (2:255)       — الله، الحي، القيوم، العلي، العظيم
-// Lesson 2: Al-Ikhlas (112:1–4)        — الله، الأحد، الصمد
-// Lesson 3: Al-Hashr 59:22–24          — 14 Names in 3 consecutive ayahs
+// 8 Quranic passages with the densest clusters of Allah's Names.
+// Ordered by pedagogical priority per Ibn Uthaymin's al-Qawa'id al-Muthla.
+// Lessons 0–3: the four richest passages (every learner should complete these)
+// Lessons 4–7: extending coverage to ~30 of the most important Names
 const ATTRIBUTE_PASSAGES = [
-  { titleBn: 'আল-ফাতিহার নামসমূহ',       surah: 1,   ayahFrom: 1,   ayahTo: 7   },
-  { titleBn: 'আয়াতুল কুরসির নামসমূহ',    surah: 2,   ayahFrom: 255, ayahTo: 255 },
-  { titleBn: 'আল-ইখলাসের নামসমূহ',        surah: 112, ayahFrom: 1,   ayahTo: 4   },
-  { titleBn: 'আল-হাশর ২২–২৪ এর নামসমূহ', surah: 59,  ayahFrom: 22,  ayahTo: 24  },
+  { titleBn: 'আল-ফাতিহার নামসমূহ',           surah: 1,   ayahFrom: 1,   ayahTo: 7   }, // الله، الرحمن، الرحيم، رب، مالك
+  { titleBn: 'আয়াতুল কুরসির নামসমূহ',        surah: 2,   ayahFrom: 255, ayahTo: 255 }, // الحي، القيوم، العلي، العظيم
+  { titleBn: 'আল-ইখলাসের নামসমূহ',            surah: 112, ayahFrom: 1,   ayahTo: 4   }, // الأحد، الصمد
+  { titleBn: 'আল-হাশর ২২–২৪ এর নামসমূহ',     surah: 59,  ayahFrom: 22,  ayahTo: 24  }, // 14 Names in 3 consecutive ayahs
+  { titleBn: 'আল-হাদিদ ১–৬ এর নামসমূহ',      surah: 57,  ayahFrom: 1,   ayahTo: 6   }, // الأول، الآخر، الظاهر، الباطن، القدير
+  { titleBn: 'আল-আনআম ১০২–১০৩ এর নামসমূহ',  surah: 6,   ayahFrom: 102, ayahTo: 103 }, // اللطيف، الخبير، الوكيل
+  { titleBn: 'আশ-শূরা ১১–১৩ এর নামসমূহ',     surah: 42,  ayahFrom: 11,  ayahTo: 13  }, // السميع، البصير
+  { titleBn: 'আল-বাকারা ২৮৪–২৮৬ এর নামসমূহ', surah: 2,   ayahFrom: 284, ayahTo: 286 }, // القدير، الغفور، الرحيم in du'a context
 ];
 
 // ── Auth + Gemini helpers ────────────────────────────────────────────────────

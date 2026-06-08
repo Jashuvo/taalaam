@@ -193,7 +193,7 @@ class _QuranCurriculumSection extends StatelessWidget {
         _UnitCurationCard(
           unitIndex: 3,
           title: 'আল্লাহর গুণাবলী',
-          subtitle: '৪ পাঠ — ফাতিহা · কুরসি · ইখলাস · হাশর',
+          subtitle: '৮ পাঠ পর্যন্ত — কুরআনের সরাসরি নামসমূহ',
           color: const Color(0xFFE65100),
           icon: Icons.star_outline,
           child: _AttributesControls(),
@@ -416,7 +416,7 @@ class _FrequentWordsControlsState extends State<_FrequentWordsControls> {
   }
 }
 
-// ── Unit 3: Allah's Attributes ────────────────────────────────────────────────
+// ── Unit 3: Allah's Attributes — dynamic (supports up to 8 lessons) ───────────
 
 class _AttributesControls extends StatefulWidget {
   @override
@@ -424,39 +424,121 @@ class _AttributesControls extends StatefulWidget {
 }
 
 class _AttributesControlsState extends State<_AttributesControls> {
-  static const _themes = [
-    'আল-ফাতিহা',
-    'আয়াতুল কুরসি',
-    'আল-ইখলাস',
-    'আল-হাশর ২২–২৪',
-  ];
-  int? _busyIndex;
+  static const _maxLessons = 8;
 
-  Future<void> _curate(int lessonIndex) async {
-    setState(() => _busyIndex = lessonIndex);
+  bool _loading = false;
+  bool _busy    = false;
+  List<Map<String, dynamic>> _lessons = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  Future<void> _loadExisting() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    try {
+      final unit = await Supabase.instance.client
+          .from('units')
+          .select('id')
+          .eq('slug', 'asma-sifat')
+          .maybeSingle();
+      if (unit != null && mounted) {
+        final rows = await Supabase.instance.client
+            .from('lessons')
+            .select('id, title_bn, sort_order')
+            .eq('unit_id', unit['id'] as String)
+            .order('sort_order') as List;
+        if (mounted) {
+          setState(() => _lessons = rows.cast<Map<String, dynamic>>());
+        }
+      }
+    } catch (_) {} finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _curate() async {
+    if (_lessons.length >= _maxLessons) return;
+    setState(() => _busy = true);
+    final nextIndex = _lessons.length;
     await _callCurate(
       ctx: context,
-      body: {'unit_type': 'attributes', 'lesson_index': lessonIndex},
-      successMsg: '"${_themes[lessonIndex]}" পাঠ তৈরি হয়েছে ✓',
+      body: {'unit_type': 'attributes', 'lesson_index': nextIndex},
+      successMsg: 'গুণাবলী পাঠ ${nextIndex + 1} তৈরি হয়েছে ✓',
     );
-    if (mounted) setState(() => _busyIndex = null);
+    await _loadExisting();
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8, runSpacing: 8,
-      children: List.generate(_themes.length, (i) => FilledButton.tonal(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 36),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        onPressed: _busyIndex != null ? null : () => _curate(i),
-        child: _busyIndex == i
-            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-            : Text(_themes[i], style: const TextStyle(fontSize: 12)),
-      )),
+    final theme = Theme.of(context);
+    if (_loading) {
+      return const SizedBox(height: 36, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+    }
+    final done     = _lessons.length;
+    final isFull   = done >= _maxLessons;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_lessons.isNotEmpty) ...[
+          Wrap(
+            spacing: 8, runSpacing: 6,
+            children: _lessons.asMap().entries.map((e) {
+              final title = (e.value['title_bn'] as String?) ?? 'পাঠ ${e.key + 1}';
+              return Chip(
+                avatar: const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
+                label: Text(title, style: const TextStyle(fontSize: 11)),
+                backgroundColor: Colors.green.withValues(alpha: 0.08),
+                side: const BorderSide(color: Colors.green, width: 0.5),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+        ],
+        if (isFull)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.green.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.green),
+                const SizedBox(width: 6),
+                Text(
+                  'সকল $_maxLessons পাঠ তৈরি হয়েছে — সম্পূর্ণ!',
+                  style: theme.textTheme.labelSmall?.copyWith(color: Colors.green, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          )
+        else
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: _busy ? null : _curate,
+            icon: _busy
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.add_rounded, size: 16),
+            label: Text(
+              done == 0 ? 'প্রথম পাঠ তৈরি করুন' : 'পাঠ ${done + 1} তৈরি করুন ($done/$_maxLessons)',
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+      ],
     );
   }
 }

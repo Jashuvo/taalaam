@@ -129,22 +129,41 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
                 ? const _EmptyTierPlaceholder()
                 : Builder(builder: (_) {
                     final items = <Widget>[];
-                    for (int ti = 0; ti < sortedTiers.length; ti++) {
-                      final tier  = sortedTiers[ti];
-                      final units = tierGroups[tier]!;
-                      items.add(_TierSectionBanner(
-                          tier: tier, sectionIndex: ti + 1));
-                      for (int ui = 0; ui < units.length; ui++) {
+                    if (isQuranic) {
+                      // Flat Quranic layout — no tier banners, no UpNext cards
+                      // All units open; sorted by sort_order
+                      final sortedUnits = [...allUnits]
+                        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+                      items.add(const _QuranicCurriculumHeader());
+                      for (int ui = 0; ui < sortedUnits.length; ui++) {
                         items.add(_UnitSection(
-                          unit: units[ui],
+                          unit: sortedUnits[ui],
                           unitNumber: ui + 1,
                           completedIds: completedIds,
                           bookmarkedIds: bookmarkedIds,
-                          tierColors: _tierColors(tier),
+                          tierColors: const [Color(0xFF1B6B3A), Color(0xFF2E8B57)],
+                          isQuranic: true,
                         ));
                       }
-                      if (ti < sortedTiers.length - 1) {
-                        items.add(_UpNextCard(nextTier: sortedTiers[ti + 1]));
+                    } else {
+                      for (int ti = 0; ti < sortedTiers.length; ti++) {
+                        final tier  = sortedTiers[ti];
+                        final units = tierGroups[tier]!;
+                        items.add(_TierSectionBanner(
+                            tier: tier, sectionIndex: ti + 1));
+                        for (int ui = 0; ui < units.length; ui++) {
+                          items.add(_UnitSection(
+                            unit: units[ui],
+                            unitNumber: ui + 1,
+                            completedIds: completedIds,
+                            bookmarkedIds: bookmarkedIds,
+                            tierColors: _tierColors(tier),
+                            isQuranic: false,
+                          ));
+                        }
+                        if (ti < sortedTiers.length - 1) {
+                          items.add(_UpNextCard(nextTier: sortedTiers[ti + 1]));
+                        }
                       }
                     }
                     items.add(const SizedBox(height: 80));
@@ -600,6 +619,7 @@ class _UnitSection extends ConsumerWidget {
   final Set<String> completedIds;
   final Set<String> bookmarkedIds;
   final List<Color> tierColors;
+  final bool isQuranic;
 
   const _UnitSection({
     required this.unit,
@@ -607,6 +627,7 @@ class _UnitSection extends ConsumerWidget {
     required this.completedIds,
     required this.bookmarkedIds,
     required this.tierColors,
+    required this.isQuranic,
   });
 
   @override
@@ -820,6 +841,7 @@ class _UnitSection extends ConsumerWidget {
                     lessons: firstHalf,
                     completedIds: completedIds,
                     tierColors: tierColors,
+                    isQuranic: isQuranic,
                   ),
                   if (showChest) ...[
                     _ChestNode(isOpen: chestOpen, tierColors: tierColors),
@@ -827,6 +849,7 @@ class _UnitSection extends ConsumerWidget {
                       lessons: secondHalf,
                       completedIds: completedIds,
                       tierColors: tierColors,
+                      isQuranic: isQuranic,
                     ),
                   ],
                   if (examLesson != null)
@@ -852,11 +875,13 @@ class _LessonPath extends StatelessWidget {
   final List<Lesson> lessons;
   final Set<String> completedIds;
   final List<Color> tierColors;
+  final bool isQuranic;
 
   const _LessonPath({
     required this.lessons,
     required this.completedIds,
     required this.tierColors,
+    required this.isQuranic,
   });
 
   @override
@@ -898,6 +923,7 @@ class _LessonPath extends StatelessWidget {
                   isDone: completedIds.contains(lessons[i].id),
                   isCurrent: i == firstUndone,
                   tierColors: tierColors,
+                  isQuranic: isQuranic,
                 ),
               );
             }),
@@ -983,12 +1009,14 @@ class _LessonNode extends ConsumerWidget {
   final bool isDone;
   final bool isCurrent;
   final List<Color> tierColors;
+  final bool isQuranic;
 
   const _LessonNode({
     required this.lesson,
     required this.isDone,
     required this.isCurrent,
     required this.tierColors,
+    required this.isQuranic,
   });
 
   @override
@@ -1026,6 +1054,13 @@ class _LessonNode extends ConsumerWidget {
           spreadRadius: 4,
         ),
       ];
+    } else if (isQuranic) {
+      // Quranic: all undone lessons are open — no lock, show open book
+      bg          = tierColors[0].withValues(alpha: 0.10);
+      borderColor = tierColors[0].withValues(alpha: 0.45);
+      nodeIcon    = Icon(Icons.menu_book_rounded,
+          color: tierColors[0].withValues(alpha: 0.75), size: 22);
+      shadows     = [];
     } else {
       bg          = isDark
           ? AppColors.darkSurfaceHigh
@@ -1163,7 +1198,7 @@ class _LessonNode extends ConsumerWidget {
             Row(
               children: [
                 _StatusChip(
-                    isDone: isDone, isCurrent: isCurrent, tierColor: tierColors[0]),
+                    isDone: isDone, isCurrent: isCurrent, tierColor: tierColors[0], isQuranic: isQuranic),
                 const Spacer(),
                 Text('${lesson.xpReward} XP',
                     style: theme.textTheme.labelMedium?.copyWith(
@@ -1199,20 +1234,30 @@ class _StatusChip extends StatelessWidget {
   final bool isDone;
   final bool isCurrent;
   final Color tierColor;
+  final bool isQuranic;
   const _StatusChip(
       {required this.isDone,
       required this.isCurrent,
-      required this.tierColor});
+      required this.tierColor,
+      required this.isQuranic});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = isDone ? '✓ সম্পন্ন' : isCurrent ? '▶ পরবর্তী' : '🔒 লক';
+    final label = isDone
+        ? '✓ সম্পন্ন'
+        : isCurrent
+            ? '▶ পরবর্তী'
+            : isQuranic
+                ? '📖 পড়ুন'
+                : '🔒 লক';
     final color = isDone
         ? AppColors.brightGreen
         : isCurrent
             ? tierColor
-            : theme.colorScheme.onSurfaceVariant;
+            : isQuranic
+                ? tierColor
+                : theme.colorScheme.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -1223,6 +1268,56 @@ class _StatusChip extends StatelessWidget {
         label,
         style: TextStyle(
             fontSize: 12, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
+  }
+}
+
+// ── Quranic open-access banner ────────────────────────────────────────────────
+
+class _QuranicCurriculumHeader extends StatelessWidget {
+  const _QuranicCurriculumHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const green = Color(0xFF1B6B3A);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: green.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: green.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_open_rounded, size: 16, color: green),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'সকল ইউনিট উন্মুক্ত — নিজের গতিতে শিখুন',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Directionality(
+              textDirection: TextDirection.rtl,
+              child: Text(
+                'تَعَلَّمْ',
+                style: const TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  fontSize: 14,
+                  height: 1.6,
+                  color: green,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
