@@ -193,7 +193,7 @@ class _QuranCurriculumSection extends StatelessWidget {
         _UnitCurationCard(
           unitIndex: 3,
           title: 'আল্লাহর গুণাবলী',
-          subtitle: '৪ পাঠ — রহমত · জ্ঞান · শক্তি · রাজত্ব',
+          subtitle: '৪ পাঠ — ফাতিহা · কুরসি · ইখলাস · হাশর',
           color: const Color(0xFFE65100),
           icon: Icons.star_outline,
           child: _AttributesControls(),
@@ -425,10 +425,10 @@ class _AttributesControls extends StatefulWidget {
 
 class _AttributesControlsState extends State<_AttributesControls> {
   static const _themes = [
-    'রহমত ও ক্ষমা',
-    'জ্ঞান ও প্রজ্ঞা',
-    'শক্তি ও ক্ষমতা',
-    'রাজত্ব ও মহত্ত্ব',
+    'আল-ফাতিহা',
+    'আয়াতুল কুরসি',
+    'আল-ইখলাস',
+    'আল-হাশর ২২–২৪',
   ];
   int? _busyIndex;
 

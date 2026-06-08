@@ -6,7 +6,7 @@
 //   'salah'      — Language of Salah (surahs 1,112,108,103) — requires surah_number
 //   'juz_amma'   — Juz Amma surahs (78–114)                 — requires surah_number
 //   'frequent'   — Top-100 most frequent words (5 lessons)   — requires lesson_index 0–4
-//   'attributes' — Names/attributes of Allah (4 themes)      — requires lesson_index 0–3
+//   'attributes' — Names of Allah from 4 Quranic passages    — requires lesson_index 0–3
 //   'verbs'      — Verb roots (5 lessons, needs root data)    — requires lesson_index 0–4
 //
 // Deploy: supabase functions deploy curate-quran-lesson --no-verify-jwt
@@ -39,11 +39,17 @@ const UNIT_CONFIG: Record<UnitType, { slug: string; title_bn: string; title_ar: 
   verbs:      { slug: 'quranic-verbs',   title_bn: 'কুরআনের ক্রিয়াপদ',        title_ar: 'الأَفْعَالُ القُرْآنِيَّة',       sort_order: 5 },
 };
 
-const ATTRIBUTE_THEMES = [
-  { titleBn: 'রহমত ও ক্ষমা',   themeEn: 'mercy, compassion, forgiveness, love, gentleness' },
-  { titleBn: 'জ্ঞান ও প্রজ্ঞা', themeEn: 'knowledge, wisdom, awareness, hearing, sight' },
-  { titleBn: 'শক্তি ও ক্ষমতা',  themeEn: 'power, strength, might, ability, dominance' },
-  { titleBn: 'রাজত্ব ও মহত্ত্ব', themeEn: 'sovereignty, majesty, greatness, oneness, glory' },
+// 4 Quranic passages that contain the densest clusters of Allah's Names.
+// Source: Quran directly — no invented groupings, no theological categories.
+// Lesson 0: Al-Fatiha (1:1–7)         — الله، الرحمن، الرحيم، رب، مالك
+// Lesson 1: Ayatul Kursi (2:255)       — الله، الحي، القيوم، العلي، العظيم
+// Lesson 2: Al-Ikhlas (112:1–4)        — الله، الأحد، الصمد
+// Lesson 3: Al-Hashr 59:22–24          — 14 Names in 3 consecutive ayahs
+const ATTRIBUTE_PASSAGES = [
+  { titleBn: 'আল-ফাতিহার নামসমূহ',       surah: 1,   ayahFrom: 1,   ayahTo: 7   },
+  { titleBn: 'আয়াতুল কুরসির নামসমূহ',    surah: 2,   ayahFrom: 255, ayahTo: 255 },
+  { titleBn: 'আল-ইখলাসের নামসমূহ',        surah: 112, ayahFrom: 1,   ayahTo: 4   },
+  { titleBn: 'আল-হাশর ২২–২৪ এর নামসমূহ', surah: 59,  ayahFrom: 22,  ayahTo: 24  },
 ];
 
 // ── Auth + Gemini helpers ────────────────────────────────────────────────────
@@ -121,16 +127,30 @@ async function fetchFrequentWords(sb: SupabaseClient, lessonIndex: number): Prom
   return (data ?? []) as WordRow[];
 }
 
-async function fetchAttributeWords(sb: SupabaseClient, geminiKey: string, themeEn: string): Promise<WordRow[]> {
-  const { data } = await sb.rpc('get_top_quran_words', { limit_count: 150, offset_count: 0 });
+async function fetchAttributeWords(
+  sb: SupabaseClient,
+  geminiKey: string,
+  passage: { surah: number; ayahFrom: number; ayahTo: number },
+): Promise<WordRow[]> {
+  const { data } = await sb
+    .from('quran_words')
+    .select('arabic, meaning_bn')
+    .eq('surah', passage.surah)
+    .gte('ayah', passage.ayahFrom)
+    .lte('ayah', passage.ayahTo)
+    .not('meaning_bn', 'is', null);
   if (!data?.length) return [];
 
-  const wordList = (data as { arabic: string; meaning_bn: string }[])
-    .map((w, i) => `${i + 1}. ${w.arabic} = ${w.meaning_bn}`)
-    .join('\n');
+  const uniqueWords = dedupeWords(data as WordRow[]);
+  const wordList = uniqueWords.map((w, i) => `${i + 1}. ${w.arabic} = ${w.meaning_bn}`).join('\n');
 
-  const prompt = `From this list of frequently occurring Quranic Arabic words, identify 10–15 words that are divine names or attributes of Allah related to the theme "${themeEn}".
-Return ONLY a JSON array of the item numbers (1-based): [3, 7, 12, ...]
+  // Ask Gemini to filter to only divine Names/Attributes — not particles, pronouns, or common verbs
+  const prompt = `From this list of Arabic words taken from the Quran, identify ONLY the Names and Attributes of Allah (أسماء الله الحسنى وصفاته).
+
+Include: divine Names (الرحمن، العليم، القدير…) and Attributes (الحي، القيوم، الملك…)
+Exclude: particles (إنَّ، عَلَى، الَّذِي…), pronouns (هُوَ، لَهُ…), common verbs, and non-divine nouns.
+
+Return ONLY a JSON array of 1-based item numbers: [1, 3, 7, ...]
 No other text.
 
 Words:
@@ -138,10 +158,9 @@ ${wordList}`;
 
   const raw = await geminiGenerate(geminiKey, prompt);
   const indices = JSON.parse(extractJsonArray(raw)) as number[];
-  const allWords = data as { arabic: string; meaning_bn: string }[];
   return indices
-    .filter(i => i >= 1 && i <= allWords.length)
-    .map(i => ({ arabic: allWords[i - 1].arabic, meaning_bn: allWords[i - 1].meaning_bn }));
+    .filter(i => i >= 1 && i <= uniqueWords.length)
+    .map(i => uniqueWords[i - 1]);
 }
 
 async function fetchVerbRoots(sb: SupabaseClient, lessonIndex: number): Promise<{ root: string; forms: string[] }[]> {
@@ -177,7 +196,7 @@ function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: nu
     case 'salah':
     case 'juz_amma':   return `সূরা ${surahNameBn}`;
     case 'frequent':   return `শীর্ষ শব্দ — পাঠ ${lessonIndex + 1} (${lessonIndex * 20 + 1}–${lessonIndex * 20 + 20})`;
-    case 'attributes': return ATTRIBUTE_THEMES[lessonIndex]?.titleBn ?? `গুণাবলী পাঠ ${lessonIndex + 1}`;
+    case 'attributes': return ATTRIBUTE_PASSAGES[lessonIndex]?.titleBn ?? `গুণাবলী পাঠ ${lessonIndex + 1}`;
     case 'verbs':      return `ক্রিয়াপদ পাঠ ${lessonIndex + 1}`;
   }
 }
@@ -322,12 +341,12 @@ Deno.serve(async (req: Request) => {
       });
 
     } else if (unitType === 'attributes') {
-      const theme = ATTRIBUTE_THEMES[lessonIndex];
-      if (!theme) return new Response(JSON.stringify({ error: `lesson_index must be 0–${ATTRIBUTE_THEMES.length - 1} for attributes` }), {
+      const passage = ATTRIBUTE_PASSAGES[lessonIndex];
+      if (!passage) return new Response(JSON.stringify({ error: `lesson_index must be 0–${ATTRIBUTE_PASSAGES.length - 1} for attributes` }), {
         status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
-      words = await fetchAttributeWords(sb, geminiKey, theme.themeEn);
-      if (words.length < 4) return new Response(JSON.stringify({ error: 'Too few attribute words found — try a different lesson_index' }), {
+      words = await fetchAttributeWords(sb, geminiKey, passage);
+      if (words.length < 4) return new Response(JSON.stringify({ error: 'Too few Names found in this passage — check quran_words table' }), {
         status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
 
