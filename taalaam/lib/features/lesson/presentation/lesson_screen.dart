@@ -30,6 +30,12 @@ const _typeLabels = <ExerciseType, (String, Color)>{
   ExerciseType.chatComplete:    ('কথোপকথন সম্পন্ন করুন',    Color(0xFF0891B2)),
   ExerciseType.translateBuild:  ('বাংলায় অনুবাদ করুন',      Color(0xFF059669)),
   ExerciseType.listenSelect:    ('শুনুন ও বেছে নিন',         Color(0xFF0284C7)),
+  // Quranic types
+  ExerciseType.ayahRead:        ('আয়াত পড়ুন',               Color(0xFF1B6B3A)),
+  ExerciseType.tafsirRead:      ('সূরা পরিচিতি',             Color(0xFF1B6B3A)),
+  ExerciseType.ayahContext:     ('আয়াতে শব্দ চিহ্নিত করুন', Color(0xFF2E7D32)),
+  ExerciseType.surahTheme:      ('বিষয় চিহ্নিত করুন',       Color(0xFF2E7D32)),
+  ExerciseType.reflectionCard:  ('তাদাব্বুর',                Color(0xFF7B4F00)),
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────

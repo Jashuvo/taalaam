@@ -14,6 +14,12 @@ enum ExerciseType {
   translateBuild,
   listenSelect,
   speakArabic,
+  // Quranic-specific types
+  ayahRead,       // informational: show full ayah + translation, auto-passes
+  tafsirRead,     // informational: surah overview + aqeedah point, auto-passes
+  ayahContext,    // tested: word highlighted inside full ayah, 4 options
+  surahTheme,     // tested: multiple choice about surah's main message
+  reflectionCard, // informational: tadabbur prompt + scholarly note, auto-passes
 }
 
 @freezed

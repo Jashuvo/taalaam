@@ -6,8 +6,12 @@
 //   'salah'      — Language of Salah (surahs 1,112,108,103) — requires surah_number
 //   'juz_amma'   — Juz Amma surahs (78–114)                 — requires surah_number
 //   'frequent'   — Top-100 most frequent words (5 lessons)   — requires lesson_index 0–4
-//   'attributes' — Names of Allah from 4 Quranic passages    — requires lesson_index 0–3
+//   'attributes' — Names of Allah from 8 Quranic passages    — requires lesson_index 0–7
 //   'verbs'      — Verb roots (5 lessons, needs root data)    — requires lesson_index 0–4
+//
+// Exercise types generated:
+//   Standard:      multiple_choice, drag_drop, true_false, fill_in_blank, tap_to_build, speak_arabic
+//   Quranic-only:  ayah_read, tafsir_read, ayah_context, surah_theme, reflection_card
 //
 // Deploy: supabase functions deploy curate-quran-lesson --no-verify-jwt
 
@@ -39,10 +43,16 @@ const UNIT_CONFIG: Record<UnitType, { slug: string; title_bn: string; title_ar: 
   verbs:      { slug: 'quranic-verbs',   title_bn: 'কুরআনের ক্রিয়াপদ',        title_ar: 'الأَفْعَالُ القُرْآنِيَّة',       sort_order: 5 },
 };
 
+// Salah context per surah — shown in ayah_read cards so the learner knows WHEN they recite this
+const SALAH_POSITIONS: Record<number, string> = {
+  1:   'প্রতি রাকআতে ফরজ — ফাতিহা ছাড়া সালাত শুদ্ধ হয় না (সহীহ বুখারী ৭৫৬)',
+  112: 'প্রতিদিনের সালাতে পঠিত — কুরআনের এক-তৃতীয়াংশের সমতুল্য (সহীহ বুখারী ৫০১৫)',
+  108: 'সালাতে পঠিত ছোট সূরা — মক্কায় অবতীর্ণ, ৩টি আয়াত',
+  103: 'সালাতে পঠিত — সাহাবীরা একে অপরের সাথে সাক্ষাতে এটি তিলাওয়াত করতেন',
+};
+
 // 8 Quranic passages with the densest clusters of Allah's Names.
 // Ordered by pedagogical priority per Ibn Uthaymin's al-Qawa'id al-Muthla.
-// Lessons 0–3: the four richest passages (every learner should complete these)
-// Lessons 4–7: extending coverage to ~30 of the most important Names
 const ATTRIBUTE_PASSAGES = [
   { titleBn: 'আল-ফাতিহার নামসমূহ',           surah: 1,   ayahFrom: 1,   ayahTo: 7   }, // الله، الرحمن، الرحيم، رب، مالك
   { titleBn: 'আয়াতুল কুরসির নামসমূহ',        surah: 2,   ayahFrom: 255, ayahTo: 255 }, // الحي، القيوم، العلي، العظيم
@@ -146,7 +156,7 @@ async function fetchAttributeWords(
   const uniqueWords = dedupeWords(data as WordRow[]);
   const wordList = uniqueWords.map((w, i) => `${i + 1}. ${w.arabic} = ${w.meaning_bn}`).join('\n');
 
-  // Ask Gemini to filter to only divine Names/Attributes — not particles, pronouns, or common verbs
+  // Ask Gemini to filter to only divine Names/Attributes
   const prompt = `From this list of Arabic words taken from the Quran, identify ONLY the Names and Attributes of Allah (أسماء الله الحسنى وصفاته).
 
 Include: divine Names (الرحمن، العليم، القدير…) and Attributes (الحي، القيوم، الملك…)
@@ -175,7 +185,6 @@ async function fetchVerbRoots(sb: SupabaseClient, lessonIndex: number): Promise<
   return data as { root: string; forms: string[] }[];
 }
 
-// Flatten verb root families into word rows (for enrichment + exercises)
 async function verbRootsToWords(sb: SupabaseClient, roots: { root: string; forms: string[] }[]): Promise<WordRow[]> {
   const words: WordRow[] = [];
   for (const r of roots) {
@@ -191,6 +200,37 @@ async function verbRootsToWords(sb: SupabaseClient, roots: { root: string; forms
   return words;
 }
 
+// ── Ayah text helpers ────────────────────────────────────────────────────────
+
+// Fetch full ayah texts + tafsir snippets for a given set of surah:ayah keys
+async function fetchAyahTexts(
+  sb: SupabaseClient,
+  ayahKeys: string[],
+): Promise<{ ayahTexts: Map<string, string>; tafsirSnippets: Map<string, string> }> {
+  const ayahTexts     = new Map<string, string>();
+  const tafsirSnippets = new Map<string, string>();
+  await Promise.all(ayahKeys.slice(0, 8).map(async (key) => {
+    const [s, a] = key.split(':').map(Number);
+    const [{ data: ayahWords }, { data: tafsir }] = await Promise.all([
+      sb.from('quran_words').select('arabic').eq('surah', s).eq('ayah', a).order('position'),
+      sb.from('quran_tafsir').select('tafsir_text').eq('surah', s).eq('ayah', a).single(),
+    ]);
+    if (ayahWords) ayahTexts.set(key, (ayahWords as { arabic: string }[]).map(w => w.arabic).join(' '));
+    if (tafsir?.tafsir_text) tafsirSnippets.set(key, (tafsir.tafsir_text as string).slice(0, 150) + '…');
+  }));
+  return { ayahTexts, tafsirSnippets };
+}
+
+// Format ayah map into a readable string for the Gemini prompt
+function formatAyahsForPrompt(ayahTexts: Map<string, string>, tafsirSnippets: Map<string, string>): string {
+  return [...ayahTexts.entries()]
+    .map(([key, ar]) => {
+      const tafsir = tafsirSnippets.get(key);
+      return `${key} → ${ar}${tafsir ? `\n  (তাফসীর: ${tafsir})` : ''}`;
+    })
+    .join('\n');
+}
+
 // ── Lesson title helpers ─────────────────────────────────────────────────────
 
 function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: number): string {
@@ -203,11 +243,11 @@ function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: nu
   }
 }
 
-// ── Exercise prompts ─────────────────────────────────────────────────────────
+// ── Exercise system prompt ───────────────────────────────────────────────────
 
-const EXERCISE_SYSTEM_PROMPT = `You are a Quranic Arabic curriculum designer for Bengali-speaking Muslims.
+const EXERCISE_SYSTEM_PROMPT = `You are a Quranic Arabic curriculum designer for Bengali-speaking Muslims, following the Salafi methodology (Ibn Sa'di, Ibn Uthaymin, Ibn Kathir for tafsir — no philosophical interpretation, no tasawwuf, affirm Attributes as they come).
 
-EXERCISE TYPE SCHEMAS (use exact field names and snake_case type values):
+STANDARD EXERCISE TYPE SCHEMAS (snake_case type values):
 
 [multiple_choice] — Arabic word shown, learner picks Bengali meaning
   {"type":"multiple_choice","sort_order":N,"prompt_bn":"«WORD» শব্দের অর্থ কী?","prompt_ar":"WORD","correct_answer":{"options":["correct","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":1}
@@ -215,30 +255,47 @@ EXERCISE TYPE SCHEMAS (use exact field names and snake_case type values):
 
 [drag_drop] — match 3–4 Arabic words to Bengali meanings
   {"type":"drag_drop","sort_order":N,"prompt_bn":"আরবি শব্দের সাথে বাংলা অর্থ মেলাও:","correct_answer":{"pairs":[{"ar":"WORD","bn":"meaning"},{"ar":"WORD2","bn":"meaning2"},{"ar":"WORD3","bn":"meaning3"}]},"grammar_note_bn":"...","difficulty":2}
-  Rules: 3–4 pairs only.
 
 [true_false] — is this translation correct?
   {"type":"true_false","sort_order":N,"prompt_bn":"অনুবাদটি কি সঠিক?","correct_answer":{"statement_ar":"ARABIC","statement_bn":"Bengali translation","is_true":true},"grammar_note_bn":"...","difficulty":2}
-  Rules: false = swap one word with a wrong word from the lesson.
 
 [fill_in_blank] — one missing word in short Arabic phrase
   {"type":"fill_in_blank","sort_order":N,"prompt_bn":"শূন্যস্থানে সঠিক শব্দ বসাও (অর্থ: HINT):","correct_answer":{"sentence":"ARABIC ___ REST","blank_index":N,"answer":"WORD"},"distractors":{"options":["wrong1","wrong2"]},"grammar_note_bn":"...","difficulty":3}
-  Rules: blank_index is 0-based position, distractors from lesson words.
 
 [tap_to_build] — tap tiles to assemble an Arabic phrase
   {"type":"tap_to_build","sort_order":N,"prompt_bn":"সঠিক ক্রমে সাজাও: «Bengali meaning»","correct_answer":{"words":["WORD1","WORD2","WORD3"],"order_matters":true,"distractor_words":["WRONG1","WRONG2"]},"distractors":null,"grammar_note_bn":"...","difficulty":4}
-  Rules: 2–4 words, distractor_words from lesson only.
 
 [speak_arabic] — learner pronounces a word aloud
   {"type":"speak_arabic","sort_order":N,"prompt_bn":"এই আরবি শব্দটি বলুন:","correct_answer":{"expected_ar":"WORD_WITH_HARAKAT","transliteration":"latin","meaning_bn":"Bengali"},"grammar_note_bn":"...","difficulty":2}
-  Rules: one per lesson, most important word.
+
+QURANIC EXERCISE TYPE SCHEMAS (informational types always pass, no hearts deducted):
+
+[ayah_read] — show full ayah with Bengali translation (always passes)
+  {"type":"ayah_read","sort_order":N,"prompt_bn":"আয়াতটি পড়ুন:","correct_answer":{"ayah_ar":"EXACT_ARABIC","ayah_bn":"Bengali translation","surah_name":"সূরা NAME","ayah_number":N,"context_bn":"why this ayah matters here"},"difficulty":0}
+  ⚠ ayah_ar MUST be copied EXACTLY from the ayah texts provided in the prompt — NEVER generate or alter Arabic text.
+  ayah_bn = your accurate Bengali translation of that exact ayah.
+
+[tafsir_read] — surah overview: revelation context, theme, aqeedah point (always passes)
+  {"type":"tafsir_read","sort_order":N,"prompt_bn":"সূরা পরিচিতি:","correct_answer":{"surah_name":"NAME_BN","revelation":"মাক্কী/মাদানী","theme_bn":"main topic in Bengali","aqeedah_bn":"the Islamic belief/lesson from this surah in Bengali","tafsir_bn":"2-3 sentences — Salafi style, based on Ibn Sa'di's Taysir, no philosophical interpretation"},"difficulty":0}
+
+[ayah_context] — tested: full ayah shown, learner picks meaning of highlighted word (affects hearts)
+  {"type":"ayah_context","sort_order":N,"prompt_bn":"হাইলাইট করা শব্দটির অর্থ কী?","prompt_ar":"THE_HIGHLIGHTED_WORD","correct_answer":{"ayah_ar":"EXACT_ARABIC","highlighted_word":"ONE_WORD_VERBATIM_IN_AYAH","options":["correct meaning","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
+  ⚠ highlighted_word must appear verbatim in ayah_ar. ayah_ar from provided list only.
+
+[surah_theme] — tested: pick the surah's main message from 4 options (affects hearts)
+  {"type":"surah_theme","sort_order":N,"prompt_bn":"সূরা X-এর প্রধান বিষয় কী?","correct_answer":{"options":["correct theme","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
+
+[reflection_card] — tadabbur prompt with scholarly note (always passes)
+  {"type":"reflection_card","sort_order":N,"prompt_bn":"চিন্তা করুন:","correct_answer":{"reflection_prompt":"A personal reflection question connecting the lesson to the learner's life","scholarly_note_bn":"Ibn Uthaymin or Ibn Sa'di insight on this topic in Bengali (authentic-sounding, Salafi appropriate)"},"difficulty":0}
 
 ABSOLUTE RULES:
 - ALL Arabic must have full harakat (تشكيل) — never bare Arabic
-- ONLY use words from the lesson word list
+- ONLY use words from the lesson word list for tested exercises
 - grammar_note_bn: one line of Arabic grammar explanation (not just the meaning)
 - sort_order: sequential integers starting at 1
-- Return ONLY a valid JSON array — no markdown, no explanation, no code fences`;
+- Return ONLY a valid JSON array — no markdown, no explanation, no code fences
+- For tafsir_read: write in accessible Bengali, no Arabic philosophical terms, no tasawwuf
+- For reflection_card: make the question personal and actionable, not abstract`;
 
 const VERB_EXERCISE_SYSTEM_PROMPT = `You are a Quranic Arabic curriculum designer for Bengali-speaking Muslims.
 This lesson teaches verb ROOT FAMILIES — multiple forms of the same Arabic root.
@@ -249,7 +306,7 @@ EXERCISE TYPES FOR VERB LESSONS (use exact field names):
   {"type":"multiple_choice","sort_order":N,"prompt_bn":"«VERB» কোন ধাতু (root) থেকে এসেছে?","prompt_ar":"VERB","correct_answer":{"options":["correct_root","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
 
 [drag_drop] — match verb forms from same root to their meanings
-  {"type":"drag_drop","sort_order":N,"prompt_bn":"ধাতু «ROOT» — শব্দের সাথে অর্থ মেলাও:","correct_answer":{"pairs":[{"ar":"VERB_FORM","bn":"meaning"},...],"grammar_note_bn":"...","difficulty":2}
+  {"type":"drag_drop","sort_order":N,"prompt_bn":"ধাতু «ROOT» — শব্দের সাথে অর্থ মেলাও:","correct_answer":{"pairs":[{"ar":"VERB_FORM","bn":"meaning"},...]},"grammar_note_bn":"...","difficulty":2}
 
 [true_false] — do these two words share the same root?
   {"type":"true_false","sort_order":N,"prompt_bn":"এই দুটি শব্দ কি একই ধাতু থেকে এসেছে?","correct_answer":{"statement_ar":"WORD1 ← WORD2","statement_bn":"Bengali statement","is_true":true},"grammar_note_bn":"...","difficulty":3}
@@ -264,6 +321,141 @@ ABSOLUTE RULES:
 - ALL Arabic must have full harakat (تشكيل)
 - grammar_note_bn: explain verb form, tense, or root pattern (not just meaning)
 - Return ONLY a valid JSON array — no markdown, no explanation`;
+
+// ── Build per-unit exercise user prompt ──────────────────────────────────────
+
+function buildExerciseUserPrompt(opts: {
+  unitType: UnitType;
+  surahRow: { name_bn: string; name_ar: string; revelation?: string } | null;
+  surahNumber: number | undefined;
+  lessonIndex: number;
+  verbRoots: { root: string; forms: string[] }[];
+  exWords: Array<{ arabic: string; transliteration: string | null; meaning_bn: string }>;
+  ayahTexts: Map<string, string>;
+  tafsirSnippets: Map<string, string>;
+  passageTitleBn: string;
+}): string {
+  const { unitType, surahRow, surahNumber, lessonIndex, verbRoots, exWords, ayahTexts, tafsirSnippets, passageTitleBn } = opts;
+  const wordList = exWords.map((w, i) => `${i + 1}. ${w.arabic} (${w.transliteration ?? '?'}) = ${w.meaning_bn}`).join('\n');
+  const ayahsBlock = formatAyahsForPrompt(ayahTexts, tafsirSnippets);
+
+  switch (unitType) {
+
+    case 'salah': {
+      const salahCtx = SALAH_POSITIONS[surahNumber!] ?? 'সালাতে পঠিত';
+      // Pick first ayah from the map for the ayah_read card
+      const firstKey = [...ayahTexts.keys()][0] ?? `${surahNumber}:1`;
+      const firstAyahNum = parseInt(firstKey.split(':')[1]);
+      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) — সূরা নং ${surahNumber}
+সালাতে অবস্থান: ${salahCtx}
+
+ডেটাবেজ থেকে আয়াত (ayah_read ও ayah_context-এর জন্য EXACT Arabic ব্যবহার করুন):
+${ayahsBlock}
+
+শব্দ তালিকা (${exWords.length} শব্দ):
+${wordList}
+
+নিচের ৮টি অনুশীলন তৈরি করুন (sort_order 1–8):
+1. ayah_read (sort_order 1): ayah_ar = EXACTLY "${ayahTexts.get(firstKey) ?? ''}" | ayah_bn = এর বাংলা অনুবাদ | surah_name = "সূরা ${surahRow?.name_bn}" | ayah_number = ${firstAyahNum} | context_bn = "${salahCtx}"
+2. tafsir_read (sort_order 2): এই সূরার পরিচিতি লিখুন — revelation (মাক্কী/মাদানী), theme_bn (মূল বিষয়), aqeedah_bn (আকীদার শিক্ষা), tafsir_bn (ইবনু সা'দীর পদ্ধতিতে ২-৩ বাক্য)
+3–5. 3×multiple_choice (sort_order 3–5): word → Bengali meaning
+6. drag_drop (sort_order 6): 3–4 pairs
+7. fill_in_blank (sort_order 7): phrase from the surah
+8. speak_arabic (sort_order 8): most important word
+
+Return valid JSON array only.`;
+    }
+
+    case 'juz_amma': {
+      // Build ayah_read lines outside the template literal to avoid paren ambiguity
+      const firstTwo = [...ayahTexts.entries()].slice(0, 2);
+      const ayahReadLines = firstTwo.map(([key, ar], idx) => {
+        const ayahNum = parseInt(key.split(':')[1]);
+        const sn = surahRow?.name_bn ?? '';
+        return `${idx + 2}. ayah_read (sort_order ${idx + 2}): ayah_ar = EXACTLY "${ar}" | ayah_bn = এর সঠিক বাংলা অনুবাদ | surah_name = "সূরা ${sn}" | ayah_number = ${ayahNum} | context_bn = এই আয়াতের তাৎপর্য`;
+      }).join('\n');
+      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) — সূরা নং ${surahNumber}
+নাযিল: ${surahRow?.revelation ?? 'মাক্কী'}
+
+ডেটাবেজ থেকে আয়াত (ayah_read ও ayah_context-এর জন্য EXACT Arabic ব্যবহার করুন — কোনো পরিবর্তন নেই):
+${ayahsBlock}
+
+মূল শব্দ তালিকা (${exWords.length} শব্দ):
+${wordList}
+
+নিচের ১০টি অনুশীলন তৈরি করুন (sort_order 1–10):
+1. tafsir_read (sort_order 1): সূরার পরিচিতি — revelation, theme_bn (মূল বিষয়), aqeedah_bn (আকীদার শিক্ষা), tafsir_bn (ইবনু সা'দীর পদ্ধতিতে ২-৩ বাক্য — এই সূরা কেন নাযিল হয়েছিল, কার জন্য, কী বার্তা)
+${ayahReadLines}
+4. surah_theme (sort_order 4): সূরার প্রধান বিষয় নিয়ে ৪ অপশন — সঠিক একটি, ভুল তিনটি
+5. ayah_context (sort_order 5): প্রথম আয়াত থেকে একটি শব্দ হাইলাইট করুন, ৪ অপশন
+6. ayah_context (sort_order 6): অন্য একটি আয়াত থেকে ভিন্ন শব্দ হাইলাইট করুন
+7–8. 2×multiple_choice (sort_order 7–8)
+9. fill_in_blank (sort_order 9)
+10. speak_arabic (sort_order 10): সবচেয়ে গুরুত্বপূর্ণ শব্দ
+
+Return valid JSON array only.`;
+    }
+
+    case 'attributes': {
+      const passage = ATTRIBUTE_PASSAGES[lessonIndex];
+      const firstKey = [...ayahTexts.keys()][0] ?? `${passage?.surah}:${passage?.ayahFrom}`;
+      const firstAyahNum = parseInt(firstKey.split(':')[1]);
+      return `পাঠ: ${passageTitleBn}
+সূরা ${passage?.surah}, আয়াত ${passage?.ayahFrom}–${passage?.ayahTo}
+
+ডেটাবেজ থেকে আয়াত (EXACT Arabic):
+${ayahsBlock}
+
+আল্লাহর নামসমূহ এই পাঠে (${exWords.length} নাম):
+${wordList}
+
+নিচের ৭টি অনুশীলন তৈরি করুন (sort_order 1–7):
+1. ayah_read (sort_order 1): ayah_ar = EXACTLY "${ayahTexts.get(firstKey) ?? ''}" | ayah_bn = এর বাংলা অনুবাদ | surah_name = উপযুক্ত সূরার নাম | ayah_number = ${firstAyahNum} | context_bn = "এই আয়াতে আল্লাহর নাম ও গুণাবলী রয়েছে"
+2. reflection_card (sort_order 2): এই নামগুলো মুমিনের হৃদয়ে কী প্রভাব ফেলে (athar) — ইবনু উসাইমীনের পদ্ধতিতে ব্যক্তিগত প্রতিফলনের প্রশ্ন তৈরি করুন
+3–5. 3×multiple_choice (sort_order 3–5): নাম → বাংলা অর্থ
+6. drag_drop (sort_order 6): ৩–৪টি নাম ও অর্থ মিলান
+7. speak_arabic (sort_order 7): সবচেয়ে গুরুত্বপূর্ণ নাম
+
+Return valid JSON array only.`;
+    }
+
+    case 'frequent': {
+      const start = lessonIndex * 20 + 1;
+      return `পাঠ ${lessonIndex + 1} — কুরআনের শীর্ষ ব্যবহৃত শব্দ #${start}–${start + 19}
+
+শব্দ তালিকা:
+${wordList}
+
+নিচের ৯টি অনুশীলন তৈরি করুন (sort_order 1–9):
+1–3. 3×multiple_choice (sort_order 1–3)
+4–5. 2×drag_drop (sort_order 4–5): 3 pairs each
+6. true_false (sort_order 6)
+7. fill_in_blank (sort_order 7)
+8. tap_to_build (sort_order 8)
+9. speak_arabic (sort_order 9)
+
+Return valid JSON array only.`;
+    }
+
+    case 'verbs': {
+      return `ক্রিয়া ধাতু: ${verbRoots.map(r => r.root).join(', ')}
+ধাতু পরিবার:
+${verbRoots.map(r => `• ${r.root}: ${r.forms.slice(0, 4).join(', ')}`).join('\n')}
+
+শব্দ তালিকা:
+${wordList}
+
+নিচের ৮টি অনুশীলন তৈরি করুন (sort_order 1–8):
+1–3. 3×multiple_choice (sort_order 1–3): root identification
+4–5. 2×drag_drop (sort_order 4–5)
+6. true_false (sort_order 6)
+7. fill_in_blank (sort_order 7)
+8. speak_arabic (sort_order 8)
+
+Return valid JSON array only.`;
+    }
+  }
+}
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 
@@ -294,14 +486,14 @@ Deno.serve(async (req: Request) => {
     const unitCfg   = UNIT_CONFIG[unitType];
 
     // ── 1. Fetch surah metadata (for salah/juz_amma only) ─────────────────
-    let surahRow: { number: number; name_bn: string; name_ar: string } | null = null;
+    let surahRow: { number: number; name_bn: string; name_ar: string; revelation?: string } | null = null;
     if (surahNumber) {
       const { data, error } = await sb.from('quran_surahs')
-        .select('number, name_bn, name_ar').eq('number', surahNumber).single();
+        .select('number, name_bn, name_ar, revelation').eq('number', surahNumber).single();
       if (error || !data) return new Response(JSON.stringify({ error: `Surah ${surahNumber} not found` }), {
         status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
-      surahRow = data as { number: number; name_bn: string; name_ar: string };
+      surahRow = data as { number: number; name_bn: string; name_ar: string; revelation?: string };
     }
 
     // ── 2. Ensure quranic track ───────────────────────────────────────────
@@ -351,8 +543,7 @@ Deno.serve(async (req: Request) => {
       if (words.length < 4) return new Response(JSON.stringify({ error: 'Too few Names found in this passage — check quran_words table' }), {
         status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
-      // Pause before enrichment — fetchAttributeWords already called Gemini,
-      // so two back-to-back calls without a gap reliably hits rate limits.
+      // Pause after Gemini call in fetchAttributeWords before next call
       await new Promise(r => setTimeout(r, 4000));
 
     } else if (unitType === 'verbs') {
@@ -414,20 +605,31 @@ ${wordList}`;
       console.warn('Enrichment failed, continuing without:', (e as Error).message);
     }
 
-    // ── 8. Build ayah context (salah/juz_amma only) ───────────────────────
-    const ayahTexts     = new Map<string, string>();
-    const tafsirSnippets = new Map<string, string>();
-    if (surahNumber && (unitType === 'salah' || unitType === 'juz_amma')) {
-      const ayahKeys = [...new Set((words as (WordRow & { ayah?: number })[]).map(w => `${surahNumber}:${w.ayah}`))];
-      await Promise.all(ayahKeys.slice(0, 8).map(async (key) => {
-        const [s, a] = key.split(':').map(Number);
-        const [{ data: ayahWords }, { data: tafsir }] = await Promise.all([
-          sb.from('quran_words').select('arabic').eq('surah', s).eq('ayah', a).order('position'),
-          sb.from('quran_tafsir').select('tafsir_text').eq('surah', s).eq('ayah', a).single(),
-        ]);
-        if (ayahWords) ayahTexts.set(key, (ayahWords as { arabic: string }[]).map(w => w.arabic).join(' '));
-        if (tafsir?.tafsir_text) tafsirSnippets.set(key, (tafsir.tafsir_text as string).slice(0, 120) + '…');
-      }));
+    // ── 8. Build ayah context from DB (salah, juz_amma, attributes) ───────
+    let ayahTexts     = new Map<string, string>();
+    let tafsirSnippets = new Map<string, string>();
+
+    if (unitType === 'salah' || unitType === 'juz_amma') {
+      // For surah-based units: get ayah texts for the words we have
+      const ayahKeys = [...new Set((words as (WordRow & { ayah?: number })[])
+        .filter(w => w.ayah != null)
+        .map(w => `${surahNumber}:${w.ayah}`))];
+      const result = await fetchAyahTexts(sb, ayahKeys);
+      ayahTexts     = result.ayahTexts;
+      tafsirSnippets = result.tafsirSnippets;
+
+    } else if (unitType === 'attributes') {
+      // For attributes: get ayah texts for the passage range
+      const passage = ATTRIBUTE_PASSAGES[lessonIndex];
+      if (passage) {
+        const ayahKeys: string[] = [];
+        for (let a = passage.ayahFrom; a <= Math.min(passage.ayahTo, passage.ayahFrom + 3); a++) {
+          ayahKeys.push(`${passage.surah}:${a}`);
+        }
+        const result = await fetchAyahTexts(sb, ayahKeys);
+        ayahTexts     = result.ayahTexts;
+        tafsirSnippets = result.tafsirSnippets;
+      }
     }
 
     // ── 9. Insert vocabulary ──────────────────────────────────────────────
@@ -459,38 +661,20 @@ ${wordList}`;
 
     if (exWords.length >= 2) {
       try {
-        const isVerbLesson  = unitType === 'verbs';
-        const systemPrompt  = isVerbLesson ? VERB_EXERCISE_SYSTEM_PROMPT : EXERCISE_SYSTEM_PROMPT;
+        const isVerbLesson = unitType === 'verbs';
+        const systemPrompt = isVerbLesson ? VERB_EXERCISE_SYSTEM_PROMPT : EXERCISE_SYSTEM_PROMPT;
 
-        let contextLabel: string;
-        if (unitType === 'salah' || unitType === 'juz_amma') contextLabel = `সূরা ${surahRow?.name_bn}`;
-        else if (unitType === 'attributes') contextLabel = ATTRIBUTE_THEMES[lessonIndex]?.titleBn ?? 'আল্লাহর গুণাবলী';
-        else if (unitType === 'verbs') {
-          contextLabel = `ক্রিয়া ধাতু: ${verbRoots.map(r => r.root).join(', ')}`;
-        }
-        else contextLabel = `শীর্ষ শব্দ পাঠ ${lessonIndex + 1}`;
-
-        const wordList = exWords.map((w, i) =>
-          `${i + 1}. ${w.arabic} (${w.transliteration ?? '?'}) = ${w.meaning_bn}`
-        ).join('\n');
-
-        const userPrompt = isVerbLesson
-          ? `Context: ${contextLabel}
-Verb root families:
-${verbRoots.map(r => `• ${r.root}: ${r.forms.slice(0, 4).join(', ')}`).join('\n')}
-
-Lesson word list:
-${wordList}
-
-Generate: 3×multiple_choice, 2×drag_drop, 1×true_false, 1×fill_in_blank, 1×speak_arabic
-= 8 exercises total (sort_order 1–8). Return valid JSON array only.`
-          : `Context: ${contextLabel}
-
-Lesson word list (arabic · transliteration = Bengali):
-${wordList}
-
-Generate: 3×multiple_choice, 2×drag_drop, 1×true_false, 1×fill_in_blank, 1×tap_to_build, 1×speak_arabic
-= 9 exercises total (sort_order 1–9). Return valid JSON array only.`;
+        const userPrompt = buildExerciseUserPrompt({
+          unitType,
+          surahRow,
+          surahNumber,
+          lessonIndex,
+          verbRoots,
+          exWords,
+          ayahTexts,
+          tafsirSnippets,
+          passageTitleBn: ATTRIBUTE_PASSAGES[lessonIndex]?.titleBn ?? `গুণাবলী পাঠ ${lessonIndex + 1}`,
+        });
 
         const rawEx   = extractJsonArray(await geminiGenerate(geminiKey, `${systemPrompt}\n\n${userPrompt}`));
         const exercises = JSON.parse(rawEx) as Array<Record<string, unknown>>;
@@ -501,15 +685,15 @@ Generate: 3×multiple_choice, 2×drag_drop, 1×true_false, 1×fill_in_blank, 1×
 
         const { data: inserted, error: exErr } = await sb.from('exercises').insert(
           exercises.map((ex, idx) => ({
-            lesson_id:      lessonId,
-            type:           ex.type,
-            sort_order:     (ex.sort_order as number) ?? (idx + 1),
-            prompt_bn:      ex.prompt_bn,
-            prompt_ar:      (ex.prompt_ar as string | undefined) ?? null,
-            correct_answer: ex.correct_answer,
-            distractors:    (ex.distractors as unknown) ?? null,
+            lesson_id:       lessonId,
+            type:            ex.type,
+            sort_order:      (ex.sort_order as number) ?? (idx + 1),
+            prompt_bn:       ex.prompt_bn,
+            prompt_ar:       (ex.prompt_ar as string | undefined) ?? null,
+            correct_answer:  ex.correct_answer,
+            distractors:     (ex.distractors as unknown) ?? null,
             grammar_note_bn: (ex.grammar_note_bn as string | undefined) ?? null,
-            difficulty:     (ex.difficulty as number) ?? 1,
+            difficulty:      (ex.difficulty as number) ?? 1,
           }))
         ).select('id');
         if (exErr) throw new Error(`Exercise insert: ${exErr.message}`);

@@ -51,4 +51,9 @@ const _$ExerciseTypeEnumMap = {
   ExerciseType.translateBuild: 'translateBuild',
   ExerciseType.listenSelect: 'listenSelect',
   ExerciseType.speakArabic: 'speakArabic',
+  ExerciseType.ayahRead: 'ayahRead',
+  ExerciseType.tafsirRead: 'tafsirRead',
+  ExerciseType.ayahContext: 'ayahContext',
+  ExerciseType.surahTheme: 'surahTheme',
+  ExerciseType.reflectionCard: 'reflectionCard',
 };

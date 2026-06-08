@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+import 'exercise_ayah_context.dart';
+import 'exercise_ayah_read.dart';
 import 'exercise_chat_complete.dart';
 import 'exercise_drag_drop.dart';
 import 'exercise_fill_blank.dart';
 import 'exercise_listen_select.dart';
 import 'exercise_multiple_choice.dart';
+import 'exercise_reflection_card.dart';
 import 'exercise_speak_arabic.dart';
+import 'exercise_surah_theme.dart';
 import 'exercise_tap_to_build.dart';
+import 'exercise_tafsir_read.dart';
 import 'exercise_translate_build.dart';
 import 'exercise_true_false.dart';
 import 'exercise_word_scramble.dart';
@@ -53,6 +58,16 @@ class ExerciseEngine extends StatelessWidget {
         ExerciseListenSelect(exercise: exercise, onAnswered: onAnswered),
       ExerciseType.speakArabic =>
         ExerciseSpeakArabic(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.ayahRead =>
+        ExerciseAyahRead(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.tafsirRead =>
+        ExerciseTafsirRead(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.ayahContext =>
+        ExerciseAyahContext(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.surahTheme =>
+        ExerciseSurahTheme(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.reflectionCard =>
+        ExerciseReflectionCard(exercise: exercise, onAnswered: onAnswered),
     };
   }
 }
