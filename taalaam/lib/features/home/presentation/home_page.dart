@@ -556,6 +556,135 @@ class _QuickAccessButton extends StatelessWidget {
 
 // ── Track card ────────────────────────────────────────────────────────────────
 
+// ── Learn tab (used by MainShell) ─────────────────────────────────────────────
+
+class LearnTab extends ConsumerWidget {
+  const LearnTab({super.key, this.onPracticeTab});
+  final VoidCallback? onPracticeTab;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tracks = ref.watch(tracksProvider);
+    final streak = ref.watch(streakProvider).valueOrNull;
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Builder(builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          return Image.asset(
+            isDark
+                ? 'assets/logo_dark-removebg-preview.png'
+                : 'assets/logo_light-removebg-preview.png',
+            height: 44,
+          );
+        }),
+        centerTitle: false,
+        actions: [
+          // Compact streak chip
+          if (streak != null) ...[
+            _StatChip('🔥', '${streak.currentStreak}'),
+            _StatChip('⭐', '${streak.totalXp}'),
+            _StatChip('❤️', '${streak.hearts}/5'),
+          ],
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                final sync = ref.read(syncServiceProvider);
+                final knownTracks =
+                    ref.read(tracksProvider).valueOrNull ?? [];
+                await sync.syncTracks();
+                ref.invalidate(tracksProvider);
+                for (final t in knownTracks) {
+                  await sync.syncUnits(t.id);
+                  ref.invalidate(unitsForTrackProvider(t.id));
+                }
+              },
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      child: Text(
+                        'শেখার পথ',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  tracks.when(
+                    data: (list) => list.isEmpty
+                        ? const SliverToBoxAdapter(
+                            child: _EmptyTracksState())
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (ctx, i) => Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                    20, 0, 20, 14),
+                                child: _TrackCard(track: list[i]),
+                              ),
+                              childCount: list.length,
+                            ),
+                          ),
+                    loading: () => const SliverToBoxAdapter(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(48),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                    ),
+                    error: (e, _) => SliverToBoxAdapter(
+                      child: Center(
+                        child: Text('পাঠ লোড হচ্ছে না।',
+                            style: TextStyle(
+                                color: Theme.of(context).colorScheme.error)),
+                      ),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String emoji;
+  final String value;
+  const _StatChip(this.emoji, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(left: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '$emoji $value',
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _TrackCard extends ConsumerWidget {
   final Track track;
   const _TrackCard({required this.track});
@@ -725,19 +854,6 @@ class _TrackCard extends ConsumerWidget {
                         ? 'চালিয়ে যান'
                         : 'শুরু করুন'),
                   ),
-                  if (isQuranic)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.menu_book_rounded, size: 15),
-                        label: const Text('শব্দে শব্দে পড়ুন'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.teal,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        onPressed: () => context.go('/quran-reader'),
-                      ),
-                    ),
                 ],
               ),
             ),

@@ -7,8 +7,15 @@ import '../../../data/local/database.dart';
 import '../../../data/local/quran_local_source.dart';
 import 'quran_reader_provider.dart';
 
+// Uthmani script has pause/sajdah marks (U+06D6–U+06DC, U+06DF–U+06E4, U+06E7+)
+// that the alquran.cloud API emits as standalone space-separated tokens.
+// These are not real words — filter them from word chips.
+bool _isRealWord(String s) =>
+    s.runes.any((r) => r >= 0x0600 && r <= 0x06D5);
+
 class QuranWordReaderPage extends ConsumerStatefulWidget {
-  const QuranWordReaderPage({super.key});
+  final bool showBackButton;
+  const QuranWordReaderPage({super.key, this.showBackButton = true});
 
   @override
   ConsumerState<QuranWordReaderPage> createState() =>
@@ -56,10 +63,12 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
-        ),
+        leading: widget.showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/home'),
+              )
+            : null,
         title: currentSurah == null
             ? const Text('শব্দে শব্দে কুরআন')
             : Column(
@@ -484,9 +493,12 @@ class _WordView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    // Filter out standalone Uthmani pause/sajdah marks (e.g. ۛ) that
+    // alquran.cloud emits as space-separated tokens — they are not words.
+    final displayWords = words.where((w) => _isRealWord(w.arabic)).toList();
     final selectedWord =
-        words.where((w) => w.position == nav.selectedWord).firstOrNull;
-    final fullAyah = words.map((w) => w.arabic).join(' ');
+        displayWords.where((w) => w.position == nav.selectedWord).firstOrNull;
+    final fullAyah = displayWords.map((w) => w.arabic).join(' ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -566,7 +578,7 @@ class _WordView extends ConsumerWidget {
                     spacing: 8,
                     runSpacing: 10,
                     alignment: WrapAlignment.center,
-                    children: words.map((word) {
+                    children: displayWords.map((word) {
                       final isSelected = word.position == nav.selectedWord;
                       return GestureDetector(
                         onTap: () {

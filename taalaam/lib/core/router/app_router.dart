@@ -14,7 +14,7 @@ import '../../features/auth/presentation/onboarding_page.dart';
 import '../../features/auth/presentation/profile_page.dart';
 import '../../features/auth/presentation/streak_goal_page.dart';
 import '../../features/lesson/presentation/exam_screen.dart';
-import '../../features/home/presentation/home_page.dart';
+import '../../features/home/presentation/main_shell.dart';
 import '../../features/home/presentation/leaderboard_page.dart';
 import '../../features/home/presentation/settings_page.dart';
 import '../../features/home/presentation/track_detail_page.dart';
@@ -83,7 +83,7 @@ final appRouterProvider =
         ),
         GoRoute(
           path: '/home',
-          builder: (_, __) => const HomePage(),
+          builder: (_, __) => const MainShell(),
         ),
         GoRoute(
           path: '/track/:trackId',
