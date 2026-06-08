@@ -36,33 +36,40 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _tab,
-        children: [
-          LearnTab(onPracticeTab: () => setState(() => _tab = 1)),
-          const _PracticeTab(),
-          const QuranWordReaderPage(showBackButton: false),
-          const _ProfileTab(),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: NavigationBar(
-              selectedIndex: _tab,
-              onDestinationSelected: (i) => setState(() => _tab = i),
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-              elevation: 8,
-              shadowColor: Colors.black38,
-              destinations: List.generate(
-                4,
-                (i) => NavigationDestination(
-                  icon: Icon(_icons[i]),
-                  selectedIcon: Icon(_selectedIcons[i]),
-                  label: _labels[i],
+    return PopScope(
+      canPop: _tab == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _tab != 0) setState(() => _tab = 0);
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _tab,
+          children: [
+            LearnTab(onPracticeTab: () => setState(() => _tab = 1)),
+            const _PracticeTab(),
+            const QuranWordReaderPage(showBackButton: false),
+            const _ProfileTab(),
+          ],
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (i) => setState(() => _tab = i),
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                animationDuration: const Duration(milliseconds: 300),
+                elevation: 8,
+                shadowColor: Colors.black38,
+                destinations: List.generate(
+                  4,
+                  (i) => NavigationDestination(
+                    icon: Icon(_icons[i]),
+                    selectedIcon: Icon(_selectedIcons[i]),
+                    label: _labels[i],
+                  ),
                 ),
               ),
             ),
@@ -101,7 +108,7 @@ class _PracticeTab extends ConsumerWidget {
                 ? '$newCount টি নতুন শব্দ অপেক্ষা করছে'
                 : 'এখন নতুন শব্দ নেই',
             badge: newCount > 0 ? '$newCount' : null,
-            onTap: newCount > 0 ? () => context.go('/memorize') : null,
+            onTap: newCount > 0 ? () => context.push('/memorize') : null,
           ),
           const SizedBox(height: 12),
           _PracticeCard(
@@ -112,7 +119,7 @@ class _PracticeTab extends ConsumerWidget {
                 ? '$dueCount টি কার্ড রিভিউ বাকি'
                 : 'আজকের রিভিউ শেষ!',
             badge: dueCount > 0 ? '$dueCount' : null,
-            onTap: dueCount > 0 ? () => context.go('/review') : null,
+            onTap: dueCount > 0 ? () => context.push('/review') : null,
           ),
           const SizedBox(height: 24),
           Padding(
@@ -126,7 +133,7 @@ class _PracticeTab extends ConsumerWidget {
             iconColor: AppColors.teal,
             title: 'কথোপকথন',
             subtitle: 'আরবিতে কথা বলার অনুশীলন',
-            onTap: () => context.go('/conversation'),
+            onTap: () => context.push('/conversation'),
           ),
           const SizedBox(height: 12),
           _PracticeCard(
@@ -134,7 +141,7 @@ class _PracticeTab extends ConsumerWidget {
             iconColor: Colors.purple,
             title: 'হালাকা',
             subtitle: 'গ্রুপ শিক্ষা কার্যক্রম',
-            onTap: () => context.go('/groups'),
+            onTap: () => context.push('/groups'),
           ),
         ],
       ),
@@ -269,12 +276,12 @@ class _ProfileTab extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.leaderboard_outlined),
             tooltip: 'র‍্যাংকিং',
-            onPressed: () => context.go('/leaderboard'),
+            onPressed: () => context.push('/leaderboard'),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'সেটিংস',
-            onPressed: () => context.go('/settings'),
+            onPressed: () => context.push('/settings'),
           ),
         ],
       ),
@@ -421,7 +428,7 @@ class _ProfileTab extends ConsumerWidget {
           FilledButton.icon(
             icon: const Icon(Icons.person_outline),
             label: const Text('প্রোফাইল সম্পাদনা'),
-            onPressed: () => context.go('/profile'),
+            onPressed: () => context.push('/profile'),
             style: FilledButton.styleFrom(
               backgroundColor: theme.colorScheme.surfaceContainer,
               foregroundColor: theme.colorScheme.onSurface,

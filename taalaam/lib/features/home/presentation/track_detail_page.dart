@@ -1038,7 +1038,7 @@ class _LessonNode extends ConsumerWidget {
     }
 
     return GestureDetector(
-      onTap:      () => context.go('/lesson/${lesson.id}'),
+      onTap:      () => context.push('/lesson/${lesson.id}'),
       onLongPress: () => _showTooltip(context, theme),
       child: SizedBox(
         width: _nodeSize,
@@ -1180,7 +1180,7 @@ class _LessonNode extends ConsumerWidget {
               child: FilledButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  context.go('/lesson/${lesson.id}');
+                  context.push('/lesson/${lesson.id}');
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: tierColors[0],
@@ -1304,7 +1304,7 @@ class _ExamNodeState extends State<_ExamNode>
       child: Center(
         child: GestureDetector(
           onTap: widget.isUnlocked
-              ? () => context.go('/exam/${widget.examLesson.id}')
+              ? () => context.push('/exam/${widget.examLesson.id}')
               : null,
           child: Column(
             mainAxisSize: MainAxisSize.min,

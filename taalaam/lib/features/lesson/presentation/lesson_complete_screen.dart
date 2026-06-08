@@ -349,7 +349,7 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                             label: Text('পরবর্তী: ${nextLesson.titleBn}',
                                 overflow: TextOverflow.ellipsis),
                             onPressed: () =>
-                                context.go('/lesson/${nextLesson.id}'),
+                                context.push('/lesson/${nextLesson.id}'),
                           ),
                           const SizedBox(height: 10),
                         ],
@@ -370,7 +370,7 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                         OutlinedButton.icon(
                           icon: const Icon(Icons.refresh_rounded),
                           label: const Text('আজকের রিভিউ করুন'),
-                          onPressed: () => context.go('/review'),
+                          onPressed: () => context.push('/review'),
                         ),
                       ],
                     ),

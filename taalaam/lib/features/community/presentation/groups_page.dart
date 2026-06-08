@@ -140,7 +140,7 @@ class _GroupsBody extends ConsumerWidget {
     final groupId = await notifier.createGroup(name, streakGoal: goal);
     if (context.mounted && groupId != null) {
       ref.invalidate(myGroupsProvider);
-      context.go('/groups/$groupId');
+      context.push('/groups/$groupId');
     }
   }
 }
@@ -175,7 +175,7 @@ class _JoinByCodeBarState extends ConsumerState<_JoinByCodeBar> {
     if (groupId != null) {
       _ctrl.clear();
       ref.invalidate(myGroupsProvider);
-      context.go('/groups/$groupId');
+      context.push('/groups/$groupId');
     } else {
       final err = ref.read(groupsNotifierProvider(widget.userId));
       ScaffoldMessenger.of(context).showSnackBar(
@@ -265,7 +265,7 @@ class _GroupTile extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.go('/groups/${group.id}'),
+        onTap: () => context.push('/groups/${group.id}'),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(

@@ -68,7 +68,7 @@ class _DetailBody extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: BackButton(onPressed: () => context.go('/groups')),
+        leading: BackButton(onPressed: () => Navigator.of(context).canPop() ? Navigator.of(context).pop() : context.go('/groups')),
         title: Text(group.name),
         actions: [
           // Copy invite code

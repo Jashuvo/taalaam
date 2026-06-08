@@ -13,6 +13,13 @@ import 'quran_reader_provider.dart';
 bool _isRealWord(String s) =>
     s.runes.any((r) => r >= 0x0600 && r <= 0x06D5);
 
+// GTAF sometimes stores ayah-number markers like "(২)" as Bengali meanings.
+// Belt-and-suspenders filter in case the pipeline didn't catch them.
+bool _isAyahMarker(String? s) {
+  if (s == null || s.isEmpty) return false;
+  return RegExp(r'^\s*\([০-৯\d\s]+\)\s*$').hasMatch(s);
+}
+
 class QuranWordReaderPage extends ConsumerStatefulWidget {
   final bool showBackButton;
   const QuranWordReaderPage({super.key, this.showBackButton = true});
@@ -500,10 +507,10 @@ class _WordView extends ConsumerWidget {
         displayWords.where((w) => w.position == nav.selectedWord).firstOrNull;
     final fullAyah = displayWords.map((w) => w.arabic).join(' ');
 
-    // Bengali rough translation — concatenate word meanings
+    // Bengali rough translation — concatenate word meanings, skip ayah markers
     final fullMeaning = displayWords
         .map((w) => w.meaningBn ?? '')
-        .where((s) => s.isNotEmpty)
+        .where((s) => s.isNotEmpty && !_isAyahMarker(s))
         .join(' ');
 
     // Dynamic font size — reduce for long ayahs so they fit the header
@@ -664,7 +671,7 @@ class _WordView extends ConsumerWidget {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                word.meaningBn ?? '—',
+                                _isAyahMarker(word.meaningBn) ? '—' : (word.meaningBn ?? '—'),
                                 style: TextStyle(
                                   fontSize: 11,
                                   height: 1.3,

@@ -67,7 +67,7 @@ class HomePage extends ConsumerWidget {
                         label: Text('$count'),
                         child: const Icon(Icons.refresh),
                       ),
-                      onPressed: () => context.go('/review'),
+                      onPressed: () => context.push('/review'),
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -82,17 +82,17 @@ class HomePage extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.leaderboard_outlined),
             tooltip: 'র‍্যাংকিং',
-            onPressed: () => context.go('/leaderboard'),
+            onPressed: () => context.push('/leaderboard'),
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'সেটিংস',
-            onPressed: () => context.go('/settings'),
+            onPressed: () => context.push('/settings'),
           ),
           IconButton(
             icon: const Icon(Icons.person_outline),
             tooltip: 'প্রোফাইল',
-            onPressed: () => context.go('/profile'),
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),
@@ -458,20 +458,20 @@ class _QuickAccessRow extends ConsumerWidget {
           icon: Icons.chat_bubble_outline_rounded,
           label: 'কথোপকথন',
           color: AppColors.teal,
-          onTap: () => context.go('/conversation'),
+          onTap: () => context.push('/conversation'),
         ),
         _QuickAccessButton(
           icon: Icons.psychology_outlined,
           label: 'মুখস্থ',
           color: const Color(0xFF5B4FCF),
           badge: newCount,
-          onTap: () => context.go('/memorize'),
+          onTap: () => context.push('/memorize'),
         ),
         _QuickAccessButton(
           icon: Icons.groups_outlined,
           label: 'হালাকা',
           color: AppColors.midGreen,
-          onTap: () => context.go('/groups'),
+          onTap: () => context.push('/groups'),
         ),
       ],
     );
@@ -722,7 +722,7 @@ class _TrackCard extends ConsumerWidget {
       shadowColor: gradientColors[0].withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
       child: InkWell(
-        onTap: () => context.go('/track/${track.slug}'),
+        onTap: () => context.push('/track/${track.slug}'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -851,7 +851,7 @@ class _TrackCard extends ConsumerWidget {
                   ] else
                     const SizedBox(height: 10),
                   FilledButton(
-                    onPressed: () => context.go('/track/${track.slug}'),
+                    onPressed: () => context.push('/track/${track.slug}'),
                     style: FilledButton.styleFrom(
                       backgroundColor: gradientColors[0],
                       foregroundColor: Colors.white,
