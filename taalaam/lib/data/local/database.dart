@@ -22,6 +22,8 @@ class QuranWords extends Table {
   IntColumn get position => integer()();
   TextColumn get arabic => text()();
   TextColumn get meaningBn => text().nullable()();
+  TextColumn get root => text().nullable()();
+  TextColumn get pos => text().nullable()();
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -65,7 +67,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -133,6 +135,12 @@ class AppDatabase extends _$AppDatabase {
             meaning_bn TEXT
           )
         ''');
+      }
+      if (from < 11) {
+        try { await customStatement('ALTER TABLE quran_words ADD COLUMN root TEXT'); } catch (_) {}
+        try { await customStatement('ALTER TABLE quran_words ADD COLUMN pos TEXT');  } catch (_) {}
+      }
+      if (from < 10) {
         await customStatement('''
           CREATE TABLE IF NOT EXISTS quran_surahs (
             number INTEGER NOT NULL PRIMARY KEY,

@@ -5374,9 +5374,19 @@ class $QuranWordsTable extends QuranWords
   late final GeneratedColumn<String> meaningBn = GeneratedColumn<String>(
       'meaning_bn', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _rootMeta = const VerificationMeta('root');
+  @override
+  late final GeneratedColumn<String> root = GeneratedColumn<String>(
+      'root', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _posMeta = const VerificationMeta('pos');
+  @override
+  late final GeneratedColumn<String> pos = GeneratedColumn<String>(
+      'pos', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, surah, ayah, position, arabic, meaningBn];
+      [id, surah, ayah, position, arabic, meaningBn, root, pos];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -5420,6 +5430,14 @@ class $QuranWordsTable extends QuranWords
       context.handle(_meaningBnMeta,
           meaningBn.isAcceptableOrUnknown(data['meaning_bn']!, _meaningBnMeta));
     }
+    if (data.containsKey('root')) {
+      context.handle(
+          _rootMeta, root.isAcceptableOrUnknown(data['root']!, _rootMeta));
+    }
+    if (data.containsKey('pos')) {
+      context.handle(
+          _posMeta, pos.isAcceptableOrUnknown(data['pos']!, _posMeta));
+    }
     return context;
   }
 
@@ -5441,6 +5459,10 @@ class $QuranWordsTable extends QuranWords
           .read(DriftSqlType.string, data['${effectivePrefix}arabic'])!,
       meaningBn: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}meaning_bn']),
+      root: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}root']),
+      pos: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pos']),
     );
   }
 
@@ -5457,13 +5479,17 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
   final int position;
   final String arabic;
   final String? meaningBn;
+  final String? root;
+  final String? pos;
   const QuranWord(
       {required this.id,
       required this.surah,
       required this.ayah,
       required this.position,
       required this.arabic,
-      this.meaningBn});
+      this.meaningBn,
+      this.root,
+      this.pos});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -5474,6 +5500,12 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
     map['arabic'] = Variable<String>(arabic);
     if (!nullToAbsent || meaningBn != null) {
       map['meaning_bn'] = Variable<String>(meaningBn);
+    }
+    if (!nullToAbsent || root != null) {
+      map['root'] = Variable<String>(root);
+    }
+    if (!nullToAbsent || pos != null) {
+      map['pos'] = Variable<String>(pos);
     }
     return map;
   }
@@ -5488,6 +5520,8 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
       meaningBn: meaningBn == null && nullToAbsent
           ? const Value.absent()
           : Value(meaningBn),
+      root: root == null && nullToAbsent ? const Value.absent() : Value(root),
+      pos: pos == null && nullToAbsent ? const Value.absent() : Value(pos),
     );
   }
 
@@ -5501,6 +5535,8 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
       position: serializer.fromJson<int>(json['position']),
       arabic: serializer.fromJson<String>(json['arabic']),
       meaningBn: serializer.fromJson<String?>(json['meaningBn']),
+      root: serializer.fromJson<String?>(json['root']),
+      pos: serializer.fromJson<String?>(json['pos']),
     );
   }
   @override
@@ -5513,6 +5549,8 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
       'position': serializer.toJson<int>(position),
       'arabic': serializer.toJson<String>(arabic),
       'meaningBn': serializer.toJson<String?>(meaningBn),
+      'root': serializer.toJson<String?>(root),
+      'pos': serializer.toJson<String?>(pos),
     };
   }
 
@@ -5522,7 +5560,9 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
           int? ayah,
           int? position,
           String? arabic,
-          Value<String?> meaningBn = const Value.absent()}) =>
+          Value<String?> meaningBn = const Value.absent(),
+          Value<String?> root = const Value.absent(),
+          Value<String?> pos = const Value.absent()}) =>
       QuranWord(
         id: id ?? this.id,
         surah: surah ?? this.surah,
@@ -5530,6 +5570,8 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
         position: position ?? this.position,
         arabic: arabic ?? this.arabic,
         meaningBn: meaningBn.present ? meaningBn.value : this.meaningBn,
+        root: root.present ? root.value : this.root,
+        pos: pos.present ? pos.value : this.pos,
       );
   QuranWord copyWithCompanion(QuranWordsCompanion data) {
     return QuranWord(
@@ -5539,6 +5581,8 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
       position: data.position.present ? data.position.value : this.position,
       arabic: data.arabic.present ? data.arabic.value : this.arabic,
       meaningBn: data.meaningBn.present ? data.meaningBn.value : this.meaningBn,
+      root: data.root.present ? data.root.value : this.root,
+      pos: data.pos.present ? data.pos.value : this.pos,
     );
   }
 
@@ -5550,13 +5594,16 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
           ..write('ayah: $ayah, ')
           ..write('position: $position, ')
           ..write('arabic: $arabic, ')
-          ..write('meaningBn: $meaningBn')
+          ..write('meaningBn: $meaningBn, ')
+          ..write('root: $root, ')
+          ..write('pos: $pos')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, surah, ayah, position, arabic, meaningBn);
+  int get hashCode =>
+      Object.hash(id, surah, ayah, position, arabic, meaningBn, root, pos);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5566,7 +5613,9 @@ class QuranWord extends DataClass implements Insertable<QuranWord> {
           other.ayah == this.ayah &&
           other.position == this.position &&
           other.arabic == this.arabic &&
-          other.meaningBn == this.meaningBn);
+          other.meaningBn == this.meaningBn &&
+          other.root == this.root &&
+          other.pos == this.pos);
 }
 
 class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
@@ -5576,6 +5625,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
   final Value<int> position;
   final Value<String> arabic;
   final Value<String?> meaningBn;
+  final Value<String?> root;
+  final Value<String?> pos;
   final Value<int> rowid;
   const QuranWordsCompanion({
     this.id = const Value.absent(),
@@ -5584,6 +5635,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
     this.position = const Value.absent(),
     this.arabic = const Value.absent(),
     this.meaningBn = const Value.absent(),
+    this.root = const Value.absent(),
+    this.pos = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   QuranWordsCompanion.insert({
@@ -5593,6 +5646,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
     required int position,
     required String arabic,
     this.meaningBn = const Value.absent(),
+    this.root = const Value.absent(),
+    this.pos = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         surah = Value(surah),
@@ -5606,6 +5661,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
     Expression<int>? position,
     Expression<String>? arabic,
     Expression<String>? meaningBn,
+    Expression<String>? root,
+    Expression<String>? pos,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5615,6 +5672,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
       if (position != null) 'position': position,
       if (arabic != null) 'arabic': arabic,
       if (meaningBn != null) 'meaning_bn': meaningBn,
+      if (root != null) 'root': root,
+      if (pos != null) 'pos': pos,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5626,6 +5685,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
       Value<int>? position,
       Value<String>? arabic,
       Value<String?>? meaningBn,
+      Value<String?>? root,
+      Value<String?>? pos,
       Value<int>? rowid}) {
     return QuranWordsCompanion(
       id: id ?? this.id,
@@ -5634,6 +5695,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
       position: position ?? this.position,
       arabic: arabic ?? this.arabic,
       meaningBn: meaningBn ?? this.meaningBn,
+      root: root ?? this.root,
+      pos: pos ?? this.pos,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5659,6 +5722,12 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
     if (meaningBn.present) {
       map['meaning_bn'] = Variable<String>(meaningBn.value);
     }
+    if (root.present) {
+      map['root'] = Variable<String>(root.value);
+    }
+    if (pos.present) {
+      map['pos'] = Variable<String>(pos.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5674,6 +5743,8 @@ class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
           ..write('position: $position, ')
           ..write('arabic: $arabic, ')
           ..write('meaningBn: $meaningBn, ')
+          ..write('root: $root, ')
+          ..write('pos: $pos, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10067,6 +10138,8 @@ typedef $$QuranWordsTableCreateCompanionBuilder = QuranWordsCompanion Function({
   required int position,
   required String arabic,
   Value<String?> meaningBn,
+  Value<String?> root,
+  Value<String?> pos,
   Value<int> rowid,
 });
 typedef $$QuranWordsTableUpdateCompanionBuilder = QuranWordsCompanion Function({
@@ -10076,6 +10149,8 @@ typedef $$QuranWordsTableUpdateCompanionBuilder = QuranWordsCompanion Function({
   Value<int> position,
   Value<String> arabic,
   Value<String?> meaningBn,
+  Value<String?> root,
+  Value<String?> pos,
   Value<int> rowid,
 });
 
@@ -10105,6 +10180,12 @@ class $$QuranWordsTableFilterComposer
 
   ColumnFilters<String> get meaningBn => $composableBuilder(
       column: $table.meaningBn, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get root => $composableBuilder(
+      column: $table.root, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pos => $composableBuilder(
+      column: $table.pos, builder: (column) => ColumnFilters(column));
 }
 
 class $$QuranWordsTableOrderingComposer
@@ -10133,6 +10214,12 @@ class $$QuranWordsTableOrderingComposer
 
   ColumnOrderings<String> get meaningBn => $composableBuilder(
       column: $table.meaningBn, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get root => $composableBuilder(
+      column: $table.root, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pos => $composableBuilder(
+      column: $table.pos, builder: (column) => ColumnOrderings(column));
 }
 
 class $$QuranWordsTableAnnotationComposer
@@ -10161,6 +10248,12 @@ class $$QuranWordsTableAnnotationComposer
 
   GeneratedColumn<String> get meaningBn =>
       $composableBuilder(column: $table.meaningBn, builder: (column) => column);
+
+  GeneratedColumn<String> get root =>
+      $composableBuilder(column: $table.root, builder: (column) => column);
+
+  GeneratedColumn<String> get pos =>
+      $composableBuilder(column: $table.pos, builder: (column) => column);
 }
 
 class $$QuranWordsTableTableManager extends RootTableManager<
@@ -10192,6 +10285,8 @@ class $$QuranWordsTableTableManager extends RootTableManager<
             Value<int> position = const Value.absent(),
             Value<String> arabic = const Value.absent(),
             Value<String?> meaningBn = const Value.absent(),
+            Value<String?> root = const Value.absent(),
+            Value<String?> pos = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               QuranWordsCompanion(
@@ -10201,6 +10296,8 @@ class $$QuranWordsTableTableManager extends RootTableManager<
             position: position,
             arabic: arabic,
             meaningBn: meaningBn,
+            root: root,
+            pos: pos,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -10210,6 +10307,8 @@ class $$QuranWordsTableTableManager extends RootTableManager<
             required int position,
             required String arabic,
             Value<String?> meaningBn = const Value.absent(),
+            Value<String?> root = const Value.absent(),
+            Value<String?> pos = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               QuranWordsCompanion.insert(
@@ -10219,6 +10318,8 @@ class $$QuranWordsTableTableManager extends RootTableManager<
             position: position,
             arabic: arabic,
             meaningBn: meaningBn,
+            root: root,
+            pos: pos,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
