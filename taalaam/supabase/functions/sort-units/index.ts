@@ -95,26 +95,10 @@ Example: "ক্রিয়ার রূপান্তর: বাব নাস
 For merged modules: pick the most descriptive title. The "keep" module absorbs all lessons.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## TRACK CLASSIFICATION RULES
-Modules belong to one of two learning tracks. If a module on the current track
-actually belongs on the other track, flag it in track_assignments.
-
-CONVERSATIONAL (কথোপকথন আরবি) — slug: "conversational":
-  Purpose: everyday spoken Modern Arabic for real communication
-  Signals: greetings, shopping, professions, travel, food, family, emotions,
-           daily objects, common phrases, dialogues, practical scenarios
-  Example titles: "পেশা ও কর্মসংস্থান", "বাজার ও কেনাকাটা", "পরিবার পরিচিতি"
-
-QURANIC (কুরআনিক আরবি) — slug: "quranic":
-  Purpose: Classical/Fusha Arabic for reading Quran and Islamic texts
-  Signals: Quranic vocabulary, verb conjugation patterns (أبواب), morphological
-           tables (صرف), tafsir terms, classical grammar (نحو/إعراب),
-           Islamic/religious context, root-word analysis
-  Example titles: "ক্রিয়ার রূপান্তর", "বাব নাসারা", "মাযি ও মুযারি"
-  TIEBREAKER: When ambiguous → assign to QURANIC (app's primary mission)
-
-In track_assignments: ONLY list modules that need to move to the OTHER track.
-Omit modules that already belong on the current track.
+## TRACK ASSIGNMENTS
+Always return "track_assignments": [] — do not move any module to a different track.
+The quranic track is managed exclusively by the curate-quran-lesson edge function
+and must never receive modules via this sort pipeline.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## OUTPUT FORMAT (STRICT JSON — NO MARKDOWN, NO EXTRA TEXT)

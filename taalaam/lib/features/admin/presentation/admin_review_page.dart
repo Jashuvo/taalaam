@@ -65,6 +65,13 @@ class _AdminReviewPageState extends ConsumerState<AdminReviewPage>
       final allTrackChanges = <Map<String, dynamic>>[];
       final modelsUsed = <String>{};
       for (final trackId in trackIds) {
+        // Quranic track order is curated — never AI-sort it
+        final trackUnits = (_localOrder ?? ref.read(_allUnitsProvider).valueOrNull ?? [])
+            .where((u) => (u['track_id'] as String) == trackId)
+            .toList();
+        final slug = (trackUnits.firstOrNull?['tracks'] as Map?)?['slug'] as String?;
+        if (slug == 'quranic') continue;
+
         final res = await Supabase.instance.client.functions
             .invoke('sort-units', body: {'track_id': trackId});
         final errMsg = res.data?['error'] as String?;

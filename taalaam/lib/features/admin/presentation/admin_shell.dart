@@ -13,18 +13,21 @@ class AdminShell extends StatelessWidget {
   });
 
   int get _selectedIndex {
-    if (currentLocation.startsWith('/admin/users')) return 3;
-    if (currentLocation.startsWith('/admin/upload')) return 2;
-    if (currentLocation.startsWith('/admin/review')) return 1;
-    return 0; // /admin → dashboard
+    if (currentLocation.startsWith('/admin/users')) return 4;
+    if (currentLocation.startsWith('/admin/upload')) return 3;
+    if (currentLocation.startsWith('/admin/review')) return 2;
+    if (currentLocation == '/admin') return 1;
+    if (currentLocation.startsWith('/admin/home')) return 0;
+    return 0;
   }
 
   void _navigate(BuildContext context, int index) {
     switch (index) {
-      case 0: context.go('/admin');
-      case 1: context.go('/admin/review');
-      case 2: context.go('/admin/upload');
-      case 3: context.go('/admin/users');
+      case 0: context.go('/admin/home');
+      case 1: context.go('/admin');
+      case 2: context.go('/admin/review');
+      case 3: context.go('/admin/upload');
+      case 4: context.go('/admin/users');
     }
   }
 
@@ -36,10 +39,11 @@ class AdminShell extends StatelessWidget {
     final isWide = MediaQuery.sizeOf(context).width >= 720;
 
     final navItems = [
-      (icon: Icons.dashboard_outlined,   active: Icons.dashboard,        label: 'Dashboard'),
-      (icon: Icons.rate_review_outlined,  active: Icons.rate_review,      label: 'Content'),
-      (icon: Icons.upload_file_outlined,  active: Icons.upload_file,      label: 'Upload'),
-      (icon: Icons.people_outline,        active: Icons.people,           label: 'Users'),
+      (icon: Icons.home_outlined,          active: Icons.home,             label: 'Home'),
+      (icon: Icons.dashboard_outlined,     active: Icons.dashboard,        label: 'Dashboard'),
+      (icon: Icons.rate_review_outlined,   active: Icons.rate_review,      label: 'Content'),
+      (icon: Icons.upload_file_outlined,   active: Icons.upload_file,      label: 'Upload'),
+      (icon: Icons.people_outline,         active: Icons.people,           label: 'Users'),
     ];
 
     return Scaffold(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 
 class AdminHomePage extends StatefulWidget {
@@ -121,6 +122,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
                         onTap: () => context.go('/admin/review'),
                       ),
                       const SizedBox(height: 16),
+                      _QuranCurationCard(),
+                      const SizedBox(height: 16),
                       _AdminActionCard(
                         icon: Icons.delete_sweep_outlined,
                         title: 'Clear All Content',
@@ -166,6 +169,174 @@ class _AdminHomePageState extends State<AdminHomePage> {
     );
   }
 }
+
+// ── Quranic lesson curation card ─────────────────────────────────────────────
+
+class _QuranCurationCard extends StatefulWidget {
+  @override
+  State<_QuranCurationCard> createState() => _QuranCurationCardState();
+}
+
+class _QuranCurationCardState extends State<_QuranCurationCard> {
+  bool _loading = false;
+  int? _selectedSurah;
+  List<Map<String, dynamic>> _surahs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSurahs();
+  }
+
+  Future<void> _loadSurahs() async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('quran_surahs')
+          .select('number, name_bn')
+          .order('number') as List;
+      if (mounted) {
+        setState(() {
+          _surahs = rows.cast<Map<String, dynamic>>();
+          if (_surahs.isNotEmpty) _selectedSurah = _surahs.first['number'] as int;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _curate(BuildContext ctx) async {
+    if (_selectedSurah == null) return;
+    final surahName = _surahs
+        .where((s) => s['number'] == _selectedSurah)
+        .firstOrNull?['name_bn'] as String? ?? '$_selectedSurah';
+
+    setState(() => _loading = true);
+    try {
+      final res = await Supabase.instance.client.functions
+          .invoke('curate-quran-lesson', body: {'surah_number': _selectedSurah});
+      final err = res.data?['error'] as String?;
+      if (err != null) throw Exception(err);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+          content: Text('সূরা $surahName থেকে পাঠ তৈরি হয়েছে ✓'),
+          backgroundColor: Colors.green,
+        ));
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx)
+            .showSnackBar(SnackBar(content: Text('ত্রুটি: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showPicker(BuildContext ctx) {
+    if (_surahs.isEmpty) {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('সূরা তালিকা লোড হয়নি। quran_surahs টেবিল পরীক্ষা করুন।'),
+      ));
+      return;
+    }
+    showDialog<void>(
+      context: ctx,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (dCtx, setDlgState) => AlertDialog(
+          title: const Text('সূরা বেছে নিন'),
+          content: SizedBox(
+            width: 320,
+            child: DropdownButton<int>(
+              value: _selectedSurah,
+              isExpanded: true,
+              items: _surahs.map((s) {
+                final n = s['number'] as int;
+                final name = s['name_bn'] as String? ?? '$n';
+                return DropdownMenuItem(value: n, child: Text('$n. $name'));
+              }).toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _selectedSurah = v);
+                  setDlgState(() {});
+                }
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dCtx),
+              child: const Text('বাতিল'),
+            ),
+            FilledButton(
+              onPressed: _loading
+                  ? null
+                  : () {
+                      Navigator.pop(dCtx);
+                      _curate(ctx);
+                    },
+              child: const Text('পাঠ তৈরি করুন'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.forestGreen.withValues(alpha: 0.35),
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.forestGreen.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: _loading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.menu_book_rounded,
+                  color: AppColors.forestGreen),
+        ),
+        title: Text(
+          'কুরআনিক পাঠ তৈরি',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.forestGreen,
+          ),
+        ),
+        subtitle: const Padding(
+          padding: EdgeInsets.only(top: 4),
+          child: Text('যেকোনো সূরা থেকে স্বয়ংক্রিয় পাঠ'),
+        ),
+        trailing: FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.forestGreen,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            minimumSize: const Size(0, 36),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: _loading ? null : () => _showPicker(context),
+          child: const Text('সূরা বেছে নিন'),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _AdminActionCard extends StatelessWidget {
   final IconData icon;

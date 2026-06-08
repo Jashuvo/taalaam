@@ -55,13 +55,24 @@ supabase/migrations/                 ← 0001-0013 SQL
 ## EDGE FUNCTIONS (all admin-guarded via JWT email check)
 | Function | Trigger | What it does |
 |---|---|---|
-| `process-content` | Admin upload | Gemini reads PDF/TXT/image → inserts unit+lessons+exercises+vocabulary |
+| `process-content` | Admin upload | Gemini reads PDF/TXT/image → inserts unit+lessons+exercises+vocabulary — **CONVERSATIONAL track only** |
 | `generate-exam` | Admin button | Gemini generates 30-question pool → `exam_questions` table |
 | `regenerate-exercise` | Admin button | Regenerates one exercise with Gemini |
 | `regenerate-vocab` | Admin button | Extracts vocabulary from existing exercises for a lesson |
 | `sort-lessons` | Admin button | Gemini sorts lessons within a unit pedagogically |
-| `sort-units` | Admin button | Gemini sorts+deduplicates units within a track |
+| `sort-units` | Admin button | Gemini sorts+deduplicates units within a track — **never moves to quranic** |
+| `curate-quran-lesson` | Admin button | Generates lesson from any surah via quran_words + Gemini |
 | `conversation` | Learner | Conversational AI (no admin guard — learner-facing) |
+
+## QURANIC LESSON CURATION
+- **Only** `curate-quran-lesson` may write to the quranic track. No other pipeline touches it.
+- `process-content` always produces `evaluated_track = 'conversational'`.
+- `sort-units` always returns `track_assignments: []` — never moves units to quranic.
+- The Upload page has no Quranic option — directing admins to the Home page curation card.
+- Admin Home (`/admin/home`) has a "কুরআনিক পাঠ তৈরি" card: pick surah → calls `curate-quran-lesson`.
+- Seed script: `tools/seed_quran_track.ts` — creates 3 units (salah-vocabulary, frequent-words, asma-sifat).
+- Run seed: `SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... GEMINI_API_KEY=... deno run --allow-net --allow-env tools/seed_quran_track.ts`
+- Deploy function: `supabase functions deploy curate-quran-lesson --no-verify-jwt`
 
 ## QURAN WORD READER
 Route: `/quran-reader` (learner only)

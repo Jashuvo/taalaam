@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../app.dart';
 import '../../features/admin/presentation/admin_dashboard_page.dart';
+import '../../features/admin/presentation/admin_home_page.dart';
 import '../../features/admin/presentation/admin_review_page.dart';
 import '../../features/admin/presentation/admin_shell.dart';
 import '../../features/admin/presentation/admin_unit_review_page.dart';
@@ -160,6 +161,10 @@ final appRouterProvider =
             GoRoute(
               path: '/admin',
               builder: (_, __) => const AdminDashboardPage(),
+            ),
+            GoRoute(
+              path: '/admin/home',
+              builder: (_, __) => const AdminHomePage(),
             ),
             GoRoute(
               path: '/admin/review',

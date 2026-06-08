@@ -45,24 +45,10 @@ property named "evaluated_tier" using these strict boundaries:
 ════════════════════════════════════════════
 🚨 CRITICAL: AUTOMATED TRACK CLASSIFICATION
 ════════════════════════════════════════════
-After tier profiling, classify the content into exactly one learning track.
-Set the root "evaluated_track" property to one of:
-
-- "conversational": Content teaches modern everyday spoken Arabic for daily
-  life situations — greetings, shopping, directions, food, family, work,
-  emotions, common Saudi/Gulf phrases. Primary purpose is spoken fluency
-  for real-world conversations.
-
-- "quranic": Content teaches Quranic vocabulary, Islamic religious terminology,
-  classical Arabic grammar (نحو / صرف), morphological conjugation tables (أبواب),
-  Hadith phrasing, root-letter analysis, tafsir vocabulary, or any material
-  whose primary framing is understanding the Quran, Sunnah, or classical texts.
-  Even if individual words appear in daily speech, classify as "quranic" when
-  the instructional context is religious or classical.
-
-TIEBREAKER: When content spans both tracks (e.g. basic nouns illustrated with
-Quranic examples), default to "quranic" — the app's primary mission is
-Quranic and Salafi Arabic comprehension.
+All content uploaded via this pipeline belongs to the conversational track.
+The quranic track (slug:'quranic') is populated exclusively via the
+curate-quran-lesson edge function from structured Quran database data.
+Always return evaluated_track='conversational'. Never return 'quranic'.
 
 ════════════════════════════════════════════
 HARAKAT CORRECTION (CRITICAL):
@@ -652,9 +638,7 @@ Deno.serve(async (req: Request) => {
       ? `\n\nAdmin context note: ${notes.trim()}`
       : '';
 
-    const trackInstruction = autoDetect
-      ? 'Track: auto-detect — use your AUTOMATED TRACK CLASSIFICATION rules to set "evaluated_track".'
-      : `Track: ${track} (conversational = daily Arabic life; quranic = Quranic/classical Arabic) — also set "evaluated_track" to match.`;
+    const trackInstruction = 'Track: conversational only. Do NOT classify as quranic. Always set evaluated_track to "conversational".';
 
     const userPrompt = `${trackInstruction}${contextNote}
 
@@ -728,10 +712,8 @@ Now CREATE interactive lessons from this Arabic learning material. Follow the pe
 
     const parsed = JSON.parse(responseText);
 
-    // Resolve final track: Gemini's classification wins when auto-detect is on
-    const finalTrack: string = autoDetect
-      ? (parsed.evaluated_track === 'conversational' ? 'conversational' : 'quranic')
-      : track;
+    // Quranic track is populated only via curate-quran-lesson — always conversational here
+    const finalTrack = 'conversational';
 
     // Look up track ID
     const { data: trackRow } = await supabase

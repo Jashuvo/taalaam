@@ -258,25 +258,43 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                         value: 'conversational',
                         label: Text('কথোপকথন'),
                         icon: Icon(Icons.record_voice_over)),
-                    ButtonSegment(
-                        value: 'quranic',
-                        label: Text('কুরআন'),
-                        icon: Icon(Icons.menu_book)),
                   ],
                   selected: {upload.track},
                   onSelectionChanged: upload.processingAll
                       ? null
                       : (s) => notifier.setTrack(s.first),
                 ),
-                if (upload.track == 'auto') ...[
-                  const SizedBox(height: 6),
+                const SizedBox(height: 6),
+                if (upload.track == 'auto')
                   Text(
-                    'AI বিষয়বস্তু পড়ে স্বয়ংক্রিয়ভাবে কুরআন বা কথোপকথন কোর্স নির্বাচন করবে।',
+                    'AI স্বয়ংক্রিয়ভাবে কথোপকথন পাঠ তৈরি করবে।',
                     style: theme.textTheme.labelSmall
                         ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
-                ],
-                const SizedBox(height: 24),
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: const Color(0xFF009688).withValues(alpha: 0.4),
+                        width: 3,
+                      ),
+                    ),
+                    color: const Color(0xFF009688).withValues(alpha: 0.05),
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(4),
+                      bottomRight: Radius.circular(4),
+                    ),
+                  ),
+                  child: Text(
+                    'কুরআনিক পাঠ → অ্যাডমিন হোমের "কুরআনিক পাঠ তৈরি" বাটন ব্যবহার করুন',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: const Color(0xFF00796B),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
 
                 // File drop zone
                 GestureDetector(
