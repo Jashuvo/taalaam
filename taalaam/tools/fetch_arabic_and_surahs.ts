@@ -80,6 +80,17 @@ const surahs = surahs_raw.map((s: any) => {
   };
 });
 
+// Filter out standalone Uthmani pause/sajdah marks (U+06D6–U+06DC, U+06DF–U+06E4,
+// U+06E7, U+06E8, U+06EA–U+06ED) that alquran.cloud emits as separate space-separated
+// tokens. A real Arabic word must contain at least one character in U+0600–U+06D5.
+function isRealWord(s: string): boolean {
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    if (cp >= 0x0600 && cp <= 0x06D5) return true;
+  }
+  return false;
+}
+
 // Build arabic_words.json — Arabic text only; GTAF handles Bengali
 type ArabicWord = { id:string; surah:number; ayah:number; position:number; arabic:string };
 const arabicWords: ArabicWord[] = [];
@@ -90,7 +101,18 @@ for (const s of surahs_raw) {
     const ayahNum = ayah.numberInSurah;
     // Strip BOM (﻿) that sometimes appears on first ayah
     const text = (ayah.text as string).replace(/^﻿/, "").trim();
-    const words = text.split(/\s+/).filter(Boolean);
+    // Filter Uthmani marks that appear as standalone tokens in the Uthmani edition
+    let words = text.split(/\s+/).filter(Boolean).filter(isRealWord);
+
+    // alquran.cloud (quran-uthmani) prepends the basmala (4 words: بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ)
+    // to ayah 1 of every surah EXCEPT surah 1 (Al-Fatiha, where ayah 1 IS the basmala)
+    // and surah 9 (At-Tawba, which has no basmala by Islamic tradition).
+    // GTAF word positions start from the actual surah content, not the prepended basmala,
+    // so we must strip those 4 words to keep position numbers aligned.
+    if (s.number !== 1 && s.number !== 9 && ayahNum === 1) {
+      words = words.slice(4);
+    }
+
     words.forEach((w: string, i: number) => {
       arabicWords.push({
         id: `${s.number}:${ayahNum}:${i+1}`,

@@ -7,6 +7,13 @@ const gtafRaw = JSON.parse(
 const tafsirRaw = JSON.parse(
   await Deno.readTextFile("tools/quran_data/tafsir_abu_bakr_zakaria.json"));
 
+// GTAF sometimes includes ayah-number markers like "(১)", "(২)" as word entries.
+// These look like Bengali (or ASCII) digits wrapped in parentheses and are not
+// real word meanings — they cause a position shift in all subsequent words.
+function isAyahMarker(s: string): boolean {
+  return /^\s*\([\s০-৯\d]+\)\s*$/.test(s);
+}
+
 // ── GTAF Bengali WBW ──────────────────────────────────────────────────────────
 // Structure: flat object keyed "surah:ayah:position" → Bengali string
 // e.g. { "1:1:1": "নামে", "1:1:2": "আল্লাহ (র)", ... }
@@ -18,7 +25,9 @@ if (Array.isArray(gtafRaw)) {
     const a = row.verse_number  ?? row.ayah  ?? row.verse;
     const p = row.word_number   ?? row.position ?? row.word;
     const t = row.translation   ?? row.text ?? row.meaning ?? row.bn;
-    if (s && a && p && t) gtafMap.set(`${s}:${a}:${p}`, t as string);
+    if (s && a && p && t && !isAyahMarker(t as string)) {
+      gtafMap.set(`${s}:${a}:${p}`, t as string);
+    }
   }
 } else {
   // Check if keys are "s:a:p" format (flat) or nested { surah: { ayah: { pos: text } } }
@@ -26,14 +35,14 @@ if (Array.isArray(gtafRaw)) {
   if (firstKey && firstKey.includes(":")) {
     // Flat object keyed "surah:ayah:position"
     for (const [key, val] of Object.entries(gtafRaw as Record<string, string>)) {
-      gtafMap.set(key, val);
+      if (!isAyahMarker(val)) gtafMap.set(key, val);
     }
   } else {
     // Nested { surah: { ayah: { position: text } } }
     for (const [s, ayahs] of Object.entries(gtafRaw as any)) {
       for (const [a, words] of Object.entries(ayahs as any)) {
         for (const [p, t] of Object.entries(words as any)) {
-          gtafMap.set(`${s}:${a}:${p}`, t as string);
+          if (!isAyahMarker(t as string)) gtafMap.set(`${s}:${a}:${p}`, t as string);
         }
       }
     }

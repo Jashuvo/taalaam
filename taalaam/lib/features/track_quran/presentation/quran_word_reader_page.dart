@@ -532,21 +532,31 @@ class _WordView extends ConsumerWidget {
                     textAlign: TextAlign.justify,
                   ),
                 ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'আয়াত ${nav.ayah}',
-                      style: const TextStyle(
-                          fontSize: 11, color: Colors.white70),
-                    ),
+                // Ayah number medallion — shown at the "end" of RTL text (left side)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: Colors.white38, width: 1.5),
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${nav.ayah}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

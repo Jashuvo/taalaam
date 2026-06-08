@@ -546,7 +546,11 @@ class _QuickAccessButton extends StatelessWidget {
           const SizedBox(height: 7),
           Text(
             label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
         ],
       ),
@@ -677,7 +681,11 @@ class _StatChip extends StatelessWidget {
       ),
       child: Text(
         '$emoji $value',
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: theme.colorScheme.onSurface,
+        ),
       ),
     );
   }
@@ -846,6 +854,7 @@ class _TrackCard extends ConsumerWidget {
                     onPressed: () => context.go('/track/${track.slug}'),
                     style: FilledButton.styleFrom(
                       backgroundColor: gradientColors[0],
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,

@@ -46,16 +46,26 @@ class _MainShellState extends ConsumerState<MainShell> {
           const _ProfileTab(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: List.generate(
-          4,
-          (i) => NavigationDestination(
-            icon: Icon(_icons[i]),
-            selectedIcon: Icon(_selectedIcons[i]),
-            label: _labels[i],
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: NavigationBar(
+              selectedIndex: _tab,
+              onDestinationSelected: (i) => setState(() => _tab = i),
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              elevation: 8,
+              shadowColor: Colors.black38,
+              destinations: List.generate(
+                4,
+                (i) => NavigationDestination(
+                  icon: Icon(_icons[i]),
+                  selectedIcon: Icon(_selectedIcons[i]),
+                  label: _labels[i],
+                ),
+              ),
+            ),
           ),
         ),
       ),
