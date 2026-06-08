@@ -560,10 +560,15 @@ class _TrackCard extends ConsumerWidget {
   final Track track;
   const _TrackCard({required this.track});
 
+  bool get _isQuranic =>
+      track.slug == 'quranic' ||
+      track.nameBn.contains('কুরআন') ||
+      track.nameBn.contains('তিলাওয়াত');
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final isQuranic = track.slug == 'quranic';
+    final isQuranic = _isQuranic;
     final progress =
         ref.watch(trackProgressProvider(track.id)).valueOrNull;
 
@@ -720,6 +725,19 @@ class _TrackCard extends ConsumerWidget {
                         ? 'চালিয়ে যান'
                         : 'শুরু করুন'),
                   ),
+                  if (isQuranic)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.menu_book_rounded, size: 15),
+                        label: const Text('শব্দে শব্দে পড়ুন'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.teal,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: () => context.go('/quran-reader'),
+                      ),
+                    ),
                 ],
               ),
             ),

@@ -5336,6 +5336,953 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
   }
 }
 
+class $QuranWordsTable extends QuranWords
+    with TableInfo<$QuranWordsTable, QuranWord> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuranWordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _surahMeta = const VerificationMeta('surah');
+  @override
+  late final GeneratedColumn<int> surah = GeneratedColumn<int>(
+      'surah', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _ayahMeta = const VerificationMeta('ayah');
+  @override
+  late final GeneratedColumn<int> ayah = GeneratedColumn<int>(
+      'ayah', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _positionMeta =
+      const VerificationMeta('position');
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+      'position', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _arabicMeta = const VerificationMeta('arabic');
+  @override
+  late final GeneratedColumn<String> arabic = GeneratedColumn<String>(
+      'arabic', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _meaningBnMeta =
+      const VerificationMeta('meaningBn');
+  @override
+  late final GeneratedColumn<String> meaningBn = GeneratedColumn<String>(
+      'meaning_bn', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, surah, ayah, position, arabic, meaningBn];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quran_words';
+  @override
+  VerificationContext validateIntegrity(Insertable<QuranWord> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('surah')) {
+      context.handle(
+          _surahMeta, surah.isAcceptableOrUnknown(data['surah']!, _surahMeta));
+    } else if (isInserting) {
+      context.missing(_surahMeta);
+    }
+    if (data.containsKey('ayah')) {
+      context.handle(
+          _ayahMeta, ayah.isAcceptableOrUnknown(data['ayah']!, _ayahMeta));
+    } else if (isInserting) {
+      context.missing(_ayahMeta);
+    }
+    if (data.containsKey('position')) {
+      context.handle(_positionMeta,
+          position.isAcceptableOrUnknown(data['position']!, _positionMeta));
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('arabic')) {
+      context.handle(_arabicMeta,
+          arabic.isAcceptableOrUnknown(data['arabic']!, _arabicMeta));
+    } else if (isInserting) {
+      context.missing(_arabicMeta);
+    }
+    if (data.containsKey('meaning_bn')) {
+      context.handle(_meaningBnMeta,
+          meaningBn.isAcceptableOrUnknown(data['meaning_bn']!, _meaningBnMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  QuranWord map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuranWord(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      surah: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}surah'])!,
+      ayah: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ayah'])!,
+      position: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}position'])!,
+      arabic: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}arabic'])!,
+      meaningBn: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}meaning_bn']),
+    );
+  }
+
+  @override
+  $QuranWordsTable createAlias(String alias) {
+    return $QuranWordsTable(attachedDatabase, alias);
+  }
+}
+
+class QuranWord extends DataClass implements Insertable<QuranWord> {
+  final String id;
+  final int surah;
+  final int ayah;
+  final int position;
+  final String arabic;
+  final String? meaningBn;
+  const QuranWord(
+      {required this.id,
+      required this.surah,
+      required this.ayah,
+      required this.position,
+      required this.arabic,
+      this.meaningBn});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['surah'] = Variable<int>(surah);
+    map['ayah'] = Variable<int>(ayah);
+    map['position'] = Variable<int>(position);
+    map['arabic'] = Variable<String>(arabic);
+    if (!nullToAbsent || meaningBn != null) {
+      map['meaning_bn'] = Variable<String>(meaningBn);
+    }
+    return map;
+  }
+
+  QuranWordsCompanion toCompanion(bool nullToAbsent) {
+    return QuranWordsCompanion(
+      id: Value(id),
+      surah: Value(surah),
+      ayah: Value(ayah),
+      position: Value(position),
+      arabic: Value(arabic),
+      meaningBn: meaningBn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(meaningBn),
+    );
+  }
+
+  factory QuranWord.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuranWord(
+      id: serializer.fromJson<String>(json['id']),
+      surah: serializer.fromJson<int>(json['surah']),
+      ayah: serializer.fromJson<int>(json['ayah']),
+      position: serializer.fromJson<int>(json['position']),
+      arabic: serializer.fromJson<String>(json['arabic']),
+      meaningBn: serializer.fromJson<String?>(json['meaningBn']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'surah': serializer.toJson<int>(surah),
+      'ayah': serializer.toJson<int>(ayah),
+      'position': serializer.toJson<int>(position),
+      'arabic': serializer.toJson<String>(arabic),
+      'meaningBn': serializer.toJson<String?>(meaningBn),
+    };
+  }
+
+  QuranWord copyWith(
+          {String? id,
+          int? surah,
+          int? ayah,
+          int? position,
+          String? arabic,
+          Value<String?> meaningBn = const Value.absent()}) =>
+      QuranWord(
+        id: id ?? this.id,
+        surah: surah ?? this.surah,
+        ayah: ayah ?? this.ayah,
+        position: position ?? this.position,
+        arabic: arabic ?? this.arabic,
+        meaningBn: meaningBn.present ? meaningBn.value : this.meaningBn,
+      );
+  QuranWord copyWithCompanion(QuranWordsCompanion data) {
+    return QuranWord(
+      id: data.id.present ? data.id.value : this.id,
+      surah: data.surah.present ? data.surah.value : this.surah,
+      ayah: data.ayah.present ? data.ayah.value : this.ayah,
+      position: data.position.present ? data.position.value : this.position,
+      arabic: data.arabic.present ? data.arabic.value : this.arabic,
+      meaningBn: data.meaningBn.present ? data.meaningBn.value : this.meaningBn,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuranWord(')
+          ..write('id: $id, ')
+          ..write('surah: $surah, ')
+          ..write('ayah: $ayah, ')
+          ..write('position: $position, ')
+          ..write('arabic: $arabic, ')
+          ..write('meaningBn: $meaningBn')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, surah, ayah, position, arabic, meaningBn);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuranWord &&
+          other.id == this.id &&
+          other.surah == this.surah &&
+          other.ayah == this.ayah &&
+          other.position == this.position &&
+          other.arabic == this.arabic &&
+          other.meaningBn == this.meaningBn);
+}
+
+class QuranWordsCompanion extends UpdateCompanion<QuranWord> {
+  final Value<String> id;
+  final Value<int> surah;
+  final Value<int> ayah;
+  final Value<int> position;
+  final Value<String> arabic;
+  final Value<String?> meaningBn;
+  final Value<int> rowid;
+  const QuranWordsCompanion({
+    this.id = const Value.absent(),
+    this.surah = const Value.absent(),
+    this.ayah = const Value.absent(),
+    this.position = const Value.absent(),
+    this.arabic = const Value.absent(),
+    this.meaningBn = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuranWordsCompanion.insert({
+    required String id,
+    required int surah,
+    required int ayah,
+    required int position,
+    required String arabic,
+    this.meaningBn = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        surah = Value(surah),
+        ayah = Value(ayah),
+        position = Value(position),
+        arabic = Value(arabic);
+  static Insertable<QuranWord> custom({
+    Expression<String>? id,
+    Expression<int>? surah,
+    Expression<int>? ayah,
+    Expression<int>? position,
+    Expression<String>? arabic,
+    Expression<String>? meaningBn,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (surah != null) 'surah': surah,
+      if (ayah != null) 'ayah': ayah,
+      if (position != null) 'position': position,
+      if (arabic != null) 'arabic': arabic,
+      if (meaningBn != null) 'meaning_bn': meaningBn,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuranWordsCompanion copyWith(
+      {Value<String>? id,
+      Value<int>? surah,
+      Value<int>? ayah,
+      Value<int>? position,
+      Value<String>? arabic,
+      Value<String?>? meaningBn,
+      Value<int>? rowid}) {
+    return QuranWordsCompanion(
+      id: id ?? this.id,
+      surah: surah ?? this.surah,
+      ayah: ayah ?? this.ayah,
+      position: position ?? this.position,
+      arabic: arabic ?? this.arabic,
+      meaningBn: meaningBn ?? this.meaningBn,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (surah.present) {
+      map['surah'] = Variable<int>(surah.value);
+    }
+    if (ayah.present) {
+      map['ayah'] = Variable<int>(ayah.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    if (arabic.present) {
+      map['arabic'] = Variable<String>(arabic.value);
+    }
+    if (meaningBn.present) {
+      map['meaning_bn'] = Variable<String>(meaningBn.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuranWordsCompanion(')
+          ..write('id: $id, ')
+          ..write('surah: $surah, ')
+          ..write('ayah: $ayah, ')
+          ..write('position: $position, ')
+          ..write('arabic: $arabic, ')
+          ..write('meaningBn: $meaningBn, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuranSurahsTable extends QuranSurahs
+    with TableInfo<$QuranSurahsTable, QuranSurah> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuranSurahsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _numberMeta = const VerificationMeta('number');
+  @override
+  late final GeneratedColumn<int> number = GeneratedColumn<int>(
+      'number', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _nameArMeta = const VerificationMeta('nameAr');
+  @override
+  late final GeneratedColumn<String> nameAr = GeneratedColumn<String>(
+      'name_ar', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameEnMeta = const VerificationMeta('nameEn');
+  @override
+  late final GeneratedColumn<String> nameEn = GeneratedColumn<String>(
+      'name_en', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameBnMeta = const VerificationMeta('nameBn');
+  @override
+  late final GeneratedColumn<String> nameBn = GeneratedColumn<String>(
+      'name_bn', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _ayahCountMeta =
+      const VerificationMeta('ayahCount');
+  @override
+  late final GeneratedColumn<int> ayahCount = GeneratedColumn<int>(
+      'ayah_count', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _revelationMeta =
+      const VerificationMeta('revelation');
+  @override
+  late final GeneratedColumn<String> revelation = GeneratedColumn<String>(
+      'revelation', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [number, nameAr, nameEn, nameBn, ayahCount, revelation];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quran_surahs';
+  @override
+  VerificationContext validateIntegrity(Insertable<QuranSurah> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('number')) {
+      context.handle(_numberMeta,
+          number.isAcceptableOrUnknown(data['number']!, _numberMeta));
+    }
+    if (data.containsKey('name_ar')) {
+      context.handle(_nameArMeta,
+          nameAr.isAcceptableOrUnknown(data['name_ar']!, _nameArMeta));
+    } else if (isInserting) {
+      context.missing(_nameArMeta);
+    }
+    if (data.containsKey('name_en')) {
+      context.handle(_nameEnMeta,
+          nameEn.isAcceptableOrUnknown(data['name_en']!, _nameEnMeta));
+    } else if (isInserting) {
+      context.missing(_nameEnMeta);
+    }
+    if (data.containsKey('name_bn')) {
+      context.handle(_nameBnMeta,
+          nameBn.isAcceptableOrUnknown(data['name_bn']!, _nameBnMeta));
+    } else if (isInserting) {
+      context.missing(_nameBnMeta);
+    }
+    if (data.containsKey('ayah_count')) {
+      context.handle(_ayahCountMeta,
+          ayahCount.isAcceptableOrUnknown(data['ayah_count']!, _ayahCountMeta));
+    } else if (isInserting) {
+      context.missing(_ayahCountMeta);
+    }
+    if (data.containsKey('revelation')) {
+      context.handle(
+          _revelationMeta,
+          revelation.isAcceptableOrUnknown(
+              data['revelation']!, _revelationMeta));
+    } else if (isInserting) {
+      context.missing(_revelationMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {number};
+  @override
+  QuranSurah map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuranSurah(
+      number: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}number'])!,
+      nameAr: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name_ar'])!,
+      nameEn: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name_en'])!,
+      nameBn: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name_bn'])!,
+      ayahCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ayah_count'])!,
+      revelation: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}revelation'])!,
+    );
+  }
+
+  @override
+  $QuranSurahsTable createAlias(String alias) {
+    return $QuranSurahsTable(attachedDatabase, alias);
+  }
+}
+
+class QuranSurah extends DataClass implements Insertable<QuranSurah> {
+  final int number;
+  final String nameAr;
+  final String nameEn;
+  final String nameBn;
+  final int ayahCount;
+  final String revelation;
+  const QuranSurah(
+      {required this.number,
+      required this.nameAr,
+      required this.nameEn,
+      required this.nameBn,
+      required this.ayahCount,
+      required this.revelation});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['number'] = Variable<int>(number);
+    map['name_ar'] = Variable<String>(nameAr);
+    map['name_en'] = Variable<String>(nameEn);
+    map['name_bn'] = Variable<String>(nameBn);
+    map['ayah_count'] = Variable<int>(ayahCount);
+    map['revelation'] = Variable<String>(revelation);
+    return map;
+  }
+
+  QuranSurahsCompanion toCompanion(bool nullToAbsent) {
+    return QuranSurahsCompanion(
+      number: Value(number),
+      nameAr: Value(nameAr),
+      nameEn: Value(nameEn),
+      nameBn: Value(nameBn),
+      ayahCount: Value(ayahCount),
+      revelation: Value(revelation),
+    );
+  }
+
+  factory QuranSurah.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuranSurah(
+      number: serializer.fromJson<int>(json['number']),
+      nameAr: serializer.fromJson<String>(json['nameAr']),
+      nameEn: serializer.fromJson<String>(json['nameEn']),
+      nameBn: serializer.fromJson<String>(json['nameBn']),
+      ayahCount: serializer.fromJson<int>(json['ayahCount']),
+      revelation: serializer.fromJson<String>(json['revelation']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'number': serializer.toJson<int>(number),
+      'nameAr': serializer.toJson<String>(nameAr),
+      'nameEn': serializer.toJson<String>(nameEn),
+      'nameBn': serializer.toJson<String>(nameBn),
+      'ayahCount': serializer.toJson<int>(ayahCount),
+      'revelation': serializer.toJson<String>(revelation),
+    };
+  }
+
+  QuranSurah copyWith(
+          {int? number,
+          String? nameAr,
+          String? nameEn,
+          String? nameBn,
+          int? ayahCount,
+          String? revelation}) =>
+      QuranSurah(
+        number: number ?? this.number,
+        nameAr: nameAr ?? this.nameAr,
+        nameEn: nameEn ?? this.nameEn,
+        nameBn: nameBn ?? this.nameBn,
+        ayahCount: ayahCount ?? this.ayahCount,
+        revelation: revelation ?? this.revelation,
+      );
+  QuranSurah copyWithCompanion(QuranSurahsCompanion data) {
+    return QuranSurah(
+      number: data.number.present ? data.number.value : this.number,
+      nameAr: data.nameAr.present ? data.nameAr.value : this.nameAr,
+      nameEn: data.nameEn.present ? data.nameEn.value : this.nameEn,
+      nameBn: data.nameBn.present ? data.nameBn.value : this.nameBn,
+      ayahCount: data.ayahCount.present ? data.ayahCount.value : this.ayahCount,
+      revelation:
+          data.revelation.present ? data.revelation.value : this.revelation,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuranSurah(')
+          ..write('number: $number, ')
+          ..write('nameAr: $nameAr, ')
+          ..write('nameEn: $nameEn, ')
+          ..write('nameBn: $nameBn, ')
+          ..write('ayahCount: $ayahCount, ')
+          ..write('revelation: $revelation')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(number, nameAr, nameEn, nameBn, ayahCount, revelation);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuranSurah &&
+          other.number == this.number &&
+          other.nameAr == this.nameAr &&
+          other.nameEn == this.nameEn &&
+          other.nameBn == this.nameBn &&
+          other.ayahCount == this.ayahCount &&
+          other.revelation == this.revelation);
+}
+
+class QuranSurahsCompanion extends UpdateCompanion<QuranSurah> {
+  final Value<int> number;
+  final Value<String> nameAr;
+  final Value<String> nameEn;
+  final Value<String> nameBn;
+  final Value<int> ayahCount;
+  final Value<String> revelation;
+  const QuranSurahsCompanion({
+    this.number = const Value.absent(),
+    this.nameAr = const Value.absent(),
+    this.nameEn = const Value.absent(),
+    this.nameBn = const Value.absent(),
+    this.ayahCount = const Value.absent(),
+    this.revelation = const Value.absent(),
+  });
+  QuranSurahsCompanion.insert({
+    this.number = const Value.absent(),
+    required String nameAr,
+    required String nameEn,
+    required String nameBn,
+    required int ayahCount,
+    required String revelation,
+  })  : nameAr = Value(nameAr),
+        nameEn = Value(nameEn),
+        nameBn = Value(nameBn),
+        ayahCount = Value(ayahCount),
+        revelation = Value(revelation);
+  static Insertable<QuranSurah> custom({
+    Expression<int>? number,
+    Expression<String>? nameAr,
+    Expression<String>? nameEn,
+    Expression<String>? nameBn,
+    Expression<int>? ayahCount,
+    Expression<String>? revelation,
+  }) {
+    return RawValuesInsertable({
+      if (number != null) 'number': number,
+      if (nameAr != null) 'name_ar': nameAr,
+      if (nameEn != null) 'name_en': nameEn,
+      if (nameBn != null) 'name_bn': nameBn,
+      if (ayahCount != null) 'ayah_count': ayahCount,
+      if (revelation != null) 'revelation': revelation,
+    });
+  }
+
+  QuranSurahsCompanion copyWith(
+      {Value<int>? number,
+      Value<String>? nameAr,
+      Value<String>? nameEn,
+      Value<String>? nameBn,
+      Value<int>? ayahCount,
+      Value<String>? revelation}) {
+    return QuranSurahsCompanion(
+      number: number ?? this.number,
+      nameAr: nameAr ?? this.nameAr,
+      nameEn: nameEn ?? this.nameEn,
+      nameBn: nameBn ?? this.nameBn,
+      ayahCount: ayahCount ?? this.ayahCount,
+      revelation: revelation ?? this.revelation,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (number.present) {
+      map['number'] = Variable<int>(number.value);
+    }
+    if (nameAr.present) {
+      map['name_ar'] = Variable<String>(nameAr.value);
+    }
+    if (nameEn.present) {
+      map['name_en'] = Variable<String>(nameEn.value);
+    }
+    if (nameBn.present) {
+      map['name_bn'] = Variable<String>(nameBn.value);
+    }
+    if (ayahCount.present) {
+      map['ayah_count'] = Variable<int>(ayahCount.value);
+    }
+    if (revelation.present) {
+      map['revelation'] = Variable<String>(revelation.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuranSurahsCompanion(')
+          ..write('number: $number, ')
+          ..write('nameAr: $nameAr, ')
+          ..write('nameEn: $nameEn, ')
+          ..write('nameBn: $nameBn, ')
+          ..write('ayahCount: $ayahCount, ')
+          ..write('revelation: $revelation')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuranTafsirTable extends QuranTafsir
+    with TableInfo<$QuranTafsirTable, QuranTafsirData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuranTafsirTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _surahMeta = const VerificationMeta('surah');
+  @override
+  late final GeneratedColumn<int> surah = GeneratedColumn<int>(
+      'surah', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _ayahMeta = const VerificationMeta('ayah');
+  @override
+  late final GeneratedColumn<int> ayah = GeneratedColumn<int>(
+      'ayah', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _tafsirTextMeta =
+      const VerificationMeta('tafsirText');
+  @override
+  late final GeneratedColumn<String> tafsirText = GeneratedColumn<String>(
+      'tafsir_text', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [id, surah, ayah, tafsirText];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quran_tafsir';
+  @override
+  VerificationContext validateIntegrity(Insertable<QuranTafsirData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('surah')) {
+      context.handle(
+          _surahMeta, surah.isAcceptableOrUnknown(data['surah']!, _surahMeta));
+    } else if (isInserting) {
+      context.missing(_surahMeta);
+    }
+    if (data.containsKey('ayah')) {
+      context.handle(
+          _ayahMeta, ayah.isAcceptableOrUnknown(data['ayah']!, _ayahMeta));
+    } else if (isInserting) {
+      context.missing(_ayahMeta);
+    }
+    if (data.containsKey('tafsir_text')) {
+      context.handle(
+          _tafsirTextMeta,
+          tafsirText.isAcceptableOrUnknown(
+              data['tafsir_text']!, _tafsirTextMeta));
+    } else if (isInserting) {
+      context.missing(_tafsirTextMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  QuranTafsirData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuranTafsirData(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      surah: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}surah'])!,
+      ayah: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}ayah'])!,
+      tafsirText: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tafsir_text'])!,
+    );
+  }
+
+  @override
+  $QuranTafsirTable createAlias(String alias) {
+    return $QuranTafsirTable(attachedDatabase, alias);
+  }
+}
+
+class QuranTafsirData extends DataClass implements Insertable<QuranTafsirData> {
+  final String id;
+  final int surah;
+  final int ayah;
+  final String tafsirText;
+  const QuranTafsirData(
+      {required this.id,
+      required this.surah,
+      required this.ayah,
+      required this.tafsirText});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['surah'] = Variable<int>(surah);
+    map['ayah'] = Variable<int>(ayah);
+    map['tafsir_text'] = Variable<String>(tafsirText);
+    return map;
+  }
+
+  QuranTafsirCompanion toCompanion(bool nullToAbsent) {
+    return QuranTafsirCompanion(
+      id: Value(id),
+      surah: Value(surah),
+      ayah: Value(ayah),
+      tafsirText: Value(tafsirText),
+    );
+  }
+
+  factory QuranTafsirData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuranTafsirData(
+      id: serializer.fromJson<String>(json['id']),
+      surah: serializer.fromJson<int>(json['surah']),
+      ayah: serializer.fromJson<int>(json['ayah']),
+      tafsirText: serializer.fromJson<String>(json['tafsirText']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'surah': serializer.toJson<int>(surah),
+      'ayah': serializer.toJson<int>(ayah),
+      'tafsirText': serializer.toJson<String>(tafsirText),
+    };
+  }
+
+  QuranTafsirData copyWith(
+          {String? id, int? surah, int? ayah, String? tafsirText}) =>
+      QuranTafsirData(
+        id: id ?? this.id,
+        surah: surah ?? this.surah,
+        ayah: ayah ?? this.ayah,
+        tafsirText: tafsirText ?? this.tafsirText,
+      );
+  QuranTafsirData copyWithCompanion(QuranTafsirCompanion data) {
+    return QuranTafsirData(
+      id: data.id.present ? data.id.value : this.id,
+      surah: data.surah.present ? data.surah.value : this.surah,
+      ayah: data.ayah.present ? data.ayah.value : this.ayah,
+      tafsirText:
+          data.tafsirText.present ? data.tafsirText.value : this.tafsirText,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuranTafsirData(')
+          ..write('id: $id, ')
+          ..write('surah: $surah, ')
+          ..write('ayah: $ayah, ')
+          ..write('tafsirText: $tafsirText')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, surah, ayah, tafsirText);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuranTafsirData &&
+          other.id == this.id &&
+          other.surah == this.surah &&
+          other.ayah == this.ayah &&
+          other.tafsirText == this.tafsirText);
+}
+
+class QuranTafsirCompanion extends UpdateCompanion<QuranTafsirData> {
+  final Value<String> id;
+  final Value<int> surah;
+  final Value<int> ayah;
+  final Value<String> tafsirText;
+  final Value<int> rowid;
+  const QuranTafsirCompanion({
+    this.id = const Value.absent(),
+    this.surah = const Value.absent(),
+    this.ayah = const Value.absent(),
+    this.tafsirText = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuranTafsirCompanion.insert({
+    required String id,
+    required int surah,
+    required int ayah,
+    required String tafsirText,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        surah = Value(surah),
+        ayah = Value(ayah),
+        tafsirText = Value(tafsirText);
+  static Insertable<QuranTafsirData> custom({
+    Expression<String>? id,
+    Expression<int>? surah,
+    Expression<int>? ayah,
+    Expression<String>? tafsirText,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (surah != null) 'surah': surah,
+      if (ayah != null) 'ayah': ayah,
+      if (tafsirText != null) 'tafsir_text': tafsirText,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuranTafsirCompanion copyWith(
+      {Value<String>? id,
+      Value<int>? surah,
+      Value<int>? ayah,
+      Value<String>? tafsirText,
+      Value<int>? rowid}) {
+    return QuranTafsirCompanion(
+      id: id ?? this.id,
+      surah: surah ?? this.surah,
+      ayah: ayah ?? this.ayah,
+      tafsirText: tafsirText ?? this.tafsirText,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (surah.present) {
+      map['surah'] = Variable<int>(surah.value);
+    }
+    if (ayah.present) {
+      map['ayah'] = Variable<int>(ayah.value);
+    }
+    if (tafsirText.present) {
+      map['tafsir_text'] = Variable<String>(tafsirText.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuranTafsirCompanion(')
+          ..write('id: $id, ')
+          ..write('surah: $surah, ')
+          ..write('ayah: $ayah, ')
+          ..write('tafsirText: $tafsirText, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5349,6 +6296,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StreaksTable streaks = $StreaksTable(this);
   late final $PendingSyncTable pendingSync = $PendingSyncTable(this);
   late final $BookmarksTable bookmarks = $BookmarksTable(this);
+  late final $QuranWordsTable quranWords = $QuranWordsTable(this);
+  late final $QuranSurahsTable quranSurahs = $QuranSurahsTable(this);
+  late final $QuranTafsirTable quranTafsir = $QuranTafsirTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5363,7 +6313,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         userProgress,
         streaks,
         pendingSync,
-        bookmarks
+        bookmarks,
+        quranWords,
+        quranSurahs,
+        quranTafsir
       ];
 }
 
@@ -9107,6 +10060,520 @@ typedef $$BookmarksTableProcessedTableManager = ProcessedTableManager<
     (Bookmark, $$BookmarksTableReferences),
     Bookmark,
     PrefetchHooks Function({bool lessonId})>;
+typedef $$QuranWordsTableCreateCompanionBuilder = QuranWordsCompanion Function({
+  required String id,
+  required int surah,
+  required int ayah,
+  required int position,
+  required String arabic,
+  Value<String?> meaningBn,
+  Value<int> rowid,
+});
+typedef $$QuranWordsTableUpdateCompanionBuilder = QuranWordsCompanion Function({
+  Value<String> id,
+  Value<int> surah,
+  Value<int> ayah,
+  Value<int> position,
+  Value<String> arabic,
+  Value<String?> meaningBn,
+  Value<int> rowid,
+});
+
+class $$QuranWordsTableFilterComposer
+    extends Composer<_$AppDatabase, $QuranWordsTable> {
+  $$QuranWordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get surah => $composableBuilder(
+      column: $table.surah, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get ayah => $composableBuilder(
+      column: $table.ayah, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get position => $composableBuilder(
+      column: $table.position, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get arabic => $composableBuilder(
+      column: $table.arabic, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get meaningBn => $composableBuilder(
+      column: $table.meaningBn, builder: (column) => ColumnFilters(column));
+}
+
+class $$QuranWordsTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuranWordsTable> {
+  $$QuranWordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get surah => $composableBuilder(
+      column: $table.surah, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get ayah => $composableBuilder(
+      column: $table.ayah, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get position => $composableBuilder(
+      column: $table.position, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get arabic => $composableBuilder(
+      column: $table.arabic, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get meaningBn => $composableBuilder(
+      column: $table.meaningBn, builder: (column) => ColumnOrderings(column));
+}
+
+class $$QuranWordsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuranWordsTable> {
+  $$QuranWordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get surah =>
+      $composableBuilder(column: $table.surah, builder: (column) => column);
+
+  GeneratedColumn<int> get ayah =>
+      $composableBuilder(column: $table.ayah, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get arabic =>
+      $composableBuilder(column: $table.arabic, builder: (column) => column);
+
+  GeneratedColumn<String> get meaningBn =>
+      $composableBuilder(column: $table.meaningBn, builder: (column) => column);
+}
+
+class $$QuranWordsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $QuranWordsTable,
+    QuranWord,
+    $$QuranWordsTableFilterComposer,
+    $$QuranWordsTableOrderingComposer,
+    $$QuranWordsTableAnnotationComposer,
+    $$QuranWordsTableCreateCompanionBuilder,
+    $$QuranWordsTableUpdateCompanionBuilder,
+    (QuranWord, BaseReferences<_$AppDatabase, $QuranWordsTable, QuranWord>),
+    QuranWord,
+    PrefetchHooks Function()> {
+  $$QuranWordsTableTableManager(_$AppDatabase db, $QuranWordsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuranWordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuranWordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuranWordsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<int> surah = const Value.absent(),
+            Value<int> ayah = const Value.absent(),
+            Value<int> position = const Value.absent(),
+            Value<String> arabic = const Value.absent(),
+            Value<String?> meaningBn = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              QuranWordsCompanion(
+            id: id,
+            surah: surah,
+            ayah: ayah,
+            position: position,
+            arabic: arabic,
+            meaningBn: meaningBn,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required int surah,
+            required int ayah,
+            required int position,
+            required String arabic,
+            Value<String?> meaningBn = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              QuranWordsCompanion.insert(
+            id: id,
+            surah: surah,
+            ayah: ayah,
+            position: position,
+            arabic: arabic,
+            meaningBn: meaningBn,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$QuranWordsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $QuranWordsTable,
+    QuranWord,
+    $$QuranWordsTableFilterComposer,
+    $$QuranWordsTableOrderingComposer,
+    $$QuranWordsTableAnnotationComposer,
+    $$QuranWordsTableCreateCompanionBuilder,
+    $$QuranWordsTableUpdateCompanionBuilder,
+    (QuranWord, BaseReferences<_$AppDatabase, $QuranWordsTable, QuranWord>),
+    QuranWord,
+    PrefetchHooks Function()>;
+typedef $$QuranSurahsTableCreateCompanionBuilder = QuranSurahsCompanion
+    Function({
+  Value<int> number,
+  required String nameAr,
+  required String nameEn,
+  required String nameBn,
+  required int ayahCount,
+  required String revelation,
+});
+typedef $$QuranSurahsTableUpdateCompanionBuilder = QuranSurahsCompanion
+    Function({
+  Value<int> number,
+  Value<String> nameAr,
+  Value<String> nameEn,
+  Value<String> nameBn,
+  Value<int> ayahCount,
+  Value<String> revelation,
+});
+
+class $$QuranSurahsTableFilterComposer
+    extends Composer<_$AppDatabase, $QuranSurahsTable> {
+  $$QuranSurahsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get number => $composableBuilder(
+      column: $table.number, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get nameAr => $composableBuilder(
+      column: $table.nameAr, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get nameEn => $composableBuilder(
+      column: $table.nameEn, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get nameBn => $composableBuilder(
+      column: $table.nameBn, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get ayahCount => $composableBuilder(
+      column: $table.ayahCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get revelation => $composableBuilder(
+      column: $table.revelation, builder: (column) => ColumnFilters(column));
+}
+
+class $$QuranSurahsTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuranSurahsTable> {
+  $$QuranSurahsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get number => $composableBuilder(
+      column: $table.number, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get nameAr => $composableBuilder(
+      column: $table.nameAr, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get nameEn => $composableBuilder(
+      column: $table.nameEn, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get nameBn => $composableBuilder(
+      column: $table.nameBn, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get ayahCount => $composableBuilder(
+      column: $table.ayahCount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get revelation => $composableBuilder(
+      column: $table.revelation, builder: (column) => ColumnOrderings(column));
+}
+
+class $$QuranSurahsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuranSurahsTable> {
+  $$QuranSurahsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get number =>
+      $composableBuilder(column: $table.number, builder: (column) => column);
+
+  GeneratedColumn<String> get nameAr =>
+      $composableBuilder(column: $table.nameAr, builder: (column) => column);
+
+  GeneratedColumn<String> get nameEn =>
+      $composableBuilder(column: $table.nameEn, builder: (column) => column);
+
+  GeneratedColumn<String> get nameBn =>
+      $composableBuilder(column: $table.nameBn, builder: (column) => column);
+
+  GeneratedColumn<int> get ayahCount =>
+      $composableBuilder(column: $table.ayahCount, builder: (column) => column);
+
+  GeneratedColumn<String> get revelation => $composableBuilder(
+      column: $table.revelation, builder: (column) => column);
+}
+
+class $$QuranSurahsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $QuranSurahsTable,
+    QuranSurah,
+    $$QuranSurahsTableFilterComposer,
+    $$QuranSurahsTableOrderingComposer,
+    $$QuranSurahsTableAnnotationComposer,
+    $$QuranSurahsTableCreateCompanionBuilder,
+    $$QuranSurahsTableUpdateCompanionBuilder,
+    (QuranSurah, BaseReferences<_$AppDatabase, $QuranSurahsTable, QuranSurah>),
+    QuranSurah,
+    PrefetchHooks Function()> {
+  $$QuranSurahsTableTableManager(_$AppDatabase db, $QuranSurahsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuranSurahsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuranSurahsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuranSurahsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> number = const Value.absent(),
+            Value<String> nameAr = const Value.absent(),
+            Value<String> nameEn = const Value.absent(),
+            Value<String> nameBn = const Value.absent(),
+            Value<int> ayahCount = const Value.absent(),
+            Value<String> revelation = const Value.absent(),
+          }) =>
+              QuranSurahsCompanion(
+            number: number,
+            nameAr: nameAr,
+            nameEn: nameEn,
+            nameBn: nameBn,
+            ayahCount: ayahCount,
+            revelation: revelation,
+          ),
+          createCompanionCallback: ({
+            Value<int> number = const Value.absent(),
+            required String nameAr,
+            required String nameEn,
+            required String nameBn,
+            required int ayahCount,
+            required String revelation,
+          }) =>
+              QuranSurahsCompanion.insert(
+            number: number,
+            nameAr: nameAr,
+            nameEn: nameEn,
+            nameBn: nameBn,
+            ayahCount: ayahCount,
+            revelation: revelation,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$QuranSurahsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $QuranSurahsTable,
+    QuranSurah,
+    $$QuranSurahsTableFilterComposer,
+    $$QuranSurahsTableOrderingComposer,
+    $$QuranSurahsTableAnnotationComposer,
+    $$QuranSurahsTableCreateCompanionBuilder,
+    $$QuranSurahsTableUpdateCompanionBuilder,
+    (QuranSurah, BaseReferences<_$AppDatabase, $QuranSurahsTable, QuranSurah>),
+    QuranSurah,
+    PrefetchHooks Function()>;
+typedef $$QuranTafsirTableCreateCompanionBuilder = QuranTafsirCompanion
+    Function({
+  required String id,
+  required int surah,
+  required int ayah,
+  required String tafsirText,
+  Value<int> rowid,
+});
+typedef $$QuranTafsirTableUpdateCompanionBuilder = QuranTafsirCompanion
+    Function({
+  Value<String> id,
+  Value<int> surah,
+  Value<int> ayah,
+  Value<String> tafsirText,
+  Value<int> rowid,
+});
+
+class $$QuranTafsirTableFilterComposer
+    extends Composer<_$AppDatabase, $QuranTafsirTable> {
+  $$QuranTafsirTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get surah => $composableBuilder(
+      column: $table.surah, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get ayah => $composableBuilder(
+      column: $table.ayah, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tafsirText => $composableBuilder(
+      column: $table.tafsirText, builder: (column) => ColumnFilters(column));
+}
+
+class $$QuranTafsirTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuranTafsirTable> {
+  $$QuranTafsirTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get surah => $composableBuilder(
+      column: $table.surah, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get ayah => $composableBuilder(
+      column: $table.ayah, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tafsirText => $composableBuilder(
+      column: $table.tafsirText, builder: (column) => ColumnOrderings(column));
+}
+
+class $$QuranTafsirTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuranTafsirTable> {
+  $$QuranTafsirTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get surah =>
+      $composableBuilder(column: $table.surah, builder: (column) => column);
+
+  GeneratedColumn<int> get ayah =>
+      $composableBuilder(column: $table.ayah, builder: (column) => column);
+
+  GeneratedColumn<String> get tafsirText => $composableBuilder(
+      column: $table.tafsirText, builder: (column) => column);
+}
+
+class $$QuranTafsirTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $QuranTafsirTable,
+    QuranTafsirData,
+    $$QuranTafsirTableFilterComposer,
+    $$QuranTafsirTableOrderingComposer,
+    $$QuranTafsirTableAnnotationComposer,
+    $$QuranTafsirTableCreateCompanionBuilder,
+    $$QuranTafsirTableUpdateCompanionBuilder,
+    (
+      QuranTafsirData,
+      BaseReferences<_$AppDatabase, $QuranTafsirTable, QuranTafsirData>
+    ),
+    QuranTafsirData,
+    PrefetchHooks Function()> {
+  $$QuranTafsirTableTableManager(_$AppDatabase db, $QuranTafsirTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuranTafsirTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuranTafsirTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuranTafsirTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<int> surah = const Value.absent(),
+            Value<int> ayah = const Value.absent(),
+            Value<String> tafsirText = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              QuranTafsirCompanion(
+            id: id,
+            surah: surah,
+            ayah: ayah,
+            tafsirText: tafsirText,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required int surah,
+            required int ayah,
+            required String tafsirText,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              QuranTafsirCompanion.insert(
+            id: id,
+            surah: surah,
+            ayah: ayah,
+            tafsirText: tafsirText,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$QuranTafsirTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $QuranTafsirTable,
+    QuranTafsirData,
+    $$QuranTafsirTableFilterComposer,
+    $$QuranTafsirTableOrderingComposer,
+    $$QuranTafsirTableAnnotationComposer,
+    $$QuranTafsirTableCreateCompanionBuilder,
+    $$QuranTafsirTableUpdateCompanionBuilder,
+    (
+      QuranTafsirData,
+      BaseReferences<_$AppDatabase, $QuranTafsirTable, QuranTafsirData>
+    ),
+    QuranTafsirData,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9131,4 +10598,10 @@ class $AppDatabaseManager {
       $$PendingSyncTableTableManager(_db, _db.pendingSync);
   $$BookmarksTableTableManager get bookmarks =>
       $$BookmarksTableTableManager(_db, _db.bookmarks);
+  $$QuranWordsTableTableManager get quranWords =>
+      $$QuranWordsTableTableManager(_db, _db.quranWords);
+  $$QuranSurahsTableTableManager get quranSurahs =>
+      $$QuranSurahsTableTableManager(_db, _db.quranSurahs);
+  $$QuranTafsirTableTableManager get quranTafsir =>
+      $$QuranTafsirTableTableManager(_db, _db.quranTafsir);
 }

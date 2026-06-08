@@ -15,6 +15,37 @@ import 'tables/vocabulary.dart';
 
 part 'database.g.dart';
 
+class QuranWords extends Table {
+  TextColumn get id => text()();
+  IntColumn get surah => integer()();
+  IntColumn get ayah => integer()();
+  IntColumn get position => integer()();
+  TextColumn get arabic => text()();
+  TextColumn get meaningBn => text().nullable()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class QuranSurahs extends Table {
+  IntColumn get number => integer()();
+  TextColumn get nameAr => text()();
+  TextColumn get nameEn => text()();
+  TextColumn get nameBn => text()();
+  IntColumn get ayahCount => integer()();
+  TextColumn get revelation => text()();
+  @override
+  Set<Column> get primaryKey => {number};
+}
+
+class QuranTafsir extends Table {
+  TextColumn get id         => text()();
+  IntColumn  get surah      => integer()();
+  IntColumn  get ayah       => integer()();
+  TextColumn get tafsirText => text()();
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(tables: [
   Tracks,
   Units,
@@ -26,12 +57,15 @@ part 'database.g.dart';
   Streaks,
   PendingSync,
   Bookmarks,
+  QuranWords,
+  QuranSurahs,
+  QuranTafsir,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,6 +121,36 @@ class AppDatabase extends _$AppDatabase {
       if (from < 9) {
         await customStatement(
             'ALTER TABLE streaks ADD COLUMN streak_goal INTEGER');
+      }
+      if (from < 10) {
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS quran_words (
+            id TEXT NOT NULL PRIMARY KEY,
+            surah INTEGER NOT NULL,
+            ayah INTEGER NOT NULL,
+            position INTEGER NOT NULL,
+            arabic TEXT NOT NULL,
+            meaning_bn TEXT
+          )
+        ''');
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS quran_surahs (
+            number INTEGER NOT NULL PRIMARY KEY,
+            name_ar TEXT NOT NULL,
+            name_en TEXT NOT NULL,
+            name_bn TEXT NOT NULL,
+            ayah_count INTEGER NOT NULL,
+            revelation TEXT NOT NULL
+          )
+        ''');
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS quran_tafsir (
+            id TEXT NOT NULL PRIMARY KEY,
+            surah INTEGER NOT NULL,
+            ayah INTEGER NOT NULL,
+            tafsir_text TEXT NOT NULL
+          )
+        ''');
       }
     },
   );

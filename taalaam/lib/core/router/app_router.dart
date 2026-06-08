@@ -24,6 +24,7 @@ import '../../features/srs/presentation/review_screen.dart';
 import '../../features/community/presentation/group_detail_page.dart';
 import '../../features/community/presentation/groups_page.dart';
 import '../../features/track_conv/presentation/conversation_screen.dart';
+import '../../features/track_quran/presentation/quran_word_reader_page.dart';
 import '../../features/track_quran/presentation/tafsir_reader_page.dart';
 
 // Manual provider — avoids riverpod_generator/analyzer_plugin version conflict
@@ -140,6 +141,10 @@ final appRouterProvider =
         GoRoute(
           path: '/streak-goal',
           builder: (_, __) => const StreakGoalPage(),
+        ),
+        GoRoute(
+          path: '/quran-reader',
+          builder: (_, __) => const QuranWordReaderPage(),
         ),
       ],
 

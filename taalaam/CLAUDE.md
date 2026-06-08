@@ -63,6 +63,23 @@ supabase/migrations/                 ← 0001-0013 SQL
 | `sort-units` | Admin button | Gemini sorts+deduplicates units within a track |
 | `conversation` | Learner | Conversational AI (no admin guard — learner-facing) |
 
+## QURAN WORD READER
+Route: `/quran-reader` (learner only)
+Tables: `quran_words`, `quran_surahs`, `quran_tafsir` (static, imported once via import script)
+Arabic: QPC Hafs Uthmani (api.alquran.cloud/v1/quran/quran-uthmani)
+Bengali word meanings: GTAF / GreenTech Foundation (from QUL — Salafi-appropriate, ~80k words)
+Tafsir: Abu Bakr Zakaria (from QUL tafsir/33 — best modern Salafi Bengali tafsir, 6236 ayahs, HTML-stripped)
+Reciter: Mishary Al-Afasy — `cdn.islamic.network/quran/audio/128/ar.alafasy/{SSS}{AAA}.mp3`
+Drift schema: v10 — adds `quran_words`, `quran_surahs`, `quran_tafsir` tables
+Drift column note: tafsir body column is `tafsirText` (Dart) / `tafsir_text` (SQLite) — NOT `text` (name conflict)
+Re-import data:
+  `cd taalaam && SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... deno run --allow-read --allow-net --allow-env tools/import_to_supabase.ts`
+Key files:
+  `lib/data/local/quran_local_source.dart` — DAO + Supabase sync
+  `lib/features/track_quran/presentation/quran_reader_provider.dart` — Riverpod providers
+  `lib/features/track_quran/presentation/quran_word_reader_page.dart` — full UI
+Auto-sync: on first open, if `quran_words` table is empty, pulls from Supabase automatically
+
 ## EXERCISE TYPES & WIDGET MAP
 `multipleChoice` → `ExerciseMultipleChoice`  
 `tapToBuild` → `ExerciseTapToBuild` — reads `correctAnswer.words`, `correctAnswer.distractor_words`  
