@@ -1,13 +1,34 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'database.dart';
 
 int _toInt(dynamic v) => (v as num).toInt();
 
+// Bump this whenever the Supabase quran_words data is reimported with a new
+// pipeline (Uthmani filter, basmala strip, ayah-marker filter, etc.).
+// On version mismatch, the local Drift cache is wiped and re-fetched so
+// users always get the corrected data without needing to clear browser storage.
+const _kQuranDataVersion = 2;
+bool _dataVersionChecked = false;
+
 class QuranLocalSource {
   final AppDatabase _db;
   const QuranLocalSource(this._db);
+
+  Future<void> _ensureFreshData() async {
+    if (_dataVersionChecked) return;
+    _dataVersionChecked = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getInt('quran_data_version') ?? 0;
+      if (stored < _kQuranDataVersion) {
+        await (_db.delete(_db.quranWords)).go();
+        await prefs.setInt('quran_data_version', _kQuranDataVersion);
+      }
+    } catch (_) {}
+  }
 
   Future<List<QuranSurah>> getAllSurahs() async {
     try {
@@ -45,6 +66,7 @@ class QuranLocalSource {
   }
 
   Future<List<QuranWord>> getAyahWords(int surah, int ayah) async {
+    await _ensureFreshData();
     try {
       final local = await (_db.select(_db.quranWords)
             ..where((t) => t.surah.equals(surah) & t.ayah.equals(ayah))

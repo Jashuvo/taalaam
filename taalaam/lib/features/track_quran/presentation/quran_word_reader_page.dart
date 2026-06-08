@@ -500,6 +500,21 @@ class _WordView extends ConsumerWidget {
         displayWords.where((w) => w.position == nav.selectedWord).firstOrNull;
     final fullAyah = displayWords.map((w) => w.arabic).join(' ');
 
+    // Bengali rough translation — concatenate word meanings
+    final fullMeaning = displayWords
+        .map((w) => w.meaningBn ?? '')
+        .where((s) => s.isNotEmpty)
+        .join(' ');
+
+    // Dynamic font size — reduce for long ayahs so they fit the header
+    final wordCount = displayWords.length;
+    final arabicFontSize = wordCount > 30 ? 14.0
+        : wordCount > 20 ? 16.0
+        : wordCount > 12 ? 18.0
+        : wordCount > 6  ? 20.0
+        : 24.0;
+    final arabicLineHeight = wordCount > 20 ? 1.5 : wordCount > 10 ? 1.7 : 2.1;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -507,7 +522,9 @@ class _WordView extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
           child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            constraints: const BoxConstraints(maxHeight: 200),
+            clipBehavior: Clip.antiAlias,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: AppColors.gradientQuranic,
@@ -517,47 +534,62 @@ class _WordView extends ConsumerWidget {
               borderRadius: AppRadius.lgBorder,
             ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Directionality(
                   textDirection: TextDirection.rtl,
                   child: Text(
                     fullAyah,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'NotoNaskhArabic',
-                      fontSize: 24,
+                      fontSize: arabicFontSize,
                       color: Colors.white,
-                      height: 2.1,
+                      height: arabicLineHeight,
                     ),
                     textAlign: TextAlign.justify,
                   ),
                 ),
-                // Ayah number medallion — shown at the "end" of RTL text (left side)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: Colors.white38, width: 1.5),
-                          color: Colors.white.withValues(alpha: 0.12),
+                const SizedBox(height: 6),
+                // Bottom row: ayah medallion + Bengali rough translation
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white38, width: 1),
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${nav.ayah}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                        alignment: Alignment.center,
+                      ),
+                    ),
+                    if (fullMeaning.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
                         child: Text(
-                          '${nav.ayah}',
+                          fullMeaning,
                           style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            fontSize: 11,
+                            color: Colors.white60,
+                            height: 1.35,
                           ),
+                          textDirection: TextDirection.ltr,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -927,47 +959,77 @@ class _AyahNavBar extends ConsumerWidget {
     final canPrev = nav.ayah > 1;
     final canNext = ayahCount > 0 && nav.ayah < ayahCount;
 
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        border:
-            Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
-      ),
-      child: Row(
-        children: [
-          // ← previous (lower ayah number)
-          IconButton(
-            iconSize: 30,
-            icon: Icon(
-              Icons.navigate_before_rounded,
-              color: canPrev ? theme.colorScheme.onSurface : theme.colorScheme.outlineVariant,
-            ),
-            tooltip: 'আগের আয়াত',
-            onPressed: canPrev ? notifier.previousAyah : null,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Thin progress bar showing position in surah
+        if (ayahCount > 0)
+          LinearProgressIndicator(
+            value: nav.ayah / ayahCount,
+            minHeight: 2,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation(
+                AppColors.forestGreen.withValues(alpha: 0.7)),
           ),
-          Expanded(
-            child: Text(
-              ayahCount > 0
-                  ? 'আয়াত ${nav.ayah} / $ayahCount'
-                  : 'আয়াত ${nav.ayah}',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
+        SizedBox(
+          height: 40,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: canPrev ? notifier.previousAyah : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: canPrev
+                        ? theme.colorScheme.onSurface
+                        : theme.colorScheme.outlineVariant,
+                    shape: const RoundedRectangleBorder(),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chevron_left_rounded, size: 20),
+                      SizedBox(width: 4),
+                      Text('আগে', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+              Text(
+                ayahCount > 0
+                    ? '${nav.ayah} / $ayahCount'
+                    : '${nav.ayah}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Expanded(
+                child: TextButton(
+                  onPressed: canNext
+                      ? () => notifier.nextAyah(ayahCount)
+                      : null,
+                  style: TextButton.styleFrom(
+                    foregroundColor: canNext
+                        ? theme.colorScheme.onSurface
+                        : theme.colorScheme.outlineVariant,
+                    shape: const RoundedRectangleBorder(),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('পরে', style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 4),
+                      Icon(Icons.chevron_right_rounded, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          // → next (higher ayah number)
-          IconButton(
-            iconSize: 30,
-            icon: Icon(
-              Icons.navigate_next_rounded,
-              color: canNext ? theme.colorScheme.onSurface : theme.colorScheme.outlineVariant,
-            ),
-            tooltip: 'পরের আয়াত',
-            onPressed: canNext ? () => notifier.nextAyah(ayahCount) : null,
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
