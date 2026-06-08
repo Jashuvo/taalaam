@@ -52,7 +52,7 @@ class QuranNavNotifier extends StateNotifier<QuranNavState> {
 }
 
 final quranNavProvider =
-    StateNotifierProvider<QuranNavNotifier, QuranNavState>(
+    StateNotifierProvider.autoDispose<QuranNavNotifier, QuranNavState>(
         (_) => QuranNavNotifier());
 
 final quranSurahsProvider = FutureProvider<List<QuranSurah>>(

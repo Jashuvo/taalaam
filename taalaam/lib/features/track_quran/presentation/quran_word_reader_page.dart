@@ -26,20 +26,6 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat();
-
-    // Auto-sync if local DB is empty
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final src = ref.read(quranLocalSourceProvider);
-      final count = await src.wordCount();
-      if (count == 0) {
-        await src.syncSurahsFromSupabase();
-        await src.syncWordsFromSupabase();
-        ref.invalidate(quranSurahsProvider);
-        final nav = ref.read(quranNavProvider);
-        ref.invalidate(quranAyahWordsProvider(
-            (surah: nav.surah, ayah: nav.ayah)));
-      }
-    });
   }
 
   @override
@@ -49,7 +35,7 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, ) {
     final nav = ref.watch(quranNavProvider);
     final surahsAsync = ref.watch(quranSurahsProvider);
     final theme = Theme.of(context);
@@ -107,10 +93,7 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
           _SurahSelector(surahsAsync: surahsAsync),
           const Divider(height: 1),
           Expanded(
-            child: _AyahBody(
-              shimmerCtrl: _shimmerCtrl,
-              nav: nav,
-            ),
+            child: _AyahBody(shimmerCtrl: _shimmerCtrl, nav: nav),
           ),
           _AyahNavBar(
             nav: nav,
@@ -132,6 +115,8 @@ class _SurahSelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final nav = ref.watch(quranNavProvider);
+    final theme = Theme.of(context);
+
     return SizedBox(
       height: 44,
       child: surahsAsync.when(
@@ -144,33 +129,42 @@ class _SurahSelector extends ConsumerWidget {
             final selected = s.number == nav.surah;
             return Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: ChoiceChip(
-                label: Text(
-                  '${s.number}. ${s.nameBn}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight:
-                        selected ? FontWeight.bold : FontWeight.normal,
+              child: GestureDetector(
+                onTap: () =>
+                    ref.read(quranNavProvider.notifier).goToSurah(s.number),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
                     color: selected
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.onSurface,
+                        ? AppColors.forestGreen
+                        : theme.colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${s.number}. ${s.nameBn}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight:
+                          selected ? FontWeight.bold : FontWeight.normal,
+                      color: selected
+                          ? Colors.white
+                          : theme.colorScheme.onSurface,
+                    ),
                   ),
                 ),
-                selected: selected,
-                selectedColor: AppColors.forestGreen,
-                backgroundColor:
-                    Theme.of(context).colorScheme.surfaceContainer,
-                onSelected: (_) =>
-                    ref.read(quranNavProvider.notifier).goToSurah(s.number),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
               ),
             );
           },
         ),
-        loading: () => const Center(child: LinearProgressIndicator()),
+        loading: () => Center(
+          child: Text(
+            'সূরা লোড হচ্ছে...',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
         error: (_, __) => const Center(child: Text('সূরা লোড হয়নি')),
       ),
     );
@@ -186,20 +180,30 @@ class _AyahBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (nav.showTafsir) return _TafsirView(nav: nav);
+
     final wordsAsync = ref.watch(
         quranAyahWordsProvider((surah: nav.surah, ayah: nav.ayah)));
 
-    if (nav.showTafsir) {
-      return _TafsirView(nav: nav);
-    }
-
     return wordsAsync.when(
-      data: (words) => _WordView(words: words, nav: nav),
+      data: (words) => words.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : _WordView(words: words, nav: nav),
       loading: () => _ShimmerWordView(ctrl: shimmerCtrl),
       error: (e, _) => Center(
-        child: Text(
-          'শব্দ লোড হয়নি: $e',
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.wifi_off_rounded, size: 40),
+            const SizedBox(height: 12),
+            Text('শব্দ লোড হয়নি', style: Theme.of(context).textTheme.bodyMedium),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => ref.invalidate(quranAyahWordsProvider(
+                  (surah: nav.surah, ayah: nav.ayah))),
+              child: const Text('আবার চেষ্টা করুন'),
+            ),
+          ],
         ),
       ),
     );
@@ -216,20 +220,61 @@ class _WordView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final selectedWord = words
-        .where((w) => w.position == nav.selectedWord)
-        .firstOrNull;
+    final selectedWord =
+        words.where((w) => w.position == nav.selectedWord).firstOrNull;
+
+    // Full ayah text joined RTL
+    final fullAyah = words.map((w) => w.arabic).join(' ');
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ── Full ayah display ──────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: AppColors.gradientQuranic,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: AppRadius.lgBorder,
+            ),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Text(
+                fullAyah,
+                style: const TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  fontSize: 24,
+                  color: Colors.white,
+                  height: 2.0,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Tap instruction ────────────────────────────────────────
+          Text(
+            'শব্দে ট্যাপ করুন',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+
+          // ── Word cards (Arabic + Bengali inline) ───────────────────
           Directionality(
             textDirection: TextDirection.rtl,
             child: Wrap(
               spacing: 8,
-              runSpacing: 8,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
               children: words.map((word) {
                 final isSelected = word.position == nav.selectedWord;
                 return GestureDetector(
@@ -242,41 +287,62 @@ class _WordView extends ConsumerWidget {
                           .selectWord(word.position);
                     }
                   },
-                  child: AnimatedScale(
-                    scale: isSelected ? 1.08 : 1.0,
+                  child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.gold.withValues(alpha: 0.15)
+                          : theme.colorScheme.surfaceContainer,
+                      border: Border.all(
                         color: isSelected
-                            ? AppColors.gold.withValues(alpha: 0.12)
-                            : theme.colorScheme.surfaceContainer,
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.gold
-                              : theme.colorScheme.outlineVariant,
-                          width: isSelected ? 1.5 : 1,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
+                            ? AppColors.gold
+                            : theme.colorScheme.outlineVariant,
+                        width: isSelected ? 1.5 : 1,
                       ),
-                      child: Text(
-                        word.arabic,
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 22,
-                          height: 1.8,
-                          color: isSelected
-                              ? AppColors.gold
-                              : theme.colorScheme.onSurface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          word.arabic,
+                          style: TextStyle(
+                            fontFamily: 'NotoNaskhArabic',
+                            fontSize: 22,
+                            height: 1.6,
+                            color: isSelected
+                                ? AppColors.gold
+                                : theme.colorScheme.onSurface,
+                          ),
                         ),
-                      ),
+                        if (word.meaningBn != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            word.meaningBn!,
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1.3,
+                              color: isSelected
+                                  ? AppColors.gold.withValues(alpha: 0.85)
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.ltr,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 );
               }).toList(),
             ),
           ),
+
+          // ── Selected word detail ───────────────────────────────────
           if (selectedWord != null) ...[
             const SizedBox(height: 20),
             _WordDetailCard(word: selectedWord),
@@ -301,9 +367,8 @@ class _WordDetailCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.gold.withValues(alpha: 0.08),
         borderRadius: AppRadius.lgBorder,
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.3),
-        ),
+        border:
+            Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
       ),
       child: Column(
         children: [
@@ -313,7 +378,7 @@ class _WordDetailCard extends StatelessWidget {
               word.arabic,
               style: const TextStyle(
                 fontFamily: 'NotoNaskhArabic',
-                fontSize: 36,
+                fontSize: 40,
                 color: AppColors.gold,
                 height: 1.8,
               ),
@@ -324,8 +389,8 @@ class _WordDetailCard extends StatelessWidget {
             Text(
               word.meaningBn!,
               style: theme.textTheme.titleMedium?.copyWith(
-                fontSize: 17,
-                height: 1.6,
+                fontSize: 18,
+                height: 1.5,
               ),
               textAlign: TextAlign.center,
             )
@@ -337,7 +402,7 @@ class _WordDetailCard extends StatelessWidget {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             'শব্দ ${word.position} • আয়াত ${word.ayah} • সূরা ${word.surah}',
             style: theme.textTheme.bodySmall?.copyWith(
@@ -362,11 +427,6 @@ class _TafsirView extends ConsumerWidget {
         quranTafsirProvider((surah: nav.surah, ayah: nav.ayah)));
     final theme = Theme.of(context);
 
-    // Also sync tafsir for this surah if first time viewing
-    ref.listen(
-        quranTafsirProvider((surah: nav.surah, ayah: nav.ayah)),
-        (_, next) {});
-
     return tafsirAsync.when(
       data: (tafsir) => SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -379,7 +439,7 @@ class _TafsirView extends ConsumerWidget {
                 'تفسير أبو بكر زكريا',
                 style: TextStyle(
                   fontFamily: 'NotoNaskhArabic',
-                  fontSize: 16,
+                  fontSize: 18,
                   color: AppColors.gold,
                   height: 1.8,
                 ),
@@ -400,15 +460,21 @@ class _TafsirView extends ConsumerWidget {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
+                      Icon(Icons.menu_book_outlined,
+                          size: 48,
+                          color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 12),
                       Text(
-                        'এই আয়াতের তাফসীর ডেটা নেই',
+                        'এই সূরার তাফসীর এখনও ডাউনলোড হয়নি',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
-                          fontStyle: FontStyle.italic,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
-                      TextButton(
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: const Text('তাফসীর ডাউনলোড করুন'),
                         onPressed: () async {
                           await ref
                               .read(quranLocalSourceProvider)
@@ -416,7 +482,6 @@ class _TafsirView extends ConsumerWidget {
                           ref.invalidate(quranTafsirProvider(
                               (surah: nav.surah, ayah: nav.ayah)));
                         },
-                        child: const Text('সূরার তাফসীর ডাউনলোড করুন'),
                       ),
                     ],
                   ),
@@ -427,7 +492,7 @@ class _TafsirView extends ConsumerWidget {
                 tafsir.tafsirText,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 15,
-                  height: 1.8,
+                  height: 1.9,
                 ),
               ),
           ],
@@ -435,9 +500,8 @@ class _TafsirView extends ConsumerWidget {
       ),
       loading: () =>
           const Center(child: CircularProgressIndicator()),
-      error: (_, __) => const Center(
-        child: Text('তাফসীর লোড হয়নি'),
-      ),
+      error: (_, __) =>
+          const Center(child: Text('তাফসীর লোড হয়নি')),
     );
   }
 }
@@ -453,43 +517,68 @@ class _ShimmerWordView extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: AnimatedBuilder(
-        animation: ctrl,
-        builder: (_, __) {
-          final shimmer = LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [
-              theme.colorScheme.surfaceContainer,
-              theme.colorScheme.surfaceContainerHighest,
-              theme.colorScheme.surfaceContainer,
-            ],
-            stops: [
-              (ctrl.value - 0.3).clamp(0.0, 1.0),
-              ctrl.value.clamp(0.0, 1.0),
-              (ctrl.value + 0.3).clamp(0.0, 1.0),
-            ],
-          );
-          return Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: List.generate(
-              7,
-              (i) => ShaderMask(
-                shaderCallback: (bounds) =>
-                    shimmer.createShader(bounds),
-                child: Container(
-                  width: 60.0 + (i % 3) * 20,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+      child: Column(
+        children: [
+          // Full ayah placeholder
+          AnimatedBuilder(
+            animation: ctrl,
+            builder: (_, __) => _shimmerBox(
+              theme,
+              ctrl.value,
+              width: double.infinity,
+              height: 80,
+              radius: 12,
+            ),
+          ),
+          const SizedBox(height: 20),
+          AnimatedBuilder(
+            animation: ctrl,
+            builder: (_, __) => Wrap(
+              spacing: 8,
+              runSpacing: 10,
+              alignment: WrapAlignment.center,
+              children: List.generate(
+                8,
+                (i) => _shimmerBox(
+                  theme,
+                  ctrl.value,
+                  width: 60.0 + (i % 3) * 18,
+                  height: 58,
+                  radius: 12,
                 ),
               ),
             ),
-          );
-        },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shimmerBox(ThemeData theme, double v,
+      {required double width, required double height, double radius = 8}) {
+    final shimmer = LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: [
+        theme.colorScheme.surfaceContainer,
+        theme.colorScheme.surfaceContainerHighest,
+        theme.colorScheme.surfaceContainer,
+      ],
+      stops: [
+        (v - 0.3).clamp(0.0, 1.0),
+        v.clamp(0.0, 1.0),
+        (v + 0.3).clamp(0.0, 1.0),
+      ],
+    );
+    return ShaderMask(
+      shaderCallback: (bounds) => shimmer.createShader(bounds),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+        ),
       ),
     );
   }
@@ -507,20 +596,19 @@ class _AyahNavBar extends ConsumerWidget {
     final theme = Theme.of(context);
     final notifier = ref.read(quranNavProvider.notifier);
     return Container(
-      height: 48,
+      height: 52,
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainer,
         border: Border(
-          top: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
+            top: BorderSide(color: theme.colorScheme.outlineVariant)),
       ),
       child: Row(
         children: [
           IconButton(
+            iconSize: 28,
             icon: const Icon(Icons.chevron_right),
             tooltip: 'আগের আয়াত',
-            onPressed:
-                nav.ayah > 1 ? () => notifier.previousAyah() : null,
+            onPressed: nav.ayah > 1 ? () => notifier.previousAyah() : null,
           ),
           Expanded(
             child: Text(
@@ -528,11 +616,12 @@ class _AyahNavBar extends ConsumerWidget {
                   ? 'আয়াত ${nav.ayah} / $ayahCount'
                   : 'আয়াত ${nav.ayah}',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall
+              style: theme.textTheme.bodyMedium
                   ?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
           IconButton(
+            iconSize: 28,
             icon: const Icon(Icons.chevron_left),
             tooltip: 'পরের আয়াত',
             onPressed: nav.ayah < ayahCount
@@ -557,7 +646,6 @@ class _AudioBar extends ConsumerWidget {
     final isPlaying = ref.watch(quranIsPlayingProvider);
     final player = ref.watch(quranAudioPlayerProvider);
 
-    // Stop audio when ayah changes
     ref.listen(quranNavProvider, (prev, next) {
       if (prev?.ayah != next.ayah || prev?.surah != next.surah) {
         player.stop();
@@ -570,18 +658,17 @@ class _AudioBar extends ConsumerWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainer,
         border: Border(
-          top: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
+            top: BorderSide(color: theme.colorScheme.outlineVariant)),
       ),
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Directionality(
-                textDirection: TextDirection.rtl,
-                child: Text(
+          const Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
                   'مشاري راشد العفاسي',
                   style: TextStyle(
                     fontFamily: 'NotoNaskhArabic',
@@ -590,20 +677,23 @@ class _AudioBar extends ConsumerWidget {
                     color: AppColors.gold,
                   ),
                 ),
-              ),
-              Text(
-                'মিশারী আল-আফাসী',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'মিশারী আল-আফাসী',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const Spacer(),
           IconButton(
             icon: Icon(
-              isPlaying ? Icons.stop_circle_outlined : Icons.play_circle_outlined,
-              size: 36,
+              isPlaying
+                  ? Icons.stop_circle_outlined
+                  : Icons.play_circle_outlined,
+              size: 38,
               color: AppColors.gold,
             ),
             onPressed: () async {
@@ -616,9 +706,8 @@ class _AudioBar extends ConsumerWidget {
                   await player.setUrl(url);
                   ref.read(quranIsPlayingProvider.notifier).state = true;
                   await player.play();
-                  // Reset when done
-                  player.playerStateStream.listen((state) {
-                    if (state.processingState == ProcessingState.completed) {
+                  player.playerStateStream.listen((s) {
+                    if (s.processingState == ProcessingState.completed) {
                       ref.read(quranIsPlayingProvider.notifier).state = false;
                     }
                   });
