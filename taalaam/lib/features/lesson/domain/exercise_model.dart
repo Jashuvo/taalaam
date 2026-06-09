@@ -20,6 +20,10 @@ enum ExerciseType {
   ayahContext,    // tested: word highlighted inside full ayah, 4 options
   surahTheme,     // tested: multiple choice about surah's main message
   reflectionCard, // informational: tadabbur prompt + scholarly note, auto-passes
+  rootFamily,     // tested: pick the word that does NOT share a root with the others
+  aqeedahTrue,    // tested: is this aqeedah statement about a Divine Name correct?
+  ayahCloze,      // tested: ayah with one word blanked — pick the missing word
+  grammarSpot,    // tested: identify which word is a verb/noun/particle
 }
 
 @freezed

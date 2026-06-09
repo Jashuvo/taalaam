@@ -56,4 +56,8 @@ const _$ExerciseTypeEnumMap = {
   ExerciseType.ayahContext: 'ayahContext',
   ExerciseType.surahTheme: 'surahTheme',
   ExerciseType.reflectionCard: 'reflectionCard',
+  ExerciseType.rootFamily: 'rootFamily',
+  ExerciseType.aqeedahTrue: 'aqeedahTrue',
+  ExerciseType.ayahCloze: 'ayahCloze',
+  ExerciseType.grammarSpot: 'grammarSpot',
 };

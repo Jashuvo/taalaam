@@ -247,45 +247,34 @@ function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: nu
 
 const EXERCISE_SYSTEM_PROMPT = `Quranic Arabic curriculum designer for Bengali-speaking Muslims (Salafi: Ibn Sa'di, Ibn Uthaymin — no philosophical interpretation).
 
-SCHEMAS (use exact snake_case type strings, sequential sort_order):
+SCHEMAS (exact snake_case type strings, sequential sort_order):
 {"type":"multiple_choice","sort_order":N,"prompt_bn":"«W» অর্থ কী?","prompt_ar":"W","correct_answer":{"options":["ok","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":1}
 {"type":"drag_drop","sort_order":N,"prompt_bn":"মিলাও:","correct_answer":{"pairs":[{"ar":"W","bn":"M"},{"ar":"W2","bn":"M2"},{"ar":"W3","bn":"M3"}]},"grammar_note_bn":"...","difficulty":2}
-{"type":"true_false","sort_order":N,"prompt_bn":"সঠিক?","correct_answer":{"statement_ar":"AR","statement_bn":"BN","is_true":true},"grammar_note_bn":"...","difficulty":2}
 {"type":"fill_in_blank","sort_order":N,"prompt_bn":"বসাও (অর্থ:HINT):","correct_answer":{"sentence":"AR ___ REST","blank_index":N,"answer":"W"},"distractors":{"options":["w1","w2"]},"grammar_note_bn":"...","difficulty":3}
-{"type":"tap_to_build","sort_order":N,"prompt_bn":"সাজাও:«BN»","correct_answer":{"words":["W1","W2","W3"],"order_matters":true,"distractor_words":["D1","D2"]},"distractors":null,"grammar_note_bn":"...","difficulty":4}
 {"type":"speak_arabic","sort_order":N,"prompt_bn":"বলুন:","correct_answer":{"expected_ar":"W","transliteration":"latin","meaning_bn":"BN"},"grammar_note_bn":"...","difficulty":2}
-{"type":"ayah_read","sort_order":N,"prompt_bn":"আয়াতটি পড়ুন:","correct_answer":{"ayah_ar":"EXACT","ayah_bn":"BN_TRANSLATION","surah_name":"সূরা X","ayah_number":N,"context_bn":"WHY"},"difficulty":0}
-{"type":"tafsir_read","sort_order":N,"prompt_bn":"সূরা পরিচিতি:","correct_answer":{"surah_name":"X","revelation":"মাক্কী/মাদানী","theme_bn":"TOPIC","aqeedah_bn":"BELIEF","tafsir_bn":"2 SENTENCES IBN SADI STYLE"},"difficulty":0}
+{"type":"ayah_read","sort_order":N,"prompt_bn":"আয়াতটি পড়ুন:","correct_answer":{"ayah_ar":"EXACT","ayah_bn":"BN","surah_name":"সূরা X","ayah_number":N,"context_bn":"WHY"},"difficulty":0}
+{"type":"tafsir_read","sort_order":N,"prompt_bn":"সূরা পরিচিতি:","correct_answer":{"surah_name":"X","revelation":"মাক্কী/মাদানী","theme_bn":"TOPIC","aqeedah_bn":"SALAFI_BELIEF","tafsir_bn":"2_SENTENCES_IBN_SADI"},"difficulty":0}
 {"type":"ayah_context","sort_order":N,"prompt_bn":"হাইলাইট শব্দের অর্থ?","prompt_ar":"W","correct_answer":{"ayah_ar":"EXACT","highlighted_word":"W_IN_AYAH","options":["ok","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
-{"type":"surah_theme","sort_order":N,"prompt_bn":"সূরা X-এর বিষয়?","correct_answer":{"options":["ok","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
+{"type":"surah_theme","sort_order":N,"prompt_bn":"সূরা X-এর মূল বিষয়?","correct_answer":{"options":["ok","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
 {"type":"reflection_card","sort_order":N,"prompt_bn":"চিন্তা করুন:","correct_answer":{"reflection_prompt":"QUESTION","scholarly_note_bn":"IBN_UTHAYMIN_NOTE"},"difficulty":0}
+{"type":"root_family","sort_order":N,"prompt_bn":"কোন শব্দটি এই ধাতুর নয়?","correct_answer":{"root_ar":"X-Y-Z","root_meaning_bn":"BN","words":[{"arabic":"W","meaning_bn":"M"},{"arabic":"W2","meaning_bn":"M2"},{"arabic":"W3","meaning_bn":"M3"},{"arabic":"ODD","meaning_bn":"M4"}],"odd_index":3},"grammar_note_bn":"...","difficulty":2}
+{"type":"aqeedah_true","sort_order":N,"prompt_bn":"এই বক্তব্যটি কি সঠিক?","correct_answer":{"statement_bn":"STMT_ABOUT_NAME","is_correct":false,"explanation_bn":"IBN_UTHAYMIN_CORRECTION_2_SENTENCES"},"difficulty":2}
+{"type":"ayah_cloze","sort_order":N,"prompt_bn":"শূন্যস্থানে কোন শব্দটি বসবে?","correct_answer":{"ayah_ar":"FULL_AYAH_EXACT","surah_name":"সূরা X","ayah_number":N,"blank_word":"WORD_IN_AYAH","blank_position":N,"options":["correct","w1","w2","w3"],"correct_index":0},"difficulty":2}
+{"type":"grammar_spot","sort_order":N,"prompt_bn":"কোনটি POSBENGALI (POSARABIC)?","correct_answer":{"target_pos_ar":"فِعْلٌ","target_pos_bn":"ক্রিয়াপদ","words":[{"arabic":"W","meaning_bn":"M","pos":"verb"},{"arabic":"W2","meaning_bn":"M2","pos":"noun"},{"arabic":"W3","meaning_bn":"M3","pos":"noun"},{"arabic":"W4","meaning_bn":"M4","pos":"particle"}],"correct_index":0},"difficulty":2}
 
-RULES: Arabic always with harakat. ayah_ar/highlighted_word EXACT from provided texts. Distractors from lesson words. Return ONLY valid JSON array.`;
+RULES: Arabic always with full harakat (تشكيل). ayah_ar/highlighted_word/blank_word EXACT from provided texts. root_family: 3 words from stated root + 1 odd. aqeedah_true: test ta'wil or tashbih errors (is_correct usually false). grammar_spot: exactly 1 correct pos match among 4 words. Return ONLY valid JSON array.`;
 
-const VERB_EXERCISE_SYSTEM_PROMPT = `You are a Quranic Arabic curriculum designer for Bengali-speaking Muslims.
-This lesson teaches verb ROOT FAMILIES — multiple forms of the same Arabic root.
+const VERB_EXERCISE_SYSTEM_PROMPT = `Quranic Arabic curriculum designer for Bengali-speaking Muslims. This lesson teaches verb ROOT FAMILIES.
 
-EXERCISE TYPES FOR VERB LESSONS (use exact field names):
+SCHEMAS:
+{"type":"grammar_spot","sort_order":N,"prompt_bn":"কোনটি ক্রিয়াপদ (فِعْلٌ)?","correct_answer":{"target_pos_ar":"فِعْلٌ","target_pos_bn":"ক্রিয়াপদ","words":[{"arabic":"V","meaning_bn":"M","pos":"verb"},{"arabic":"W2","meaning_bn":"M2","pos":"noun"},{"arabic":"W3","meaning_bn":"M3","pos":"noun"},{"arabic":"W4","meaning_bn":"M4","pos":"particle"}],"correct_index":0},"difficulty":2}
+{"type":"root_family","sort_order":N,"prompt_bn":"কোন শব্দটি ধাতু X-এর নয়?","correct_answer":{"root_ar":"X-Y-Z","root_meaning_bn":"BN","words":[{"arabic":"W","meaning_bn":"M"},{"arabic":"W2","meaning_bn":"M2"},{"arabic":"W3","meaning_bn":"M3"},{"arabic":"ODD","meaning_bn":"M4"}],"odd_index":3},"grammar_note_bn":"...","difficulty":2}
+{"type":"multiple_choice","sort_order":N,"prompt_bn":"«VERB» কোন ধাতু থেকে?","prompt_ar":"VERB","correct_answer":{"options":["root","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
+{"type":"drag_drop","sort_order":N,"prompt_bn":"ধাতু «ROOT» — মেলাও:","correct_answer":{"pairs":[{"ar":"V1","bn":"M1"},{"ar":"V2","bn":"M2"},{"ar":"V3","bn":"M3"}]},"grammar_note_bn":"...","difficulty":2}
+{"type":"fill_in_blank","sort_order":N,"prompt_bn":"সঠিক ক্রিয়া বসাও (অর্থ:HINT):","correct_answer":{"sentence":"AR ___ REST","blank_index":N,"answer":"VERB"},"distractors":{"options":["w1","w2"]},"grammar_note_bn":"...","difficulty":3}
+{"type":"speak_arabic","sort_order":N,"prompt_bn":"বলুন:","correct_answer":{"expected_ar":"VERB","transliteration":"latin","meaning_bn":"BN"},"grammar_note_bn":"...","difficulty":2}
 
-[multiple_choice] — identify the root of a verb
-  {"type":"multiple_choice","sort_order":N,"prompt_bn":"«VERB» কোন ধাতু (root) থেকে এসেছে?","prompt_ar":"VERB","correct_answer":{"options":["correct_root","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
-
-[drag_drop] — match verb forms from same root to their meanings
-  {"type":"drag_drop","sort_order":N,"prompt_bn":"ধাতু «ROOT» — শব্দের সাথে অর্থ মেলাও:","correct_answer":{"pairs":[{"ar":"VERB_FORM","bn":"meaning"},...]},"grammar_note_bn":"...","difficulty":2}
-
-[true_false] — do these two words share the same root?
-  {"type":"true_false","sort_order":N,"prompt_bn":"এই দুটি শব্দ কি একই ধাতু থেকে এসেছে?","correct_answer":{"statement_ar":"WORD1 ← WORD2","statement_bn":"Bengali statement","is_true":true},"grammar_note_bn":"...","difficulty":3}
-
-[fill_in_blank] — fill missing verb form
-  {"type":"fill_in_blank","sort_order":N,"prompt_bn":"শূন্যস্থানে সঠিক ক্রিয়া বসাও (অর্থ: HINT):","correct_answer":{"sentence":"ARABIC ___ REST","blank_index":N,"answer":"VERB"},"distractors":{"options":["wrong1","wrong2"]},"grammar_note_bn":"...","difficulty":3}
-
-[speak_arabic] — pronounce the verb
-  {"type":"speak_arabic","sort_order":N,"prompt_bn":"এই ক্রিয়াটি বলুন:","correct_answer":{"expected_ar":"VERB_WITH_HARAKAT","transliteration":"latin","meaning_bn":"Bengali"},"grammar_note_bn":"...","difficulty":2}
-
-ABSOLUTE RULES:
-- ALL Arabic must have full harakat (تشكيل)
-- grammar_note_bn: explain verb form, tense, or root pattern (not just meaning)
-- Return ONLY a valid JSON array — no markdown, no explanation`;
+RULES: All Arabic with full harakat. grammar_note_bn explains verb form/tense/root pattern. Return ONLY valid JSON array.`;
 
 // ── Build per-unit exercise user prompt ──────────────────────────────────────
 
@@ -314,7 +303,7 @@ function buildExerciseUserPrompt(opts: {
       return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) #${surahNumber}
 সালাতে: ${salahCtx}
 
-আয়াত (EXACT Arabic for ayah_read):
+আয়াত (EXACT for ayah_read/ayah_cloze):
 ${ayahsBlock}
 
 শব্দ (${exWords.length}):
@@ -322,8 +311,9 @@ ${wordList}
 
 ৬টি অনুশীলন (sort_order 1–6):
 1. ayah_read: ayah_ar="${firstAyahAr}" ayah_bn=অনুবাদ surah_name="সূরা ${surahRow?.name_bn}" ayah_number=${firstAyahNum} context_bn="${salahCtx}"
-2. tafsir_read: revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী পদ্ধতিতে)
-3–4. 2×multiple_choice
+2. tafsir_read: revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
+3. ayah_cloze: blank one lesson word from the first ayah above — 4 Arabic options
+4. multiple_choice
 5. drag_drop (3 pairs)
 6. speak_arabic
 
@@ -331,30 +321,31 @@ Return JSON array only.`;
     }
 
     case 'juz_amma': {
-      // Build ayah_read lines outside the template literal to avoid paren ambiguity
       const firstTwo = [...ayahTexts.entries()].slice(0, 2);
       const ayahReadLines = firstTwo.map(([key, ar], idx) => {
         const ayahNum = parseInt(key.split(':')[1]);
         const sn = surahRow?.name_bn ?? '';
-        return `${idx + 2}. ayah_read (sort_order ${idx + 2}): ayah_ar = EXACTLY "${ar}" | ayah_bn = এর সঠিক বাংলা অনুবাদ | surah_name = "সূরা ${sn}" | ayah_number = ${ayahNum} | context_bn = এই আয়াতের তাৎপর্য`;
+        return `${idx + 2}. ayah_read (sort_order ${idx + 2}): ayah_ar=EXACTLY "${ar}" | ayah_bn=সঠিক বাংলা অনুবাদ | surah_name="সূরা ${sn}" | ayah_number=${ayahNum} | context_bn=এই আয়াতের তাৎপর্য`;
       }).join('\n');
+      const firstKey = [...ayahTexts.keys()][0] ?? `${surahNumber}:1`;
+      const firstAyahNum = parseInt(firstKey.split(':')[1]);
+      const firstAyahAr = ayahTexts.get(firstKey) ?? '';
       return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) #${surahNumber}
 নাযিল: ${surahRow?.revelation ?? 'মাক্কী'}
 
-আয়াত (EXACT Arabic for ayah_read/ayah_context):
+আয়াত (EXACT for ayah_read/ayah_context/ayah_cloze):
 ${ayahsBlock}
 
 শব্দ (${exWords.length}):
 ${wordList}
 
-৮টি অনুশীলন (sort_order 1–8):
+৭টি অনুশীলন (sort_order 1–7):
 1. tafsir_read: revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
 ${ayahReadLines}
 4. surah_theme: প্রধান বিষয় ৪ অপশন
-5. ayah_context: প্রথম আয়াত থেকে ১ শব্দ হাইলাইট
-6. multiple_choice
-7. fill_in_blank
-8. speak_arabic
+5. ayah_cloze: blank one lesson word from ayah_ar="${firstAyahAr}" ayah_number=${firstAyahNum}
+6. ayah_context: প্রথম আয়াত থেকে ১ শব্দ হাইলাইট — ৪ অপশন
+7. speak_arabic
 
 Return JSON array only.`;
     }
@@ -372,12 +363,13 @@ ${ayahsBlock}
 নামসমূহ (${exWords.length}):
 ${wordList}
 
-৭টি অনুশীলন (sort_order 1–7):
+৮টি অনুশীলন (sort_order 1–8):
 1. ayah_read: ayah_ar="${firstAyahAr}" ayah_bn=অনুবাদ surah_name=উপযুক্ত_সূরা ayah_number=${firstAyahNum} context_bn="এই আয়াতে আল্লাহর নাম ও গুণাবলী"
 2. reflection_card: এই নামগুলোর athar (মুমিনের হৃদয়ে প্রভাব) — ইবনু উসাইমীন পদ্ধতিতে ব্যক্তিগত প্রশ্ন
-3–5. 3×multiple_choice: নাম → অর্থ
-6. drag_drop (3 pairs)
-7. speak_arabic
+3–4. 2×aqeedah_true: একটি সঠিক বক্তব্য (is_correct:true) + একটি ta'wil বা tashbih ভুল (is_correct:false) — এই পাঠের নামগুলো সম্পর্কে
+5–6. 2×multiple_choice: নাম → অর্থ
+7. drag_drop (3 pairs)
+8. speak_arabic
 
 Return JSON array only.`;
     }
@@ -389,13 +381,14 @@ Return JSON array only.`;
 শব্দ তালিকা:
 ${wordList}
 
-নিচের ৯টি অনুশীলন তৈরি করুন (sort_order 1–9):
-1–3. 3×multiple_choice (sort_order 1–3)
-4–5. 2×drag_drop (sort_order 4–5): 3 pairs each
-6. true_false (sort_order 6)
-7. fill_in_blank (sort_order 7)
-8. tap_to_build (sort_order 8)
-9. speak_arabic (sort_order 9)
+৮টি অনুশীলন (sort_order 1–8):
+1. root_family: শব্দ তালিকা থেকে একটি ধাতু বেছে — ৩টি সেই ধাতু থেকে + ১টি ভিন্ন ধাতুর (odd_index=3)
+2. grammar_spot: ৪টি শব্দ — একটি فعل, একটি حرف, দুটি اسم — কোনটি فعل বা اسم বা حرف?
+3–4. 2×multiple_choice
+5. ayah_context: শব্দ তালিকার যেকোনো শব্দ একটি Quranic ayah থেকে (আরবি লিখে ayah_ar বানাও)
+6. drag_drop (3 pairs)
+7. fill_in_blank
+8. speak_arabic
 
 Return valid JSON array only.`;
     }
@@ -408,12 +401,12 @@ ${verbRoots.map(r => `• ${r.root}: ${r.forms.slice(0, 4).join(', ')}`).join('\
 শব্দ তালিকা:
 ${wordList}
 
-নিচের ৮টি অনুশীলন তৈরি করুন (sort_order 1–8):
-1–3. 3×multiple_choice (sort_order 1–3): root identification
-4–5. 2×drag_drop (sort_order 4–5)
-6. true_false (sort_order 6)
-7. fill_in_blank (sort_order 7)
-8. speak_arabic (sort_order 8)
+৭টি অনুশীলন (sort_order 1–7):
+1. grammar_spot: ৪টি শব্দ — কোনটি فعل? (ক্রিয়াপদ)
+2. root_family: একটি ধাতু থেকে ৩টি ক্রিয়ারূপ + ১টি ভিন্ন ধাতুর শব্দ (odd_index=3)
+3–4. 2×multiple_choice: ক্রিয়া → ধাতু চিনুন
+5–6. 2×drag_drop: ধাতু পরিবার মেলানো
+7. speak_arabic
 
 Return valid JSON array only.`;
     }

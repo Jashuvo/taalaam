@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+import 'exercise_aqeedah_true.dart';
+import 'exercise_ayah_cloze.dart';
 import 'exercise_ayah_context.dart';
 import 'exercise_ayah_read.dart';
 import 'exercise_chat_complete.dart';
+import 'exercise_grammar_spot.dart';
+import 'exercise_root_family.dart';
 import 'exercise_drag_drop.dart';
 import 'exercise_fill_blank.dart';
 import 'exercise_listen_select.dart';
@@ -68,6 +72,14 @@ class ExerciseEngine extends StatelessWidget {
         ExerciseSurahTheme(exercise: exercise, onAnswered: onAnswered),
       ExerciseType.reflectionCard =>
         ExerciseReflectionCard(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.rootFamily =>
+        ExerciseRootFamily(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.aqeedahTrue =>
+        ExerciseAqeedahTrue(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.ayahCloze =>
+        ExerciseAyahCloze(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.grammarSpot =>
+        ExerciseGrammarSpot(exercise: exercise, onAnswered: onAnswered),
     };
   }
 }

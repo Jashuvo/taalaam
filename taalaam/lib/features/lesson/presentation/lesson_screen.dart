@@ -36,6 +36,10 @@ const _typeLabels = <ExerciseType, (String, Color)>{
   ExerciseType.ayahContext:     ('আয়াতে শব্দ চিহ্নিত করুন', Color(0xFF2E7D32)),
   ExerciseType.surahTheme:      ('বিষয় চিহ্নিত করুন',       Color(0xFF2E7D32)),
   ExerciseType.reflectionCard:  ('তাদাব্বুর',                Color(0xFF7B4F00)),
+  ExerciseType.rootFamily:      ('ধাতু পরিবার',              Color(0xFF1B6B3A)),
+  ExerciseType.aqeedahTrue:     ('আকীদাহ যাচাই',             Color(0xFF7B4F00)),
+  ExerciseType.ayahCloze:       ('আয়াত পূরণ করুন',          Color(0xFF2E7D32)),
+  ExerciseType.grammarSpot:     ('শব্দ-শ্রেণী চিহ্নিত করুন', Color(0xFF1565C0)),
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
