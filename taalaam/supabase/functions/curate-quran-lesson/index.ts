@@ -314,7 +314,7 @@ IMPORTANT: Output exercises in EXACTLY this order in the JSON array (first item 
 2nd: tafsir_read — revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
 3rd: ayah_cloze — blank one lesson word from the first ayah above, 4 Arabic options (correct_index:0 first)
 4th: ayah_context — highlight one lesson word inside the same ayah, 4 Bengali meaning options
-5th: drag_drop — 3 Arabic word → Bengali meaning pairs
+5th: reflection_card — tadabbur prompt: what does this ayah mean when you recite it in Salah? Include a scholarly note (Ibn Sa'di or Ibn Uthaymin)
 6th: speak_arabic — a lesson word to pronounce
 
 Return JSON array only.`;
@@ -679,7 +679,7 @@ ${wordList}`;
         const TYPE_PRIORITY: Record<string, number> = {
           salah: {
             ayah_read: 0, tafsir_read: 1, ayah_cloze: 2,
-            ayah_context: 3, drag_drop: 4, speak_arabic: 5,
+            ayah_context: 3, reflection_card: 4, speak_arabic: 5,
           },
           juz_amma: {
             tafsir_read: 0, ayah_read: 1, surah_theme: 3,
