@@ -113,8 +113,9 @@ class SrsLocalSource {
           dueDate: Value(now),
           state: const Value(0),
         ));
-    // Skip Supabase push for synthetic vocab (no matching FK in remote vocabulary).
-    if (vocabularyId.startsWith('syn_')) return;
+    // Skip Supabase push for synthetic vocab and reader-added words
+    // (no matching FK in remote vocabulary table for either prefix).
+    if (vocabularyId.startsWith('syn_') || vocabularyId.startsWith('reader_')) return;
     Supabase.instance.client.from('srs_cards').upsert({
       'user_id': userId,
       'vocabulary_id': vocabularyId,

@@ -7,6 +7,7 @@ import '../../../data/local/database.dart';
 import '../../../shared/widgets/shimmer_skeleton.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../track_quran/presentation/widgets/quran_coverage_ring.dart';
+import '../../track_quran/presentation/widgets/tadabbur_card.dart';
 import 'home_provider.dart';
 
 // ── Path geometry ─────────────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
                           ref.watch(currentUserProvider)?.id;
                       if (userId != null) {
                         items.add(QuranCoverageRing(userId: userId));
+                        items.add(TadabburCard(userId: userId));
                       }
                       items.add(const _QuranicCurriculumHeader());
                       for (int ui = 0; ui < sortedUnits.length; ui++) {

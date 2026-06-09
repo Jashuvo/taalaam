@@ -75,6 +75,37 @@ Future<Map<String, int>> _getOrBuildFreqMap(AppDatabase db) async {
   return map;
 }
 
+// ── Word-knowledge sets provider ──────────────────────────────────────────────
+// Emits per-userId (mastered, learning) sets of normalized arabic forms.
+// mastered: state==2 OR scheduledDays>=7; learning: has card but not mastered.
+// Reuses normalizeArabic — single source of truth for tinting and coverage.
+final knownWordFormsProvider = StreamProvider.family
+    .autoDispose<({Set<String> mastered, Set<String> learning}), String>(
+        (ref, userId) {
+  final db = ref.watch(appDatabaseProvider);
+  return (db.select(db.srsCards).join([
+    drift.innerJoin(db.vocabulary,
+        db.vocabulary.id.equalsExp(db.srsCards.vocabularyId)),
+  ])
+        ..where(db.srsCards.userId.equals(userId)))
+      .watch()
+      .map((rows) {
+    final mastered = <String>{};
+    final learning = <String>{};
+    for (final row in rows) {
+      final card = row.readTable(db.srsCards);
+      final vocab = row.readTable(db.vocabulary);
+      final norm = normalizeArabic(vocab.arabic);
+      if (card.state == 2 || card.scheduledDays >= 7) {
+        mastered.add(norm);
+      } else {
+        learning.add(norm);
+      }
+    }
+    return (mastered: mastered, learning: learning);
+  });
+});
+
 // ── Riverpod provider ──────────────────────────────────────────────────────────
 // Watches SRS cards live; re-emits CoverageResult on every lesson completion.
 // "Known" = state == 2 (review-passed) OR scheduledDays >= 7.
