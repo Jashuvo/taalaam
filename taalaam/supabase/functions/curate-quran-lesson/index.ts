@@ -17,6 +17,7 @@
 
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 import { createClient }        from 'npm:@supabase/supabase-js';
+import { AZKAAR_LESSONS }      from './salah_azkaar_data.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin':  '*',
@@ -29,7 +30,7 @@ const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type UnitType = 'salah' | 'juz_amma' | 'frequent' | 'attributes' | 'verbs';
+type UnitType = 'salah' | 'azkaar' | 'juz_amma' | 'frequent' | 'attributes' | 'verbs';
 
 interface WordRow { arabic: string; meaning_bn: string; ayah?: number; position?: number; surah?: number; }
 
@@ -37,10 +38,11 @@ interface WordRow { arabic: string; meaning_bn: string; ayah?: number; position?
 
 const UNIT_CONFIG: Record<UnitType, { slug: string; title_bn: string; title_ar: string; sort_order: number }> = {
   salah:      { slug: 'salah-vocabulary', title_bn: 'সালাতের ভাষা',           title_ar: 'لُغَةُ الصَّلَاة',               sort_order: 1 },
-  frequent:   { slug: 'frequent-words',  title_bn: 'সবচেয়ে বেশি ব্যবহৃত শব্দ', title_ar: 'الكَلِمَاتُ الأَكْثَرُ تَكْرَارًا', sort_order: 2 },
-  attributes: { slug: 'asma-sifat',      title_bn: 'আল্লাহর গুণাবলী',          title_ar: 'أَسْمَاءُ اللهِ الحُسْنَى',       sort_order: 3 },
-  juz_amma:   { slug: 'juz-amma',        title_bn: 'জুয আম্মার সূরা',          title_ar: 'سُوَرُ جُزْءِ عَمَّ',             sort_order: 4 },
-  verbs:      { slug: 'quranic-verbs',   title_bn: 'কুরআনের ক্রিয়াপদ',        title_ar: 'الأَفْعَالُ القُرْآنِيَّة',       sort_order: 5 },
+  azkaar:     { slug: 'salah-azkaar',     title_bn: 'সালাতের আযকার',           title_ar: 'أَذْكَارُ الصَّلَاةِ',            sort_order: 2 },
+  frequent:   { slug: 'frequent-words',  title_bn: 'সবচেয়ে বেশি ব্যবহৃত শব্দ', title_ar: 'الكَلِمَاتُ الأَكْثَرُ تَكْرَارًا', sort_order: 3 },
+  attributes: { slug: 'asma-sifat',      title_bn: 'আল্লাহর গুণাবলী',          title_ar: 'أَسْمَاءُ اللهِ الحُسْنَى',       sort_order: 4 },
+  juz_amma:   { slug: 'juz-amma',        title_bn: 'জুয আম্মার সূরা',          title_ar: 'سُوَرُ جُزْءِ عَمَّ',             sort_order: 5 },
+  verbs:      { slug: 'quranic-verbs',   title_bn: 'কুরআনের ক্রিয়াপদ',        title_ar: 'الأَفْعَالُ القُرْآنِيَّة',       sort_order: 6 },
 };
 
 // Salah context per surah — shown in ayah_read cards so the learner knows WHEN they recite this
@@ -237,6 +239,7 @@ function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: nu
   switch (unitType) {
     case 'salah':
     case 'juz_amma':   return `সূরা ${surahNameBn}`;
+    case 'azkaar':     return AZKAAR_LESSONS[lessonIndex]?.title_bn ?? `আযকার পাঠ ${lessonIndex + 1}`;
     case 'frequent':   return `শীর্ষ শব্দ — পাঠ ${lessonIndex + 1} (${lessonIndex * 20 + 1}–${lessonIndex * 20 + 20})`;
     case 'attributes': return ATTRIBUTE_PASSAGES[lessonIndex]?.titleBn ?? `গুণাবলী পাঠ ${lessonIndex + 1}`;
     case 'verbs':      return `ক্রিয়াপদ পাঠ ${lessonIndex + 1}`;
@@ -294,6 +297,36 @@ function buildExerciseUserPrompt(opts: {
   const ayahsBlock = formatAyahsForPrompt(ayahTexts, tafsirSnippets);
 
   switch (unitType) {
+
+    case 'azkaar': {
+      const lesson = AZKAAR_LESSONS[lessonIndex];
+      return `পাঠ: ${lesson.title_bn}
+যিকর: ${lesson.full_text_ar}
+বাংলা অর্থ: ${lesson.full_text_bn}
+কখন পড়া হয়: ${lesson.recite_when}
+সূত্র: ${lesson.source_bn}
+
+শব্দ তালিকা (শুধু এই শব্দগুলো ব্যবহার করুন, নতুন কিছু বানাবেন না):
+${wordList}
+
+IMPORTANT: Output exercises in EXACTLY this order (৯টি):
+1st: ayah_read — ayah_ar=EXACTLY "${lesson.full_text_ar}", ayah_bn="${lesson.full_text_bn}", surah_name="${lesson.title_bn}", ayah_number=${lessonIndex + 1}, context_bn="${lesson.recite_when}"
+2nd: tafsir_read — surah_name="${lesson.title_bn}", revelation="মাক্কী", theme_bn="এই যিকরে বান্দা আল্লাহকে কী বলছে", aqeedah_bn="সালাফী আকিদা অনুযায়ী এই যিকরের তাৎপর্য", tafsir_bn="ইবনু সা'দী বা ইবনু উসাইমীন পদ্ধতিতে ২–৩ বাক্যে এই যিকরের ব্যাখ্যা"
+3rd: reflection_card — reflection_prompt="পরের সালাতে ${lesson.title_bn} পড়ার সময় এই অর্থ মনে রাখুন: কোন শব্দটি আজ আপনার হৃদয় স্পর্শ করল?", scholarly_note_bn="ইবনু উসাইমীন বা ইবনুল কাইয়্যিম — খুশু সম্পর্কে একটি উক্তি"
+4th: multiple_choice — শব্দ তালিকা থেকে একটি শব্দের অর্থ জিজ্ঞেস করুন
+5th: multiple_choice — শব্দ তালিকা থেকে আরেকটি শব্দের অর্থ জিজ্ঞেস করুন
+6th: drag_drop — শব্দ তালিকা থেকে ৩ জোড়া আরবি-বাংলা মেলানো
+7th: fill_in_blank — যিকরের ভেতর একটি শব্দ বাদ দিয়ে শূন্যস্থান তৈরি করুন; sentence-এ EXACT Arabic, blank_word শব্দ তালিকা থেকে
+8th: tap_to_build — যিকরের একটি ছোট অংশ সাজানো; words: প্রতিটি আরবি শব্দ আলাদা element, distractor_words: ১–২টি ভুল শব্দ যা তালিকায় আছে; correct_answer.words=["w1","w2","w3",...]
+9th: speak_arabic — expected_ar=যিকরের একটি সম্পূর্ণ বাক্য বা ছোট অংশ; meaning_bn=এর অর্থ
+
+STRICT RULES:
+- ONLY use Arabic words that appear in the provided word list or in the full_text_ar above.
+- Do NOT invent Arabic words not in the list.
+- tap_to_build words array: each element is ONE Arabic word (no multi-word elements).
+- All Arabic with full harakat.
+Return valid JSON array only.`;
+    }
 
     case 'salah': {
       const salahCtx = SALAH_POSITIONS[surahNumber!] ?? 'সালাতে পঠিত';
@@ -449,6 +482,11 @@ Deno.serve(async (req: Request) => {
         status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
+    if (unitType === 'azkaar' && (lessonIndex < 0 || lessonIndex >= AZKAAR_LESSONS.length)) {
+      return new Response(JSON.stringify({ error: `lesson_index must be 0–${AZKAAR_LESSONS.length - 1} for azkaar` }), {
+        status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
 
     const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const geminiKey = Deno.env.get('GEMINI_API_KEY')!;
@@ -515,6 +553,11 @@ Deno.serve(async (req: Request) => {
       // Pause after Gemini call in fetchAttributeWords before next call
       await new Promise(r => setTimeout(r, 4000));
 
+    } else if (unitType === 'azkaar') {
+      // Words come from the static data file — no DB query needed.
+      const lesson = AZKAAR_LESSONS[lessonIndex];
+      words = lesson.words.map(w => ({ arabic: w.arabic, meaning_bn: w.meaning_bn }));
+
     } else if (unitType === 'verbs') {
       verbRoots = await fetchVerbRoots(sb, lessonIndex);
       words     = await verbRootsToWords(sb, verbRoots);
@@ -556,7 +599,13 @@ Deno.serve(async (req: Request) => {
 
     // ── 7. Gemini enrichment (transliteration, meaning_en, grammar_note) ──
     type EnrichedWord = WordRow & { transliteration: string | null; meaning_en: string | null; grammar_note_bn: string | null };
-    let enrichedWords: EnrichedWord[] = words.map(w => ({ ...w, transliteration: null, meaning_en: null, grammar_note_bn: null }));
+    // For azkaar, seed grammar_note_bn from the hand-curated context_bn field.
+    let enrichedWords: EnrichedWord[] = unitType === 'azkaar'
+      ? AZKAAR_LESSONS[lessonIndex].words.map(w => ({
+          arabic: w.arabic, meaning_bn: w.meaning_bn,
+          transliteration: null, meaning_en: null, grammar_note_bn: w.context_bn,
+        }))
+      : words.map(w => ({ ...w, transliteration: null, meaning_en: null, grammar_note_bn: null }));
 
     try {
       const wordList = words.map((w, i) => `${i + 1}. ${w.arabic} = ${w.meaning_bn}`).join('\n');
@@ -681,6 +730,11 @@ ${wordList}`;
           salah: {
             ayah_read: 0, tafsir_read: 1, ayah_cloze: 2,
             ayah_context: 3, reflection_card: 4, speak_arabic: 5,
+          },
+          azkaar: {
+            ayah_read: 0, tafsir_read: 1, reflection_card: 2,
+            multiple_choice: 3, drag_drop: 5, fill_in_blank: 6,
+            tap_to_build: 7, speak_arabic: 8,
           },
           juz_amma: {
             tafsir_read: 0, ayah_read: 1, surah_theme: 3,

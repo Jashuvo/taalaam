@@ -160,7 +160,7 @@ class _QuranCurriculumSection extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(
             children: [
-              Icon(Icons.menu_book_rounded, size: 18, color: AppColors.forestGreen),
+              const Icon(Icons.menu_book_rounded, size: 18, color: AppColors.forestGreen),
               const SizedBox(width: 8),
               Text(
                 'কুরআনিক পাঠ কারিকুলাম',
@@ -183,6 +183,15 @@ class _QuranCurriculumSection extends StatelessWidget {
         const SizedBox(height: 8),
         _UnitCurationCard(
           unitIndex: 2,
+          title: 'সালাতের আযকার',
+          subtitle: '৬ পাঠ — ছানা, রুকু-সিজদা, তাশাহহুদ, দরূদ',
+          color: const Color(0xFF00838F),
+          icon: Icons.record_voice_over_outlined,
+          child: _AzkaarControls(),
+        ),
+        const SizedBox(height: 8),
+        _UnitCurationCard(
+          unitIndex: 3,
           title: 'সবচেয়ে বেশি ব্যবহৃত শব্দ',
           subtitle: '১৫ পাঠ — কুরআনের ৭০% শব্দ শিখুন',
           color: const Color(0xFF6A1B9A),
@@ -191,7 +200,7 @@ class _QuranCurriculumSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _UnitCurationCard(
-          unitIndex: 3,
+          unitIndex: 4,
           title: 'আল্লাহর গুণাবলী',
           subtitle: '৮ পাঠ পর্যন্ত — কুরআনের সরাসরি নামসমূহ',
           color: const Color(0xFFE65100),
@@ -200,7 +209,7 @@ class _QuranCurriculumSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _UnitCurationCard(
-          unitIndex: 4,
+          unitIndex: 5,
           title: 'জুয আম্মার সূরা',
           subtitle: 'যেকোনো সূরা থেকে পাঠ তৈরি করুন',
           color: AppColors.forestGreen,
@@ -209,7 +218,7 @@ class _QuranCurriculumSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _UnitCurationCard(
-          unitIndex: 5,
+          unitIndex: 6,
           title: 'কুরআনের ক্রিয়াপদ',
           subtitle: '৫ পাঠ — শিকড়ভিত্তিক ক্রিয়া শিক্ষা',
           color: const Color(0xFF00695C),
@@ -397,7 +406,82 @@ class _SalahUnitControlsState extends State<_SalahUnitControls> {
   }
 }
 
-// ── Unit 2: Frequent words ────────────────────────────────────────────────────
+// ── Unit 2: Salah Azkaar ─────────────────────────────────────────────────────
+
+class _AzkaarControls extends StatefulWidget {
+  @override
+  State<_AzkaarControls> createState() => _AzkaarControlsState();
+}
+
+class _AzkaarControlsState extends State<_AzkaarControls> {
+  static const _lessons = [
+    (index: 0, title: 'ছানা (দুআ আল-ইস্তিফতাহ)'),
+    (index: 1, title: 'রুকু ও সিজদার তাসবীহ'),
+    (index: 2, title: 'দুই সিজদার মাঝের দুআ'),
+    (index: 3, title: 'তাশাহহুদ'),
+    (index: 4, title: 'দরূদ ইবরাহীম'),
+    (index: 5, title: 'সালামের পূর্বের দুআ'),
+  ];
+
+  int? _busyIndex;
+  Set<int> _existingOrders = {};
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final unit = await Supabase.instance.client
+        .from('units').select('id').eq('slug', 'salah-azkaar').maybeSingle();
+    if (unit == null || !mounted) return;
+    final rows = await Supabase.instance.client
+        .from('lessons').select('sort_order').eq('unit_id', unit['id'] as String) as List;
+    if (mounted) setState(() => _existingOrders = rows.map((r) => r['sort_order'] as int).toSet());
+  }
+
+  Future<void> _curate(int lessonIndex, String title) async {
+    setState(() => _busyIndex = lessonIndex);
+    await _callCurate(
+      ctx: context,
+      body: {'unit_type': 'azkaar', 'lesson_index': lessonIndex},
+      successMsg: '$title পাঠ তৈরি হয়েছে ✓',
+    );
+    await _loadExisting();
+    if (mounted) setState(() => _busyIndex = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8, runSpacing: 8,
+      children: _lessons.map((l) {
+        final exists = _existingOrders.contains(l.index + 1);
+        if (exists) {
+          return Chip(
+            avatar: const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
+            label: Text(l.title, style: const TextStyle(fontSize: 11)),
+            backgroundColor: Colors.green.withValues(alpha: 0.08),
+            side: const BorderSide(color: Colors.green, width: 0.5),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+          );
+        }
+        return FilledButton.tonal(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: _busyIndex != null ? null : () => _curate(l.index, l.title),
+          child: _busyIndex == l.index
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(l.title, style: const TextStyle(fontSize: 12)),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ── Unit 3: Frequent words ────────────────────────────────────────────────────
 
 class _FrequentWordsControls extends StatefulWidget {
   @override
