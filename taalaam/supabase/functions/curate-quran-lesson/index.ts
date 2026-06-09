@@ -664,13 +664,50 @@ ${wordList}`;
         ]);
         const toSnake = (s: string) => s.replace(/([A-Z])/g, m => `_${m.toLowerCase()}`);
 
-        const validExercises = exercises
+        // Normalise type names, drop unknown types.
+        const normalised = exercises
           .map(ex => ({ ...ex, type: toSnake(ex.type as string) }))
           .filter(ex => VALID_TYPES.has(ex.type as string));
 
-        if (validExercises.length === 0) {
+        if (normalised.length === 0) {
           throw new Error(`No valid exercise types — Gemini returned: ${exercises.map(e => e.type).join(', ')}`);
         }
+
+        // Enforce the pedagogical sequence regardless of what order Gemini outputs.
+        // Gemini consistently reverses the array, so we re-sort by a hardcoded type priority.
+        // Types appearing multiple times (e.g. 2×multiple_choice) keep stable relative order.
+        const TYPE_PRIORITY: Record<string, number> = {
+          salah: {
+            ayah_read: 0, tafsir_read: 1, ayah_cloze: 2,
+            multiple_choice: 3, drag_drop: 4, speak_arabic: 5,
+          },
+          juz_amma: {
+            tafsir_read: 0, ayah_read: 1, surah_theme: 3,
+            ayah_cloze: 4, ayah_context: 5, speak_arabic: 6,
+          },
+          attributes: {
+            ayah_read: 0, reflection_card: 1, aqeedah_true: 2,
+            multiple_choice: 4, drag_drop: 6, speak_arabic: 7,
+          },
+          frequent: {
+            root_family: 0, grammar_spot: 1, multiple_choice: 2,
+            ayah_context: 4, drag_drop: 5, fill_in_blank: 6, speak_arabic: 7,
+          },
+          verbs: {
+            grammar_spot: 0, root_family: 1, multiple_choice: 2,
+            drag_drop: 4, speak_arabic: 6,
+          },
+        }[unitType] ?? {};
+
+        // Stable sort: unknown types fall to end, ties keep original relative order.
+        const validExercises = normalised
+          .map((ex, i) => ({ ex, origIdx: i }))
+          .sort((a, b) => {
+            const pa = TYPE_PRIORITY[a.ex.type as string] ?? 99;
+            const pb = TYPE_PRIORITY[b.ex.type as string] ?? 99;
+            return pa !== pb ? pa - pb : a.origIdx - b.origIdx;
+          })
+          .map(({ ex }) => ex);
 
         // Insert one-by-one so a single bad exercise never kills the whole batch.
         const insertErrors: string[] = [];
