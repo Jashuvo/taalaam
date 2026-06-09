@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/shimmer_skeleton.dart';
+import '../../auth/presentation/auth_provider.dart';
+import '../../track_quran/presentation/widgets/quran_coverage_ring.dart';
 import 'home_provider.dart';
 
 // ── Path geometry ─────────────────────────────────────────────────────────────
@@ -134,6 +136,11 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
                       // All units open; sorted by sort_order
                       final sortedUnits = [...allUnits]
                         ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+                      final userId =
+                          ref.watch(currentUserProvider)?.id;
+                      if (userId != null) {
+                        items.add(QuranCoverageRing(userId: userId));
+                      }
                       items.add(const _QuranicCurriculumHeader());
                       for (int ui = 0; ui < sortedUnits.length; ui++) {
                         items.add(_UnitSection(

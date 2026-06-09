@@ -5,7 +5,7 @@
 // unit_type:
 //   'salah'      — Language of Salah (surahs 1,112,108,103) — requires surah_number
 //   'juz_amma'   — Juz Amma surahs (78–114)                 — requires surah_number
-//   'frequent'   — Top-100 most frequent words (5 lessons)   — requires lesson_index 0–4
+//   'frequent'   — Top-300 most frequent words (15 lessons)  — requires lesson_index 0–14
 //   'attributes' — Names of Allah from 8 Quranic passages    — requires lesson_index 0–7
 //   'verbs'      — Verb roots (5 lessons, needs root data)    — requires lesson_index 0–4
 //
@@ -390,15 +390,16 @@ Return JSON array only.`;
 শব্দ তালিকা:
 ${wordList}
 
-IMPORTANT: Output exercises in EXACTLY this order (৮টি):
+IMPORTANT: Output exercises in EXACTLY this order (৯টি):
 1st: root_family — শব্দ তালিকা থেকে একটি ধাতু বেছে — ৩টি সেই ধাতু থেকে + ১টি ভিন্ন ধাতুর (odd_index=3)
 2nd: grammar_spot — ৪টি শব্দ — একটি فعل, একটি حرف, দুটি اسم
 3rd: multiple_choice — শব্দ → অর্থ
 4th: multiple_choice — শব্দ → অর্থ
 5th: ayah_context — শব্দ তালিকার একটি শব্দ Quranic ayah থেকে highlight করুন
-6th: drag_drop — 3 শব্দ-অর্থ জোড়া
-7th: fill_in_blank — বাক্যে শূন্যস্থান পূরণ
-8th: speak_arabic — একটি শব্দ উচ্চারণ
+6th: tafsir_read — এই পাঠের শব্দগুলো যে সূরায় বেশি পাওয়া যায় সেই সূরার সংক্ষিপ্ত পরিচিতি — revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী পদ্ধতিতে, ২ বাক্য)
+7th: drag_drop — 3 শব্দ-অর্থ জোড়া
+8th: fill_in_blank — বাক্যে শূন্যস্থান পূরণ
+9th: speak_arabic — একটি শব্দ উচ্চারণ
 
 Return valid JSON array only.`;
     }
@@ -691,7 +692,7 @@ ${wordList}`;
           },
           frequent: {
             root_family: 0, grammar_spot: 1, multiple_choice: 2,
-            ayah_context: 4, drag_drop: 5, fill_in_blank: 6, speak_arabic: 7,
+            ayah_context: 4, tafsir_read: 5, drag_drop: 6, fill_in_blank: 7, speak_arabic: 8,
           },
           verbs: {
             grammar_spot: 0, root_family: 1, multiple_choice: 2,

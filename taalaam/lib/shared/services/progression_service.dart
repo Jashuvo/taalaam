@@ -160,6 +160,22 @@ class ProgressionService {
     }).then((_) {}).catchError((_) {});
   }
 
+  /// Awards bonus XP (e.g. milestone rewards) without touching streak or hearts.
+  Future<void> awardBonusXp(String userId, int xp) async {
+    final existing = await (_db.select(_db.streaks)
+          ..where((t) => t.userId.equals(userId)))
+        .getSingleOrNull();
+    if (existing == null) return;
+    final newXp = existing.totalXp + xp;
+    await (_db.update(_db.streaks)
+          ..where((t) => t.userId.equals(userId)))
+        .write(StreaksCompanion(totalXp: drift.Value(newXp)));
+    Supabase.instance.client.from('streaks').upsert({
+      'user_id': userId,
+      'total_xp': newXp,
+    }).then((_) {}).catchError((_) {});
+  }
+
   Future<int> _incrementHearts(String userId) async {
     final existing = await (_db.select(_db.streaks)
           ..where((t) => t.userId.equals(userId)))

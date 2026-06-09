@@ -184,7 +184,7 @@ class _QuranCurriculumSection extends StatelessWidget {
         _UnitCurationCard(
           unitIndex: 2,
           title: 'সবচেয়ে বেশি ব্যবহৃত শব্দ',
-          subtitle: '৫ পাঠ — কুরআনের ৫০% শব্দ শিখুন',
+          subtitle: '১৫ পাঠ — কুরআনের ৭০% শব্দ শিখুন',
           color: const Color(0xFF6A1B9A),
           icon: Icons.bar_chart_outlined,
           child: _FrequentWordsControls(),
@@ -435,7 +435,7 @@ class _FrequentWordsControlsState extends State<_FrequentWordsControls> {
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 8, runSpacing: 8,
-      children: List.generate(5, (i) {
+      children: List.generate(15, (i) {
         final exists = _existingOrders.contains(i + 1);
         final label  = 'পাঠ ${i + 1} (${i * 20 + 1}–${i * 20 + 20})';
         if (exists) {
