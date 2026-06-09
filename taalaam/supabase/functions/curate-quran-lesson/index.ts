@@ -641,8 +641,27 @@ ${wordList}`;
           throw new Error('Gemini returned empty exercise array');
         }
 
+        // Gemini sometimes outputs camelCase types (e.g. "ayahRead") even when told snake_case.
+        // Normalise to snake_case then drop any type not in the DB constraint so one bad
+        // exercise never poisons the entire batch.
+        const VALID_TYPES = new Set([
+          'tap_to_build','fill_in_blank','multiple_choice','drag_drop','word_scramble',
+          'true_false','chat_complete','translate_build','listen_select','speak_arabic',
+          'ayah_read','tafsir_read','ayah_context','surah_theme','reflection_card',
+          'root_family','aqeedah_true','ayah_cloze','grammar_spot',
+        ]);
+        const toSnake = (s: string) => s.replace(/([A-Z])/g, m => `_${m.toLowerCase()}`);
+
+        const validExercises = exercises
+          .map(ex => ({ ...ex, type: toSnake(ex.type as string) }))
+          .filter(ex => VALID_TYPES.has(ex.type as string));
+
+        if (validExercises.length === 0) {
+          throw new Error(`No valid exercise types — Gemini returned: ${exercises.map(e => e.type).join(', ')}`);
+        }
+
         const { data: inserted, error: exErr } = await sb.from('exercises').insert(
-          exercises.map((ex, idx) => ({
+          validExercises.map((ex, idx) => ({
             lesson_id:       lessonId,
             type:            ex.type,
             sort_order:      (ex.sort_order as number) ?? (idx + 1),
