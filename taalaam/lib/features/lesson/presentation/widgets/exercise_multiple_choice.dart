@@ -26,10 +26,12 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
   @override
   void initState() {
     super.initState();
-    final raw = List<String>.from(
-        widget.exercise.correctAnswer['options'] as List);
-    final correctAnswer =
-        raw[widget.exercise.correctAnswer['correct_index'] as int];
+    final rawOpts = widget.exercise.correctAnswer['options'];
+    final raw = rawOpts is List ? List<String>.from(rawOpts) : <String>[];
+    final cidxRaw = widget.exercise.correctAnswer['correct_index'];
+    final correctAnswer = raw.isNotEmpty
+        ? raw[cidxRaw is int ? cidxRaw.clamp(0, raw.length - 1) : 0]
+        : '';
     raw.shuffle();
     _options = raw;
     _correctIdx = raw.indexOf(correctAnswer);

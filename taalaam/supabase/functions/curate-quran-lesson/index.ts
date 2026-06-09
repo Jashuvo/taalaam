@@ -309,28 +309,35 @@ ${ayahsBlock}
 শব্দ (${exWords.length}):
 ${wordList}
 
-৬টি অনুশীলন (sort_order 1–6):
-1. ayah_read: ayah_ar="${firstAyahAr}" ayah_bn=অনুবাদ surah_name="সূরা ${surahRow?.name_bn}" ayah_number=${firstAyahNum} context_bn="${salahCtx}"
-2. tafsir_read: revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
-3. ayah_cloze: blank one lesson word from the first ayah above — 4 Arabic options
-4. multiple_choice
-5. drag_drop (3 pairs)
-6. speak_arabic
+IMPORTANT: Output exercises in EXACTLY this order in the JSON array (first item = first exercise shown to learner):
+1st: ayah_read — ayah_ar=EXACTLY "${firstAyahAr}", ayah_bn=বাংলা অনুবাদ, surah_name="সূরা ${surahRow?.name_bn}", ayah_number=${firstAyahNum}, context_bn="${salahCtx}"
+2nd: tafsir_read — revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
+3rd: ayah_cloze — blank one lesson word from the first ayah above, 4 Arabic options (correct_index:0 first)
+4th: multiple_choice — vocab word → meaning
+5th: drag_drop — 3 word-meaning pairs
+6th: speak_arabic — a lesson word to pronounce
 
 Return JSON array only.`;
     }
 
     case 'juz_amma': {
-      const firstTwo = [...ayahTexts.entries()].slice(0, 2);
-      const ayahReadLines = firstTwo.map(([key, ar], idx) => {
+      const ayahCount = ayahTexts.size;
+      // Scale ayah_read count to surah length
+      const numAyahReads = ayahCount <= 5 ? 1 : ayahCount <= 19 ? 2 : 3;
+      const totalEx = 4 + numAyahReads; // tafsirRead + ayahReads + surahTheme + ayahCloze + ayahContext + speakArabic
+      const ayahEntries = [...ayahTexts.entries()];
+      const ayahReadLines = ayahEntries.slice(0, numAyahReads).map(([key, ar], i) => {
         const ayahNum = parseInt(key.split(':')[1]);
-        const sn = surahRow?.name_bn ?? '';
-        return `${idx + 2}. ayah_read (sort_order ${idx + 2}): ayah_ar=EXACTLY "${ar}" | ayah_bn=সঠিক বাংলা অনুবাদ | surah_name="সূরা ${sn}" | ayah_number=${ayahNum} | context_bn=এই আয়াতের তাৎপর্য`;
+        return `${i + 2}th: ayah_read — ayah_ar=EXACTLY "${ar}", ayah_bn=বাংলা অনুবাদ, surah_name="সূরা ${surahRow?.name_bn ?? ''}", ayah_number=${ayahNum}, context_bn=এই আয়াতের প্রেক্ষাপট`;
       }).join('\n');
-      const firstKey = [...ayahTexts.keys()][0] ?? `${surahNumber}:1`;
-      const firstAyahNum = parseInt(firstKey.split(':')[1]);
-      const firstAyahAr = ayahTexts.get(firstKey) ?? '';
-      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) #${surahNumber}
+      const clozeAyahKey = ayahEntries[0]?.[0] ?? `${surahNumber}:1`;
+      const clozeAyahNum = parseInt(clozeAyahKey.split(':')[1]);
+      const clozeAyahAr = ayahTexts.get(clozeAyahKey) ?? '';
+      const themeSlot = numAyahReads + 2;
+      const clozeSlot = numAyahReads + 3;
+      const contextSlot = numAyahReads + 4;
+      const speakSlot = numAyahReads + 5;
+      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) #${surahNumber} | আয়াত সংখ্যা: ${ayahCount}
 নাযিল: ${surahRow?.revelation ?? 'মাক্কী'}
 
 আয়াত (EXACT for ayah_read/ayah_context/ayah_cloze):
@@ -339,13 +346,13 @@ ${ayahsBlock}
 শব্দ (${exWords.length}):
 ${wordList}
 
-৭টি অনুশীলন (sort_order 1–7):
-1. tafsir_read: revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
+IMPORTANT: Output exercises in EXACTLY this order (${totalEx}টি):
+1st: tafsir_read — revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
 ${ayahReadLines}
-4. surah_theme: প্রধান বিষয় ৪ অপশন
-5. ayah_cloze: blank one lesson word from ayah_ar="${firstAyahAr}" ayah_number=${firstAyahNum}
-6. ayah_context: প্রথম আয়াত থেকে ১ শব্দ হাইলাইট — ৪ অপশন
-7. speak_arabic
+${themeSlot}th: surah_theme — প্রধান বিষয় ৪ অপশন
+${clozeSlot}th: ayah_cloze — ayah_ar=EXACTLY "${clozeAyahAr}", ayah_number=${clozeAyahNum}, blank one lesson word, 4 Arabic options (correct_index:0 first)
+${contextSlot}th: ayah_context — প্রথম আয়াত থেকে ১ শব্দ হাইলাইট — ৪ অপশন
+${speakSlot}th: speak_arabic — a lesson word to pronounce
 
 Return JSON array only.`;
     }
@@ -363,13 +370,15 @@ ${ayahsBlock}
 নামসমূহ (${exWords.length}):
 ${wordList}
 
-৮টি অনুশীলন (sort_order 1–8):
-1. ayah_read: ayah_ar="${firstAyahAr}" ayah_bn=অনুবাদ surah_name=উপযুক্ত_সূরা ayah_number=${firstAyahNum} context_bn="এই আয়াতে আল্লাহর নাম ও গুণাবলী"
-2. reflection_card: এই নামগুলোর athar (মুমিনের হৃদয়ে প্রভাব) — ইবনু উসাইমীন পদ্ধতিতে ব্যক্তিগত প্রশ্ন
-3–4. 2×aqeedah_true: একটি সঠিক বক্তব্য (is_correct:true) + একটি ta'wil বা tashbih ভুল (is_correct:false) — এই পাঠের নামগুলো সম্পর্কে
-5–6. 2×multiple_choice: নাম → অর্থ
-7. drag_drop (3 pairs)
-8. speak_arabic
+IMPORTANT: Output exercises in EXACTLY this order (৮টি):
+1st: ayah_read — ayah_ar=EXACTLY "${firstAyahAr}", ayah_bn=অনুবাদ, surah_name=উপযুক্ত_সূরা, ayah_number=${firstAyahNum}, context_bn="এই আয়াতে আল্লাহর নাম ও গুণাবলী"
+2nd: reflection_card — এই নামগুলোর athar (মুমিনের হৃদয়ে প্রভাব) — ইবনু উসাইমীন পদ্ধতিতে ব্যক্তিগত প্রশ্ন
+3rd: aqeedah_true — সঠিক বক্তব্য (is_correct:true) — এই পাঠের নামগুলো সম্পর্কে
+4th: aqeedah_true — ta'wil বা tashbih ভুল বক্তব্য (is_correct:false)
+5th: multiple_choice — নাম → অর্থ
+6th: multiple_choice — নাম → অর্থ
+7th: drag_drop — 3 নাম-অর্থ জোড়া
+8th: speak_arabic — একটি নাম উচ্চারণ
 
 Return JSON array only.`;
     }
@@ -381,14 +390,15 @@ Return JSON array only.`;
 শব্দ তালিকা:
 ${wordList}
 
-৮টি অনুশীলন (sort_order 1–8):
-1. root_family: শব্দ তালিকা থেকে একটি ধাতু বেছে — ৩টি সেই ধাতু থেকে + ১টি ভিন্ন ধাতুর (odd_index=3)
-2. grammar_spot: ৪টি শব্দ — একটি فعل, একটি حرف, দুটি اسم — কোনটি فعل বা اسم বা حرف?
-3–4. 2×multiple_choice
-5. ayah_context: শব্দ তালিকার যেকোনো শব্দ একটি Quranic ayah থেকে (আরবি লিখে ayah_ar বানাও)
-6. drag_drop (3 pairs)
-7. fill_in_blank
-8. speak_arabic
+IMPORTANT: Output exercises in EXACTLY this order (৮টি):
+1st: root_family — শব্দ তালিকা থেকে একটি ধাতু বেছে — ৩টি সেই ধাতু থেকে + ১টি ভিন্ন ধাতুর (odd_index=3)
+2nd: grammar_spot — ৪টি শব্দ — একটি فعل, একটি حرف, দুটি اسم
+3rd: multiple_choice — শব্দ → অর্থ
+4th: multiple_choice — শব্দ → অর্থ
+5th: ayah_context — শব্দ তালিকার একটি শব্দ Quranic ayah থেকে highlight করুন
+6th: drag_drop — 3 শব্দ-অর্থ জোড়া
+7th: fill_in_blank — বাক্যে শূন্যস্থান পূরণ
+8th: speak_arabic — একটি শব্দ উচ্চারণ
 
 Return valid JSON array only.`;
     }
@@ -401,12 +411,14 @@ ${verbRoots.map(r => `• ${r.root}: ${r.forms.slice(0, 4).join(', ')}`).join('\
 শব্দ তালিকা:
 ${wordList}
 
-৭টি অনুশীলন (sort_order 1–7):
-1. grammar_spot: ৪টি শব্দ — কোনটি فعل? (ক্রিয়াপদ)
-2. root_family: একটি ধাতু থেকে ৩টি ক্রিয়ারূপ + ১টি ভিন্ন ধাতুর শব্দ (odd_index=3)
-3–4. 2×multiple_choice: ক্রিয়া → ধাতু চিনুন
-5–6. 2×drag_drop: ধাতু পরিবার মেলানো
-7. speak_arabic
+IMPORTANT: Output exercises in EXACTLY this order (৭টি):
+1st: grammar_spot — ৪টি শব্দ — কোনটি فعل? (ক্রিয়াপদ)
+2nd: root_family — একটি ধাতু থেকে ৩টি ক্রিয়ারূপ + ১টি ভিন্ন ধাতুর শব্দ (odd_index=3)
+3rd: multiple_choice — ক্রিয়া → ধাতু চিনুন
+4th: multiple_choice — ক্রিয়া → ধাতু চিনুন
+5th: drag_drop — ধাতু পরিবার মেলানো (3 pairs)
+6th: drag_drop — ধাতু পরিবার মেলানো (3 pairs)
+7th: speak_arabic — একটি ক্রিয়াপদ উচ্চারণ
 
 Return valid JSON array only.`;
     }
@@ -669,7 +681,7 @@ ${wordList}`;
           const { error: exErr } = await sb.from('exercises').insert({
             lesson_id:       lessonId,
             type:            ex.type,
-            sort_order:      (ex.sort_order as number) ?? (idx + 1),
+            sort_order:      idx + 1,   // always use insertion index; ignore Gemini's sort_order
             prompt_bn:       ex.prompt_bn ?? null,
             prompt_ar:       (ex.prompt_ar as string | undefined) ?? null,
             correct_answer:  ex.correct_answer ?? {},

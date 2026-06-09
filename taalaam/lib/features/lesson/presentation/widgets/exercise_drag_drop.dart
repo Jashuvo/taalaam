@@ -25,8 +25,10 @@ class _ExerciseDragDropState extends State<ExerciseDragDrop> {
   @override
   void initState() {
     super.initState();
-    final raw =
-        List<Map<String, dynamic>>.from(widget.exercise.correctAnswer['pairs'] as List);
+    final rawPairs = widget.exercise.correctAnswer['pairs'];
+    final raw = rawPairs is List
+        ? List<Map<String, dynamic>>.from(rawPairs)
+        : <Map<String, dynamic>>[];
     _pairs = raw
         .map((p) => {'ar': p['ar'] as String, 'bn': p['bn'] as String})
         .toList();
