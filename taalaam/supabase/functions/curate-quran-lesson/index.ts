@@ -660,21 +660,36 @@ ${wordList}`;
           throw new Error(`No valid exercise types — Gemini returned: ${exercises.map(e => e.type).join(', ')}`);
         }
 
-        const { data: inserted, error: exErr } = await sb.from('exercises').insert(
-          validExercises.map((ex, idx) => ({
+        // Insert one-by-one so a single bad exercise never kills the whole batch.
+        const insertErrors: string[] = [];
+        for (let idx = 0; idx < validExercises.length; idx++) {
+          const ex = validExercises[idx];
+          const rawDiff = ex.difficulty as number | undefined | null;
+          const clampedDiff = Math.max(1, Math.min(5, (rawDiff != null && rawDiff > 0) ? rawDiff : 1));
+          const { error: exErr } = await sb.from('exercises').insert({
             lesson_id:       lessonId,
             type:            ex.type,
             sort_order:      (ex.sort_order as number) ?? (idx + 1),
-            prompt_bn:       ex.prompt_bn,
+            prompt_bn:       ex.prompt_bn ?? null,
             prompt_ar:       (ex.prompt_ar as string | undefined) ?? null,
-            correct_answer:  ex.correct_answer,
+            correct_answer:  ex.correct_answer ?? {},
             distractors:     (ex.distractors as unknown) ?? null,
             grammar_note_bn: (ex.grammar_note_bn as string | undefined) ?? null,
-            difficulty:      (ex.difficulty as number) ?? 1,
-          }))
-        ).select('id');
-        if (exErr) throw new Error(`Exercise insert: ${exErr.message}`);
-        exerciseCount = inserted?.length ?? 0;
+            difficulty:      clampedDiff,
+          });
+          if (exErr) {
+            insertErrors.push(`[${ex.type}] ${exErr.message}`);
+            console.error(`Exercise insert failed for type=${ex.type}:`, exErr.message);
+          } else {
+            exerciseCount++;
+          }
+        }
+        if (insertErrors.length > 0 && exerciseCount === 0) {
+          throw new Error(`All exercises failed: ${insertErrors.join(' | ')}`);
+        }
+        if (insertErrors.length > 0) {
+          exerciseError = `Partial insert — ${exerciseCount}/${validExercises.length} ok. Errors: ${insertErrors.join(' | ')}`;
+        }
       } catch (e) {
         exerciseError = (e as Error).message;
         console.error('Exercise generation failed:', exerciseError);
