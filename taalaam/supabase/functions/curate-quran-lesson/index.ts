@@ -466,7 +466,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // ── 3. Find or create unit ────────────────────────────────────────────
-    let { data: unitRow } = await sb.from('units').select('id').eq('slug', unitCfg.slug).eq('track_id', trackRow.id).single();
+    let { data: unitRow } = await sb.from('units').select('id, status').eq('slug', unitCfg.slug).eq('track_id', trackRow.id).single();
     if (!unitRow) {
       const { data: newUnit, error: uErr } = await sb.from('units').insert({
         track_id:   trackRow.id,
@@ -528,6 +528,8 @@ Deno.serve(async (req: Request) => {
     const { data: existingLesson } = await sb.from('lessons')
       .select('id').eq('unit_id', unitRow!.id).eq('title_bn', lessonTitleBn).single();
 
+    const newLessonStatus = (unitRow as any)?.status === 'published' ? 'review' : 'draft';
+
     if (existingLesson) {
       lessonId = existingLesson.id;
       await Promise.all([
@@ -540,7 +542,7 @@ Deno.serve(async (req: Request) => {
         title_bn:   lessonTitleBn,
         sort_order: lessonSortOrder,
         level:      'beginner',
-        status:     'draft',
+        status:     newLessonStatus,
       }).select('id').single();
       if (lErr) throw lErr;
       lessonId = newLesson!.id;
