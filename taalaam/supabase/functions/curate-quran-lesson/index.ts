@@ -202,22 +202,22 @@ async function verbRootsToWords(sb: SupabaseClient, roots: { root: string; forms
 
 // ── Ayah text helpers ────────────────────────────────────────────────────────
 
-// Fetch full ayah texts + tafsir snippets for a given set of surah:ayah keys
+// Fetch full ayah texts + tafsir snippets — sequential to stay within free-tier memory limits
 async function fetchAyahTexts(
   sb: SupabaseClient,
   ayahKeys: string[],
 ): Promise<{ ayahTexts: Map<string, string>; tafsirSnippets: Map<string, string> }> {
   const ayahTexts     = new Map<string, string>();
   const tafsirSnippets = new Map<string, string>();
-  await Promise.all(ayahKeys.slice(0, 8).map(async (key) => {
+  for (const key of ayahKeys.slice(0, 4)) { // max 4 ayahs to stay within memory budget
     const [s, a] = key.split(':').map(Number);
-    const [{ data: ayahWords }, { data: tafsir }] = await Promise.all([
-      sb.from('quran_words').select('arabic').eq('surah', s).eq('ayah', a).order('position'),
-      sb.from('quran_tafsir').select('tafsir_text').eq('surah', s).eq('ayah', a).single(),
-    ]);
+    const { data: ayahWords } = await sb
+      .from('quran_words').select('arabic').eq('surah', s).eq('ayah', a).order('position');
     if (ayahWords) ayahTexts.set(key, (ayahWords as { arabic: string }[]).map(w => w.arabic).join(' '));
-    if (tafsir?.tafsir_text) tafsirSnippets.set(key, (tafsir.tafsir_text as string).slice(0, 150) + '…');
-  }));
+    const { data: tafsir } = await sb
+      .from('quran_tafsir').select('tafsir_text').eq('surah', s).eq('ayah', a).single();
+    if (tafsir?.tafsir_text) tafsirSnippets.set(key, (tafsir.tafsir_text as string).slice(0, 100) + '…');
+  }
   return { ayahTexts, tafsirSnippets };
 }
 
@@ -245,57 +245,22 @@ function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: nu
 
 // ── Exercise system prompt ───────────────────────────────────────────────────
 
-const EXERCISE_SYSTEM_PROMPT = `You are a Quranic Arabic curriculum designer for Bengali-speaking Muslims, following the Salafi methodology (Ibn Sa'di, Ibn Uthaymin, Ibn Kathir for tafsir — no philosophical interpretation, no tasawwuf, affirm Attributes as they come).
+const EXERCISE_SYSTEM_PROMPT = `Quranic Arabic curriculum designer for Bengali-speaking Muslims (Salafi: Ibn Sa'di, Ibn Uthaymin — no philosophical interpretation).
 
-STANDARD EXERCISE TYPE SCHEMAS (snake_case type values):
+SCHEMAS (use exact snake_case type strings, sequential sort_order):
+{"type":"multiple_choice","sort_order":N,"prompt_bn":"«W» অর্থ কী?","prompt_ar":"W","correct_answer":{"options":["ok","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":1}
+{"type":"drag_drop","sort_order":N,"prompt_bn":"মিলাও:","correct_answer":{"pairs":[{"ar":"W","bn":"M"},{"ar":"W2","bn":"M2"},{"ar":"W3","bn":"M3"}]},"grammar_note_bn":"...","difficulty":2}
+{"type":"true_false","sort_order":N,"prompt_bn":"সঠিক?","correct_answer":{"statement_ar":"AR","statement_bn":"BN","is_true":true},"grammar_note_bn":"...","difficulty":2}
+{"type":"fill_in_blank","sort_order":N,"prompt_bn":"বসাও (অর্থ:HINT):","correct_answer":{"sentence":"AR ___ REST","blank_index":N,"answer":"W"},"distractors":{"options":["w1","w2"]},"grammar_note_bn":"...","difficulty":3}
+{"type":"tap_to_build","sort_order":N,"prompt_bn":"সাজাও:«BN»","correct_answer":{"words":["W1","W2","W3"],"order_matters":true,"distractor_words":["D1","D2"]},"distractors":null,"grammar_note_bn":"...","difficulty":4}
+{"type":"speak_arabic","sort_order":N,"prompt_bn":"বলুন:","correct_answer":{"expected_ar":"W","transliteration":"latin","meaning_bn":"BN"},"grammar_note_bn":"...","difficulty":2}
+{"type":"ayah_read","sort_order":N,"prompt_bn":"আয়াতটি পড়ুন:","correct_answer":{"ayah_ar":"EXACT","ayah_bn":"BN_TRANSLATION","surah_name":"সূরা X","ayah_number":N,"context_bn":"WHY"},"difficulty":0}
+{"type":"tafsir_read","sort_order":N,"prompt_bn":"সূরা পরিচিতি:","correct_answer":{"surah_name":"X","revelation":"মাক্কী/মাদানী","theme_bn":"TOPIC","aqeedah_bn":"BELIEF","tafsir_bn":"2 SENTENCES IBN SADI STYLE"},"difficulty":0}
+{"type":"ayah_context","sort_order":N,"prompt_bn":"হাইলাইট শব্দের অর্থ?","prompt_ar":"W","correct_answer":{"ayah_ar":"EXACT","highlighted_word":"W_IN_AYAH","options":["ok","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
+{"type":"surah_theme","sort_order":N,"prompt_bn":"সূরা X-এর বিষয়?","correct_answer":{"options":["ok","w1","w2","w3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
+{"type":"reflection_card","sort_order":N,"prompt_bn":"চিন্তা করুন:","correct_answer":{"reflection_prompt":"QUESTION","scholarly_note_bn":"IBN_UTHAYMIN_NOTE"},"difficulty":0}
 
-[multiple_choice] — Arabic word shown, learner picks Bengali meaning
-  {"type":"multiple_choice","sort_order":N,"prompt_bn":"«WORD» শব্দের অর্থ কী?","prompt_ar":"WORD","correct_answer":{"options":["correct","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":1}
-  Rules: exactly 4 options, correct_index 0–3, distractors from lesson words only.
-
-[drag_drop] — match 3–4 Arabic words to Bengali meanings
-  {"type":"drag_drop","sort_order":N,"prompt_bn":"আরবি শব্দের সাথে বাংলা অর্থ মেলাও:","correct_answer":{"pairs":[{"ar":"WORD","bn":"meaning"},{"ar":"WORD2","bn":"meaning2"},{"ar":"WORD3","bn":"meaning3"}]},"grammar_note_bn":"...","difficulty":2}
-
-[true_false] — is this translation correct?
-  {"type":"true_false","sort_order":N,"prompt_bn":"অনুবাদটি কি সঠিক?","correct_answer":{"statement_ar":"ARABIC","statement_bn":"Bengali translation","is_true":true},"grammar_note_bn":"...","difficulty":2}
-
-[fill_in_blank] — one missing word in short Arabic phrase
-  {"type":"fill_in_blank","sort_order":N,"prompt_bn":"শূন্যস্থানে সঠিক শব্দ বসাও (অর্থ: HINT):","correct_answer":{"sentence":"ARABIC ___ REST","blank_index":N,"answer":"WORD"},"distractors":{"options":["wrong1","wrong2"]},"grammar_note_bn":"...","difficulty":3}
-
-[tap_to_build] — tap tiles to assemble an Arabic phrase
-  {"type":"tap_to_build","sort_order":N,"prompt_bn":"সঠিক ক্রমে সাজাও: «Bengali meaning»","correct_answer":{"words":["WORD1","WORD2","WORD3"],"order_matters":true,"distractor_words":["WRONG1","WRONG2"]},"distractors":null,"grammar_note_bn":"...","difficulty":4}
-
-[speak_arabic] — learner pronounces a word aloud
-  {"type":"speak_arabic","sort_order":N,"prompt_bn":"এই আরবি শব্দটি বলুন:","correct_answer":{"expected_ar":"WORD_WITH_HARAKAT","transliteration":"latin","meaning_bn":"Bengali"},"grammar_note_bn":"...","difficulty":2}
-
-QURANIC EXERCISE TYPE SCHEMAS (informational types always pass, no hearts deducted):
-
-[ayah_read] — show full ayah with Bengali translation (always passes)
-  {"type":"ayah_read","sort_order":N,"prompt_bn":"আয়াতটি পড়ুন:","correct_answer":{"ayah_ar":"EXACT_ARABIC","ayah_bn":"Bengali translation","surah_name":"সূরা NAME","ayah_number":N,"context_bn":"why this ayah matters here"},"difficulty":0}
-  ⚠ ayah_ar MUST be copied EXACTLY from the ayah texts provided in the prompt — NEVER generate or alter Arabic text.
-  ayah_bn = your accurate Bengali translation of that exact ayah.
-
-[tafsir_read] — surah overview: revelation context, theme, aqeedah point (always passes)
-  {"type":"tafsir_read","sort_order":N,"prompt_bn":"সূরা পরিচিতি:","correct_answer":{"surah_name":"NAME_BN","revelation":"মাক্কী/মাদানী","theme_bn":"main topic in Bengali","aqeedah_bn":"the Islamic belief/lesson from this surah in Bengali","tafsir_bn":"2-3 sentences — Salafi style, based on Ibn Sa'di's Taysir, no philosophical interpretation"},"difficulty":0}
-
-[ayah_context] — tested: full ayah shown, learner picks meaning of highlighted word (affects hearts)
-  {"type":"ayah_context","sort_order":N,"prompt_bn":"হাইলাইট করা শব্দটির অর্থ কী?","prompt_ar":"THE_HIGHLIGHTED_WORD","correct_answer":{"ayah_ar":"EXACT_ARABIC","highlighted_word":"ONE_WORD_VERBATIM_IN_AYAH","options":["correct meaning","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
-  ⚠ highlighted_word must appear verbatim in ayah_ar. ayah_ar from provided list only.
-
-[surah_theme] — tested: pick the surah's main message from 4 options (affects hearts)
-  {"type":"surah_theme","sort_order":N,"prompt_bn":"সূরা X-এর প্রধান বিষয় কী?","correct_answer":{"options":["correct theme","wrong1","wrong2","wrong3"],"correct_index":0},"grammar_note_bn":"...","difficulty":2}
-
-[reflection_card] — tadabbur prompt with scholarly note (always passes)
-  {"type":"reflection_card","sort_order":N,"prompt_bn":"চিন্তা করুন:","correct_answer":{"reflection_prompt":"A personal reflection question connecting the lesson to the learner's life","scholarly_note_bn":"Ibn Uthaymin or Ibn Sa'di insight on this topic in Bengali (authentic-sounding, Salafi appropriate)"},"difficulty":0}
-
-ABSOLUTE RULES:
-- ALL Arabic must have full harakat (تشكيل) — never bare Arabic
-- ONLY use words from the lesson word list for tested exercises
-- grammar_note_bn: one line of Arabic grammar explanation (not just the meaning)
-- sort_order: sequential integers starting at 1
-- Return ONLY a valid JSON array — no markdown, no explanation, no code fences
-- For tafsir_read: write in accessible Bengali, no Arabic philosophical terms, no tasawwuf
-- For reflection_card: make the question personal and actionable, not abstract`;
+RULES: Arabic always with harakat. ayah_ar/highlighted_word EXACT from provided texts. Distractors from lesson words. Return ONLY valid JSON array.`;
 
 const VERB_EXERCISE_SYSTEM_PROMPT = `You are a Quranic Arabic curriculum designer for Bengali-speaking Muslims.
 This lesson teaches verb ROOT FAMILIES — multiple forms of the same Arabic root.
@@ -343,27 +308,26 @@ function buildExerciseUserPrompt(opts: {
 
     case 'salah': {
       const salahCtx = SALAH_POSITIONS[surahNumber!] ?? 'সালাতে পঠিত';
-      // Pick first ayah from the map for the ayah_read card
       const firstKey = [...ayahTexts.keys()][0] ?? `${surahNumber}:1`;
       const firstAyahNum = parseInt(firstKey.split(':')[1]);
-      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) — সূরা নং ${surahNumber}
-সালাতে অবস্থান: ${salahCtx}
+      const firstAyahAr = ayahTexts.get(firstKey) ?? '';
+      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) #${surahNumber}
+সালাতে: ${salahCtx}
 
-ডেটাবেজ থেকে আয়াত (ayah_read ও ayah_context-এর জন্য EXACT Arabic ব্যবহার করুন):
+আয়াত (EXACT Arabic for ayah_read):
 ${ayahsBlock}
 
-শব্দ তালিকা (${exWords.length} শব্দ):
+শব্দ (${exWords.length}):
 ${wordList}
 
-নিচের ৮টি অনুশীলন তৈরি করুন (sort_order 1–8):
-1. ayah_read (sort_order 1): ayah_ar = EXACTLY "${ayahTexts.get(firstKey) ?? ''}" | ayah_bn = এর বাংলা অনুবাদ | surah_name = "সূরা ${surahRow?.name_bn}" | ayah_number = ${firstAyahNum} | context_bn = "${salahCtx}"
-2. tafsir_read (sort_order 2): এই সূরার পরিচিতি লিখুন — revelation (মাক্কী/মাদানী), theme_bn (মূল বিষয়), aqeedah_bn (আকীদার শিক্ষা), tafsir_bn (ইবনু সা'দীর পদ্ধতিতে ২-৩ বাক্য)
-3–5. 3×multiple_choice (sort_order 3–5): word → Bengali meaning
-6. drag_drop (sort_order 6): 3–4 pairs
-7. fill_in_blank (sort_order 7): phrase from the surah
-8. speak_arabic (sort_order 8): most important word
+৬টি অনুশীলন (sort_order 1–6):
+1. ayah_read: ayah_ar="${firstAyahAr}" ayah_bn=অনুবাদ surah_name="সূরা ${surahRow?.name_bn}" ayah_number=${firstAyahNum} context_bn="${salahCtx}"
+2. tafsir_read: revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী পদ্ধতিতে)
+3–4. 2×multiple_choice
+5. drag_drop (3 pairs)
+6. speak_arabic
 
-Return valid JSON array only.`;
+Return JSON array only.`;
     }
 
     case 'juz_amma': {
@@ -374,49 +338,48 @@ Return valid JSON array only.`;
         const sn = surahRow?.name_bn ?? '';
         return `${idx + 2}. ayah_read (sort_order ${idx + 2}): ayah_ar = EXACTLY "${ar}" | ayah_bn = এর সঠিক বাংলা অনুবাদ | surah_name = "সূরা ${sn}" | ayah_number = ${ayahNum} | context_bn = এই আয়াতের তাৎপর্য`;
       }).join('\n');
-      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) — সূরা নং ${surahNumber}
+      return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) #${surahNumber}
 নাযিল: ${surahRow?.revelation ?? 'মাক্কী'}
 
-ডেটাবেজ থেকে আয়াত (ayah_read ও ayah_context-এর জন্য EXACT Arabic ব্যবহার করুন — কোনো পরিবর্তন নেই):
+আয়াত (EXACT Arabic for ayah_read/ayah_context):
 ${ayahsBlock}
 
-মূল শব্দ তালিকা (${exWords.length} শব্দ):
+শব্দ (${exWords.length}):
 ${wordList}
 
-নিচের ১০টি অনুশীলন তৈরি করুন (sort_order 1–10):
-1. tafsir_read (sort_order 1): সূরার পরিচিতি — revelation, theme_bn (মূল বিষয়), aqeedah_bn (আকীদার শিক্ষা), tafsir_bn (ইবনু সা'দীর পদ্ধতিতে ২-৩ বাক্য — এই সূরা কেন নাযিল হয়েছিল, কার জন্য, কী বার্তা)
+৮টি অনুশীলন (sort_order 1–8):
+1. tafsir_read: revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
 ${ayahReadLines}
-4. surah_theme (sort_order 4): সূরার প্রধান বিষয় নিয়ে ৪ অপশন — সঠিক একটি, ভুল তিনটি
-5. ayah_context (sort_order 5): প্রথম আয়াত থেকে একটি শব্দ হাইলাইট করুন, ৪ অপশন
-6. ayah_context (sort_order 6): অন্য একটি আয়াত থেকে ভিন্ন শব্দ হাইলাইট করুন
-7–8. 2×multiple_choice (sort_order 7–8)
-9. fill_in_blank (sort_order 9)
-10. speak_arabic (sort_order 10): সবচেয়ে গুরুত্বপূর্ণ শব্দ
+4. surah_theme: প্রধান বিষয় ৪ অপশন
+5. ayah_context: প্রথম আয়াত থেকে ১ শব্দ হাইলাইট
+6. multiple_choice
+7. fill_in_blank
+8. speak_arabic
 
-Return valid JSON array only.`;
+Return JSON array only.`;
     }
 
     case 'attributes': {
       const passage = ATTRIBUTE_PASSAGES[lessonIndex];
       const firstKey = [...ayahTexts.keys()][0] ?? `${passage?.surah}:${passage?.ayahFrom}`;
       const firstAyahNum = parseInt(firstKey.split(':')[1]);
-      return `পাঠ: ${passageTitleBn}
-সূরা ${passage?.surah}, আয়াত ${passage?.ayahFrom}–${passage?.ayahTo}
+      const firstAyahAr = ayahTexts.get(firstKey) ?? '';
+      return `পাঠ: ${passageTitleBn} (সূরা ${passage?.surah}:${passage?.ayahFrom}–${passage?.ayahTo})
 
-ডেটাবেজ থেকে আয়াত (EXACT Arabic):
+আয়াত (EXACT Arabic):
 ${ayahsBlock}
 
-আল্লাহর নামসমূহ এই পাঠে (${exWords.length} নাম):
+নামসমূহ (${exWords.length}):
 ${wordList}
 
-নিচের ৭টি অনুশীলন তৈরি করুন (sort_order 1–7):
-1. ayah_read (sort_order 1): ayah_ar = EXACTLY "${ayahTexts.get(firstKey) ?? ''}" | ayah_bn = এর বাংলা অনুবাদ | surah_name = উপযুক্ত সূরার নাম | ayah_number = ${firstAyahNum} | context_bn = "এই আয়াতে আল্লাহর নাম ও গুণাবলী রয়েছে"
-2. reflection_card (sort_order 2): এই নামগুলো মুমিনের হৃদয়ে কী প্রভাব ফেলে (athar) — ইবনু উসাইমীনের পদ্ধতিতে ব্যক্তিগত প্রতিফলনের প্রশ্ন তৈরি করুন
-3–5. 3×multiple_choice (sort_order 3–5): নাম → বাংলা অর্থ
-6. drag_drop (sort_order 6): ৩–৪টি নাম ও অর্থ মিলান
-7. speak_arabic (sort_order 7): সবচেয়ে গুরুত্বপূর্ণ নাম
+৭টি অনুশীলন (sort_order 1–7):
+1. ayah_read: ayah_ar="${firstAyahAr}" ayah_bn=অনুবাদ surah_name=উপযুক্ত_সূরা ayah_number=${firstAyahNum} context_bn="এই আয়াতে আল্লাহর নাম ও গুণাবলী"
+2. reflection_card: এই নামগুলোর athar (মুমিনের হৃদয়ে প্রভাব) — ইবনু উসাইমীন পদ্ধতিতে ব্যক্তিগত প্রশ্ন
+3–5. 3×multiple_choice: নাম → অর্থ
+6. drag_drop (3 pairs)
+7. speak_arabic
 
-Return valid JSON array only.`;
+Return JSON array only.`;
     }
 
     case 'frequent': {
