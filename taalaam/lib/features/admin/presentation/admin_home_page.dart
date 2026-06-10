@@ -225,6 +225,24 @@ class _QuranCurriculumSection extends StatelessWidget {
           icon: Icons.timeline_outlined,
           child: _VerbsControls(),
         ),
+        const SizedBox(height: 8),
+        _UnitCurationCard(
+          unitIndex: 7,
+          title: 'হারফ মাস্টারি',
+          subtitle: '৪ পাঠ — সবচেয়ে বেশি ব্যবহৃত হারফ (অব্যয়)',
+          color: const Color(0xFFAD1457),
+          icon: Icons.link_outlined,
+          child: _ParticlesControls(),
+        ),
+        const SizedBox(height: 8),
+        _UnitCurationCard(
+          unitIndex: 8,
+          title: 'সর্বনাম ও যুক্ত সর্বনাম',
+          subtitle: '৩ পাঠ — সর্বনাম ও যুক্ত সর্বনাম প্রত্যয়',
+          color: const Color(0xFF4527A0),
+          icon: Icons.alternate_email_outlined,
+          child: _PronounsControls(),
+        ),
       ],
     );
   }
@@ -844,6 +862,134 @@ class _VerbsControlsState extends State<_VerbsControls> {
           }),
         ),
       ],
+    );
+  }
+}
+
+// ── Unit 7: Particles (হারফ মাস্টারি) ─────────────────────────────────────────
+
+class _ParticlesControls extends StatefulWidget {
+  @override
+  State<_ParticlesControls> createState() => _ParticlesControlsState();
+}
+
+class _ParticlesControlsState extends State<_ParticlesControls> {
+  int? _busyIndex;
+  Set<int> _existingOrders = {};
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final unit = await Supabase.instance.client.from('units').select('id').eq('slug', 'harf-mastery').maybeSingle();
+    if (unit == null || !mounted) return;
+    final rows = await Supabase.instance.client.from('lessons').select('sort_order').eq('unit_id', unit['id'] as String) as List;
+    if (mounted) setState(() => _existingOrders = rows.map((r) => r['sort_order'] as int).toSet());
+  }
+
+  Future<void> _curate(int lessonIndex) async {
+    setState(() => _busyIndex = lessonIndex);
+    await _callCurate(
+      ctx: context,
+      body: {'unit_type': 'particles', 'lesson_index': lessonIndex},
+      successMsg: 'হারফ পাঠ ${lessonIndex + 1} তৈরি হয়েছে ✓',
+    );
+    await _loadExisting();
+    if (mounted) setState(() => _busyIndex = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8, runSpacing: 8,
+      children: List.generate(4, (i) {
+        final exists = _existingOrders.contains(i + 1);
+        if (exists) {
+          return Chip(
+            avatar: const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
+            label: Text('হারফ পাঠ ${i + 1}', style: const TextStyle(fontSize: 11)),
+            backgroundColor: Colors.green.withValues(alpha: 0.08),
+            side: const BorderSide(color: Colors.green, width: 0.5),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+          );
+        }
+        return FilledButton.tonal(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: _busyIndex != null ? null : () => _curate(i),
+          child: _busyIndex == i
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text('হারফ পাঠ ${i + 1}', style: const TextStyle(fontSize: 12)),
+        );
+      }),
+    );
+  }
+}
+
+// ── Unit 8: Pronouns (সর্বনাম ও যুক্ত সর্বনাম) ────────────────────────────────
+
+class _PronounsControls extends StatefulWidget {
+  @override
+  State<_PronounsControls> createState() => _PronounsControlsState();
+}
+
+class _PronounsControlsState extends State<_PronounsControls> {
+  int? _busyIndex;
+  Set<int> _existingOrders = {};
+
+  @override
+  void initState() { super.initState(); _loadExisting(); }
+
+  Future<void> _loadExisting() async {
+    final unit = await Supabase.instance.client.from('units').select('id').eq('slug', 'pronouns').maybeSingle();
+    if (unit == null || !mounted) return;
+    final rows = await Supabase.instance.client.from('lessons').select('sort_order').eq('unit_id', unit['id'] as String) as List;
+    if (mounted) setState(() => _existingOrders = rows.map((r) => r['sort_order'] as int).toSet());
+  }
+
+  Future<void> _curate(int lessonIndex) async {
+    setState(() => _busyIndex = lessonIndex);
+    await _callCurate(
+      ctx: context,
+      body: {'unit_type': 'pronouns', 'lesson_index': lessonIndex},
+      successMsg: 'সর্বনাম পাঠ ${lessonIndex + 1} তৈরি হয়েছে ✓',
+    );
+    await _loadExisting();
+    if (mounted) setState(() => _busyIndex = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8, runSpacing: 8,
+      children: List.generate(3, (i) {
+        final exists = _existingOrders.contains(i + 1);
+        if (exists) {
+          return Chip(
+            avatar: const Icon(Icons.check_circle_rounded, size: 14, color: Colors.green),
+            label: Text('সর্বনাম পাঠ ${i + 1}', style: const TextStyle(fontSize: 11)),
+            backgroundColor: Colors.green.withValues(alpha: 0.08),
+            side: const BorderSide(color: Colors.green, width: 0.5),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+          );
+        }
+        return FilledButton.tonal(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 36),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: _busyIndex != null ? null : () => _curate(i),
+          child: _busyIndex == i
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : Text('সর্বনাম পাঠ ${i + 1}', style: const TextStyle(fontSize: 12)),
+        );
+      }),
     );
   }
 }

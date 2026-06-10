@@ -8,6 +8,8 @@
 //   'frequent'   — Top-300 most frequent words (15 lessons)  — requires lesson_index 0–14
 //   'attributes' — Names of Allah from 8 Quranic passages    — requires lesson_index 0–7
 //   'verbs'      — Verb roots (5 lessons, needs root data)    — requires lesson_index 0–4
+//   'particles'  — Top harf/particles (4 lessons)             — requires lesson_index 0–3
+//   'pronouns'   — Pronouns + attached suffixes (3 lessons)   — requires lesson_index 0–2
 //
 // Exercise types generated:
 //   Standard:      multiple_choice, drag_drop, true_false, fill_in_blank, tap_to_build, speak_arabic
@@ -30,7 +32,7 @@ const GEMINI_MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type UnitType = 'salah' | 'azkaar' | 'juz_amma' | 'frequent' | 'attributes' | 'verbs';
+type UnitType = 'salah' | 'azkaar' | 'juz_amma' | 'frequent' | 'attributes' | 'verbs' | 'particles' | 'pronouns';
 
 interface WordRow { arabic: string; meaning_bn: string; ayah?: number; position?: number; surah?: number; }
 
@@ -43,6 +45,8 @@ const UNIT_CONFIG: Record<UnitType, { slug: string; title_bn: string; title_ar: 
   attributes: { slug: 'asma-sifat',      title_bn: 'আল্লাহর গুণাবলী',          title_ar: 'أَسْمَاءُ اللهِ الحُسْنَى',       sort_order: 4 },
   juz_amma:   { slug: 'juz-amma',        title_bn: 'জুয আম্মার সূরা',          title_ar: 'سُوَرُ جُزْءِ عَمَّ',             sort_order: 5 },
   verbs:      { slug: 'quranic-verbs',   title_bn: 'কুরআনের ক্রিয়াপদ',        title_ar: 'الأَفْعَالُ القُرْآنِيَّة',       sort_order: 6 },
+  particles:  { slug: 'harf-mastery',    title_bn: 'হারফ মাস্টারি',            title_ar: 'إِتْقَانُ الحُرُوفِ',            sort_order: 7 },
+  pronouns:   { slug: 'pronouns',        title_bn: 'সর্বনাম ও যুক্ত সর্বনাম',   title_ar: 'الضَّمَائِرُ',                   sort_order: 8 },
 };
 
 // Salah context per surah — shown in ayah_read cards so the learner knows WHEN they recite this
@@ -138,6 +142,24 @@ async function fetchFrequentWords(sb: SupabaseClient, lessonIndex: number): Prom
     offset_count: lessonIndex * 20,
   });
   if (error) throw new Error(`get_top_quran_words: ${error.message}`);
+  return (data ?? []) as WordRow[];
+}
+
+async function fetchParticleWords(sb: SupabaseClient, lessonIndex: number): Promise<WordRow[]> {
+  const { data, error } = await sb.rpc('get_quran_particles', {
+    limit_count: 8,
+    offset_count: lessonIndex * 8,
+  });
+  if (error) throw new Error(`get_quran_particles: ${error.message}`);
+  return (data ?? []) as WordRow[];
+}
+
+async function fetchPronounWords(sb: SupabaseClient, lessonIndex: number): Promise<WordRow[]> {
+  const { data, error } = await sb.rpc('get_quran_pronoun_words', {
+    limit_count: 8,
+    offset_count: lessonIndex * 8,
+  });
+  if (error) throw new Error(`get_quran_pronoun_words: ${error.message}`);
   return (data ?? []) as WordRow[];
 }
 
@@ -243,6 +265,8 @@ function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: nu
     case 'frequent':   return `শীর্ষ শব্দ — পাঠ ${lessonIndex + 1} (${lessonIndex * 20 + 1}–${lessonIndex * 20 + 20})`;
     case 'attributes': return ATTRIBUTE_PASSAGES[lessonIndex]?.titleBn ?? `গুণাবলী পাঠ ${lessonIndex + 1}`;
     case 'verbs':      return `ক্রিয়াপদ পাঠ ${lessonIndex + 1}`;
+    case 'particles':  return `হারফ মাস্টারি — পাঠ ${lessonIndex + 1}`;
+    case 'pronouns':   return `সর্বনাম পাঠ ${lessonIndex + 1}`;
   }
 }
 
@@ -456,6 +480,48 @@ IMPORTANT: Output exercises in EXACTLY this order (৭টি):
 
 Return valid JSON array only.`;
     }
+
+    case 'particles': {
+      return `হারফ (অব্যয়) তালিকা — এই পাঠে শুধু এই হরফগুলো নিয়ে কাজ করুন:
+${wordList}
+
+IMPORTANT: Output exercises in EXACTLY this order (৮টি):
+1st: grammar_spot — target_pos_ar="حَرْفٌ", target_pos_bn="হরফ (অব্যয়)" — words: ৪টি শব্দ যার মধ্যে ১টি শব্দ তালিকা থেকে حَرْفٌ (pos:"particle"), বাকি ৩টি ভিন্ন اسم/فعل শব্দ (pos:"noun"/"verb"); correct_index = حرف এর অবস্থান
+2nd: ayah_context — শব্দ তালিকার একটি হরফ একটি প্রকৃত কুরআনের আয়াতে হাইলাইট করুন — ayah_ar=EXACT প্রকৃত আয়াত যেখানে এই হরফ আছে, highlighted_word=সেই হরফ, ৪টি বাংলা অর্থ অপশন
+3rd: multiple_choice — শব্দ তালিকা থেকে একটি হরফের অর্থ জিজ্ঞেস করুন
+4th: multiple_choice — শব্দ তালিকা থেকে আরেকটি হরফের অর্থ জিজ্ঞেস করুন
+5th: drag_drop — শব্দ তালিকা থেকে ৩টি হরফ-অর্থ জোড়া মেলানো
+6th: fill_in_blank — একটি প্রকৃত কুরআনের আয়াতাংশ থেকে এই হরফটি বাদ দিয়ে শূন্যস্থান তৈরি করুন; sentence-এ EXACT আয়াতাংশ (___ সহ), answer=হরফ, distractors.options=অন্য ১-২টি হরফ
+7th: tap_to_build — শব্দ তালিকার ২-৩টি হরফ সহ একটি ছোট প্রকৃত আয়াতাংশ সাজানো; correct_answer.words=প্রতিটি আরবি শব্দ আলাদা element
+8th: speak_arabic — শব্দ তালিকা থেকে একটি হরফ উচ্চারণ
+
+STRICT RULES:
+- ayah_ar এবং sentence-এর আয়াতাংশ অবশ্যই কুরআনের প্রকৃত (authentic) আয়াত হতে হবে, বানানো নয়।
+- Arabic always with full harakat (تشكيل).
+Return valid JSON array only.`;
+    }
+
+    case 'pronouns': {
+      return `সর্বনাম ও যুক্ত সর্বনাম তালিকা — এই পাঠে শুধু এই শব্দগুলো নিয়ে কাজ করুন:
+${wordList}
+
+IMPORTANT: Output exercises in EXACTLY this order (৮টি):
+1st: grammar_spot — target_pos_ar="ضَمِيرٌ", target_pos_bn="সর্বনাম" — words: ৪টি শব্দ যার মধ্যে ১টি শব্দ তালিকা থেকে ضَمِيرٌ (pos:"pronoun"), বাকি ৩টি ভিন্ন اسم/فعل/حرف শব্দ; correct_index = সর্বনামের অবস্থান
+2nd: ayah_context — শব্দ তালিকার একটি সর্বনাম একটি প্রকৃত কুরআনের আয়াতে হাইলাইট করুন — ayah_ar=EXACT প্রকৃত আয়াত, highlighted_word=সেই সর্বনাম, ৪টি বাংলা অর্থ অপশন
+3rd: multiple_choice — শব্দ তালিকা থেকে একটি সর্বনামের অর্থ জিজ্ঞেস করুন
+4th: multiple_choice — শব্দ তালিকা থেকে আরেকটি সর্বনামের অর্থ জিজ্ঞেস করুন
+5th: drag_drop — শব্দ তালিকা থেকে ৩টি সর্বনাম-অর্থ জোড়া মেলানো
+6th: fill_in_blank — একটি প্রকৃত কুরআনের আয়াতাংশ থেকে একটি যুক্ত সর্বনাম-সহ শব্দ বাদ দিয়ে শূন্যস্থান তৈরি করুন; sentence-এ EXACT আয়াতাংশ (___ সহ), answer=শব্দটি, distractors.options=অন্য ১-২টি শব্দ
+7th: tap_to_build — যুক্ত সর্বনামযুক্ত একটি শব্দকে ভেঙে অংশ সাজানো (যেমন رَبُّ + كُمْ); correct_answer.words=প্রতিটি অংশ আলাদা element
+8th: speak_arabic — শব্দ তালিকা থেকে একটি সর্বনাম উচ্চারণ
+
+STRICT RULES:
+- যুক্ত সর্বনামযুক্ত প্রতিটি শব্দের grammar_note_bn অবশ্যই শব্দটি ভেঙে দেখাবে এই ফরম্যাটে: "رَبُّكُمْ = رَبُّ (রব) + كُمْ (তোমাদের)"
+- এছাড়া এমন একটি শব্দের grammar_note_bn-এ এই বাংলা ব্যাখ্যাও যোগ করুন: "যুক্ত সর্বনাম (Attached Pronoun) বাংলার বিভক্তির মতো শব্দের শেষে যুক্ত হয় — যেমন বাংলায় 'তোমাদের' শব্দে '-দের' যুক্ত হয়, তেমনি আরবিতে 'كُمْ' যুক্ত হয়ে 'তোমাদের' অর্থ তৈরি করে।"
+- ayah_ar এবং sentence-এর আয়াতাংশ অবশ্যই কুরআনের প্রকৃত (authentic) আয়াত হতে হবে, বানানো নয়।
+- Arabic always with full harakat (تشكيل).
+Return valid JSON array only.`;
+    }
   }
 }
 
@@ -484,6 +550,16 @@ Deno.serve(async (req: Request) => {
     }
     if (unitType === 'azkaar' && (lessonIndex < 0 || lessonIndex >= AZKAAR_LESSONS.length)) {
       return new Response(JSON.stringify({ error: `lesson_index must be 0–${AZKAAR_LESSONS.length - 1} for azkaar` }), {
+        status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+    if (unitType === 'particles' && (lessonIndex < 0 || lessonIndex > 3)) {
+      return new Response(JSON.stringify({ error: 'lesson_index must be 0–3 for particles' }), {
+        status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+    if (unitType === 'pronouns' && (lessonIndex < 0 || lessonIndex > 2)) {
+      return new Response(JSON.stringify({ error: 'lesson_index must be 0–2 for pronouns' }), {
         status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
@@ -562,6 +638,18 @@ Deno.serve(async (req: Request) => {
       verbRoots = await fetchVerbRoots(sb, lessonIndex);
       words     = await verbRootsToWords(sb, verbRoots);
       if (words.length < 2) return new Response(JSON.stringify({ error: 'Too few verb forms — run enrich_quran_roots.ts first' }), {
+        status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+
+    } else if (unitType === 'particles') {
+      words = await fetchParticleWords(sb, lessonIndex);
+      if (words.length === 0) return new Response(JSON.stringify({ error: 'No particle words found — check get_quran_particles' }), {
+        status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+
+    } else if (unitType === 'pronouns') {
+      words = await fetchPronounWords(sb, lessonIndex);
+      if (words.length === 0) return new Response(JSON.stringify({ error: 'No pronoun words found — check get_quran_pronoun_words' }), {
         status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
@@ -662,7 +750,7 @@ ${wordList}`;
         meaning_en:         w.meaning_en,
         transliteration:    w.transliteration,
         grammar_note_bn:    w.grammar_note_bn,
-        word_type:          unitType === 'verbs' ? 'verb' : 'noun',
+        word_type:          unitType === 'verbs' ? 'verb' : unitType === 'particles' ? 'particle' : 'noun',
         context_snippet_ar: ayahTexts.get(key) ?? null,
         context_snippet_bn: tafsirSnippets.get(key) ?? null,
       };
@@ -751,6 +839,14 @@ ${wordList}`;
           verbs: {
             grammar_spot: 0, root_family: 1, multiple_choice: 2,
             drag_drop: 4, speak_arabic: 6,
+          },
+          particles: {
+            grammar_spot: 0, ayah_context: 1, multiple_choice: 2,
+            drag_drop: 4, fill_in_blank: 5, tap_to_build: 6, speak_arabic: 7,
+          },
+          pronouns: {
+            grammar_spot: 0, ayah_context: 1, multiple_choice: 2,
+            drag_drop: 4, fill_in_blank: 5, tap_to_build: 6, speak_arabic: 7,
           },
         }[unitType] ?? {};
 
