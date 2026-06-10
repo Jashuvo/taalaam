@@ -89,7 +89,13 @@ class LessonLocalSource {
           ..where((t) => t.lessonId.equals(lessonId))
           ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
         .get();
-    return rows.map(_exerciseFromRow).toList();
+    // Drop cached exercises whose type isn't recognized by this app build
+    // (e.g. cached before an app update added the type) instead of falling
+    // back to multipleChoice, which renders an empty unanswerable widget.
+    return rows
+        .where((r) => ExerciseType.values.any((e) => e.name == r.type))
+        .map(_exerciseFromRow)
+        .toList();
   }
 
   LessonModel _lessonFromRow(Lesson row, List<ExerciseModel> exercises) =>
@@ -108,8 +114,7 @@ class LessonLocalSource {
   ExerciseModel _exerciseFromRow(Exercise row) => ExerciseModel(
         id: row.id,
         lessonId: row.lessonId,
-        type: ExerciseType.values.firstWhere((e) => e.name == row.type,
-            orElse: () => ExerciseType.multipleChoice),
+        type: ExerciseType.values.firstWhere((e) => e.name == row.type),
         sortOrder: row.sortOrder,
         promptAr: row.promptAr,
         promptBn: row.promptBn,

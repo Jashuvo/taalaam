@@ -45,14 +45,18 @@ class LessonRepository {
         .eq('lesson_id', id)
         .order('sort_order');
 
-    final exercises = (exerciseRows as List).map((r) {
+    // Drop exercises whose type isn't recognized by this app build instead of
+    // falling back to multipleChoice — a fallback renders an empty,
+    // permanently-disabled "Check" button (correct_answer shape mismatch).
+    final exercises = (exerciseRows as List)
+        .where((r) => ExerciseType.values
+            .any((e) => e.name == _snakeToCamel(r['type'] as String)))
+        .map((r) {
       return ExerciseModel(
         id: r['id'] as String,
         lessonId: id,
-        type: ExerciseType.values.firstWhere(
-          (e) => e.name == _snakeToCamel(r['type'] as String),
-          orElse: () => ExerciseType.multipleChoice,
-        ),
+        type: ExerciseType.values
+            .firstWhere((e) => e.name == _snakeToCamel(r['type'] as String)),
         sortOrder: r['sort_order'] as int,
         promptAr: r['prompt_ar'] as String?,
         promptBn: r['prompt_bn'] as String?,

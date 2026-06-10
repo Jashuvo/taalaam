@@ -89,18 +89,19 @@ async function checkAdmin(req: Request): Promise<Response | null> {
   return null;
 }
 
+// Each model attempt is capped at 20s so a hanging/rate-limited call can never
+// silently eat the edge function's ~150s wall-clock budget and trigger a 504
+// with zero diagnostic info. One attempt per model — cross-model fallback
+// already provides redundancy, so per-model retries just multiply worst-case time.
 async function geminiGenerate(apiKey: string, prompt: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(apiKey);
   let lastErr: unknown;
   for (const modelName of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 4000));
-      try {
-        const m = genAI.getGenerativeModel({ model: modelName });
-        const result = await m.generateContent(prompt);
-        return result.response.text();
-      } catch (err) { lastErr = err; }
-    }
+    try {
+      const m = genAI.getGenerativeModel({ model: modelName });
+      const result = await m.generateContent(prompt, { timeout: 20000 });
+      return result.response.text();
+    } catch (err) { lastErr = err; }
   }
   throw new Error(`All Gemini models failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
 }
