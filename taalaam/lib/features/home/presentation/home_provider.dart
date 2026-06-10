@@ -234,6 +234,21 @@ final masteredWordCountProvider = StreamProvider<int>((ref) {
       .map((rows) => rows.length);
 });
 
+/// Count of SRS cards currently being learned (state 1 = learning, 3 = relearning).
+final learningWordCountProvider = StreamProvider<int>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value(0);
+  final db = ref.watch(appDatabaseProvider);
+  return (db.select(db.srsCards).join([
+        drift.innerJoin(db.vocabulary,
+            db.vocabulary.id.equalsExp(db.srsCards.vocabularyId)),
+      ])
+        ..where(db.srsCards.userId.equals(user.id) &
+            (db.srsCards.state.equals(1) | db.srsCards.state.equals(3))))
+      .watch()
+      .map((rows) => rows.length);
+});
+
 /// Maps lessonId → accuracy percentage (0–100) from the user's progress rows.
 final lessonAccuracyMapProvider = StreamProvider<Map<String, int>>((ref) {
   final user = ref.watch(currentUserProvider);
@@ -243,6 +258,94 @@ final lessonAccuracyMapProvider = StreamProvider<Map<String, int>>((ref) {
         ..where((t) => t.userId.equals(user.id)))
       .watch()
       .map((rows) => {for (final r in rows) r.lessonId: r.accuracyPct});
+});
+
+// ── Continue learning: the user's current (next-incomplete) lesson ───────────
+
+class CurrentLesson {
+  final Track track;
+  final Unit unit;
+  final Lesson lesson;
+  final int unitCompleted;
+  final int unitTotal;
+  const CurrentLesson({
+    required this.track,
+    required this.unit,
+    required this.lesson,
+    required this.unitCompleted,
+    required this.unitTotal,
+  });
+}
+
+/// The next incomplete lesson for the user, in the most recently active track.
+/// "Most recently active" = the track containing the lesson from the user's
+/// latest completed-lesson timestamp; falls back to the first track.
+final currentLessonProvider = FutureProvider<CurrentLesson?>((ref) async {
+  final tracks = await ref.watch(tracksProvider.future);
+  if (tracks.isEmpty) return null;
+  final completedIds = await ref.watch(completedLessonIdsProvider.future);
+
+  String? recentTrackId;
+  final user = ref.watch(currentUserProvider);
+  if (user != null) {
+    final db = ref.watch(appDatabaseProvider);
+    final recent = await (db.select(db.userProgress)
+          ..where((t) => t.userId.equals(user.id))
+          ..orderBy([(t) => drift.OrderingTerm.desc(t.completedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    if (recent != null) {
+      final lesson = await (db.select(db.lessons)
+            ..where((t) => t.id.equals(recent.lessonId)))
+          .getSingleOrNull();
+      if (lesson != null) {
+        final unit = await (db.select(db.units)
+              ..where((t) => t.id.equals(lesson.unitId)))
+            .getSingleOrNull();
+        recentTrackId = unit?.trackId;
+      }
+    }
+  }
+
+  final orderedTracks = [...tracks];
+  if (recentTrackId != null) {
+    final idx = orderedTracks.indexWhere((t) => t.id == recentTrackId);
+    if (idx > 0) {
+      final track = orderedTracks.removeAt(idx);
+      orderedTracks.insert(0, track);
+    }
+  }
+
+  for (final track in orderedTracks) {
+    final units = await ref.watch(unitsForTrackProvider(track.id).future);
+    final sortedUnits = [...units]
+      ..sort((a, b) {
+        if (a.tierLevel != b.tierLevel) {
+          return a.tierLevel.compareTo(b.tierLevel);
+        }
+        return a.sequenceOrder.compareTo(b.sequenceOrder);
+      });
+    for (final unit in sortedUnits) {
+      final lessons = await ref.watch(lessonsForUnitProvider(unit.id).future);
+      if (lessons.isEmpty) continue;
+      final completedInUnit =
+          lessons.where((l) => completedIds.contains(l.id)).length;
+      final next = lessons.firstWhere(
+        (l) => !completedIds.contains(l.id),
+        orElse: () => lessons.first,
+      );
+      if (completedInUnit < lessons.length) {
+        return CurrentLesson(
+          track: track,
+          unit: unit,
+          lesson: next,
+          unitCompleted: completedInUnit,
+          unitTotal: lessons.length,
+        );
+      }
+    }
+  }
+  return null;
 });
 
 final trackProgressProvider =

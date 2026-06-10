@@ -1,3 +1,4 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,8 +13,17 @@ import '../../auth/presentation/auth_provider.dart';
 import '../../auth/presentation/onboarding_page.dart';
 import '../../../shared/widgets/progress_share_card.dart';
 import 'home_provider.dart';
+import 'track_detail_page.dart';
 import 'widgets/streak_goal_completion_dialog.dart';
 import 'widgets/streak_goal_progress_widget.dart';
+
+// Tier accent colours, mirroring track_detail_page._tierGradients (first colour).
+const _heroTierColors = <int, Color>{
+  1: AppColors.teal,
+  2: AppColors.forestGreen,
+  3: Color(0xFF78350F),
+  4: Color(0xFF3B0764),
+};
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -592,19 +602,243 @@ class _QuickAccessButton extends StatelessWidget {
   }
 }
 
+// ── Continue learning hero card ─────────────────────────────────────────────
+
+class _ContinueLearningCard extends ConsumerWidget {
+  const _ContinueLearningCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final current = ref.watch(currentLessonProvider).valueOrNull;
+    if (current == null) return const SizedBox.shrink();
+
+    final accent = _heroTierColors[current.unit.tierLevel] ?? AppColors.teal;
+    final fraction =
+        current.unitTotal == 0 ? 0.0 : current.unitCompleted / current.unitTotal;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: TapScale(
+        child: Material(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: AppRadius.lgBorder,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => context.push('/lesson/${current.lesson.id}'),
+            child: IntrinsicHeight(
+              child: Row(
+                children: [
+                  Container(width: 5, color: accent),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'চালিয়ে যাও',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: accent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            current.lesson.titleBn,
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            current.unit.titleBn,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: AppRadius.xxlBorder,
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0, end: fraction),
+                              duration: const Duration(milliseconds: 600),
+                              curve: Curves.easeOut,
+                              builder: (_, val, __) => LinearProgressIndicator(
+                                value: val,
+                                minHeight: 5,
+                                backgroundColor:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                valueColor: AlwaysStoppedAnimation(accent),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 14),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.play_arrow_rounded,
+                          color: accent, size: 26),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── SRS due chip ─────────────────────────────────────────────────────────────
+
+class _ReviewDueChip extends ConsumerWidget {
+  const _ReviewDueChip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final dueCount = ref.watch(dueCountProvider).valueOrNull ?? 0;
+    final isDue = dueCount > 0;
+
+    return TapScale(
+      child: Material(
+        color: isDue
+            ? AppColors.gold.withValues(alpha: 0.08)
+            : theme.colorScheme.surfaceContainer.withValues(alpha: 0.5),
+        borderRadius: AppRadius.lgBorder,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: isDue ? () => context.push('/review') : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: AppRadius.lgBorder,
+              border: Border.all(
+                color: isDue
+                    ? AppColors.gold.withValues(alpha: 0.3)
+                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isDue ? Icons.refresh_rounded : Icons.check_circle_rounded,
+                  color: isDue
+                      ? AppColors.gold
+                      : AppColors.forestGreen.withValues(alpha: 0.7),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isDue ? 'আজকের রিভিউ: $dueCount কার্ড' : 'রিভিউ শেষ ✓',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: isDue
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (isDue)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$dueCount',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Track card ────────────────────────────────────────────────────────────────
 
 // ── Learn tab (used by MainShell) ─────────────────────────────────────────────
 
-class LearnTab extends ConsumerWidget {
+class LearnTab extends ConsumerStatefulWidget {
   const LearnTab({super.key, this.onPracticeTab});
   final VoidCallback? onPracticeTab;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LearnTab> createState() => _LearnTabState();
+}
+
+class _LearnTabState extends ConsumerState<LearnTab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _flameController;
+  bool _pulseTriggered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _flameController =
+        AnimationController(vsync: this, duration: AppMotion.gentle);
+  }
+
+  @override
+  void dispose() {
+    _flameController.dispose();
+    super.dispose();
+  }
+
+  void _maybePulseFlame(Streak? streak) {
+    if (_pulseTriggered || streak == null) return;
+    final last = streak.lastActivityDate;
+    if (last == null) return;
+    final now = DateTime.now();
+    final isToday =
+        last.year == now.year && last.month == now.month && last.day == now.day;
+    if (!isToday) return;
+    _pulseTriggered = true;
+    if (!MediaQuery.of(context).disableAnimations) {
+      _flameController.forward(from: 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final tracks = ref.watch(tracksProvider);
     final streak = ref.watch(streakProvider).valueOrNull;
     final theme = Theme.of(context);
+    _maybePulseFlame(streak);
+
+    final flameScale = TweenSequence<double>([
+      TweenSequenceItem(
+          tween: Tween(begin: 1.0, end: 1.3)
+              .chain(CurveTween(curve: Curves.easeOut)),
+          weight: 50),
+      TweenSequenceItem(
+          tween: Tween(begin: 1.3, end: 1.0)
+              .chain(CurveTween(curve: Curves.easeIn)),
+          weight: 50),
+    ]).animate(_flameController);
 
     return Scaffold(
       appBar: AppBar(
@@ -621,8 +855,11 @@ class LearnTab extends ConsumerWidget {
         actions: [
           // Compact streak chip
           if (streak != null) ...[
-            _StatChip(Icons.local_fire_department, AppColors.gold,
-                '${streak.currentStreak}'),
+            ScaleTransition(
+              scale: flameScale,
+              child: _StatChip(Icons.local_fire_department, AppColors.gold,
+                  '${streak.currentStreak}'),
+            ),
             _StatChip(Icons.star_rounded, AppColors.gold,
                 '${streak.totalXp}'),
             _StatChip(Icons.favorite, Colors.red, '${streak.hearts}/5'),
@@ -648,6 +885,12 @@ class LearnTab extends ConsumerWidget {
               },
               child: CustomScrollView(
                 slivers: [
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: _ContinueLearningCard(),
+                    ),
+                  ),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -689,6 +932,12 @@ class LearnTab extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: _ReviewDueChip(),
+                    ),
+                  ),
                   const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 ],
               ),
@@ -721,12 +970,20 @@ class _StatChip extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: iconColor),
           const SizedBox(width: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+          AnimatedSwitcher(
+            duration: AppMotion.normal,
+            transitionBuilder: (child, anim) => ScaleTransition(
+              scale: anim,
+              child: FadeTransition(opacity: anim, child: child),
+            ),
+            child: Text(
+              value,
+              key: ValueKey(value),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
           ),
         ],
@@ -762,13 +1019,15 @@ class _TrackCard extends ConsumerWidget {
         isQuranic ? 'কুরআনের শব্দ ও ব্যাকরণ' : 'দৈনন্দিন কথোপকথন';
 
     return TapScale(
-      child: Card(
-      clipBehavior: Clip.antiAlias,
-      shadowColor: gradientColors[0].withValues(alpha: 0.35),
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
-      child: InkWell(
-        onTap: () => context.push('/track/${track.slug}'),
-        child: Column(
+      child: OpenContainer(
+        closedElevation: 1,
+        closedColor: theme.cardColor,
+        closedShape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
+        transitionDuration: MediaQuery.of(context).disableAnimations
+            ? Duration.zero
+            : AppMotion.route,
+        openBuilder: (context, _) => TrackDetailPage(slug: track.slug),
+        closedBuilder: (context, openContainer) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Gradient header
@@ -781,70 +1040,72 @@ class _TrackCard extends ConsumerWidget {
                   colors: gradientColors,
                 ),
               ),
-              child: Stack(
-                children: [
-                  // Decorative background Arabic text
-                  Positioned(
-                    right: -8,
-                    bottom: -18,
-                    child: Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: Text(
-                        track.nameAr,
-                        style: const TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: 64,
-                          color: Colors.white10,
-                          height: 1,
+              child: ClipRRect(
+                child: Stack(
+                  children: [
+                    // Decorative background Arabic text
+                    Positioned(
+                      right: -8,
+                      bottom: -18,
+                      child: Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Text(
+                          track.nameAr,
+                          style: TextStyle(
+                            fontFamily: 'NotoNaskhArabic',
+                            fontSize: 64,
+                            color: Colors.white.withValues(alpha: 0.06),
+                            height: 1,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  // Icon + name
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(icon, size: 26, color: Colors.white),
-                        ),
-                        const SizedBox(width: 14),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              track.nameBn,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 17,
-                              ),
+                    // Icon + name
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(height: 2),
-                            Directionality(
-                              textDirection: TextDirection.rtl,
-                              child: Text(
-                                track.nameAr,
+                            child: Icon(icon, size: 26, color: Colors.white),
+                          ),
+                          const SizedBox(width: 14),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                track.nameBn,
                                 style: const TextStyle(
-                                  fontFamily: 'NotoNaskhArabic',
-                                  fontSize: 14,
-                                  height: 1.4,
-                                  color: Colors.white70,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                              const SizedBox(height: 2),
+                              Directionality(
+                                textDirection: TextDirection.rtl,
+                                child: Text(
+                                  track.nameAr,
+                                  style: const TextStyle(
+                                    fontFamily: 'NotoNaskhArabic',
+                                    fontSize: 14,
+                                    height: 1.4,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             // Bottom row
@@ -892,30 +1153,12 @@ class _TrackCard extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                  ] else
-                    const SizedBox(height: 10),
-                  TapScale(
-                    child: FilledButton(
-                      onPressed: () => context.push('/track/${track.slug}'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: gradientColors[0],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(progress != null && progress.completed > 0
-                          ? 'চালিয়ে যান'
-                          : 'শুরু করুন'),
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
           ],
         ),
-      ),
       ),
     );
   }

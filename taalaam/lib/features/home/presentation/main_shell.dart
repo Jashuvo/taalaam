@@ -56,20 +56,51 @@ class _MainShellState extends ConsumerState<MainShell> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(28),
-              child: NavigationBar(
-                selectedIndex: _tab,
-                onDestinationSelected: (i) => setState(() => _tab = i),
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                animationDuration: const Duration(milliseconds: 300),
+              child: Material(
                 elevation: 8,
                 shadowColor: Colors.black38,
-                destinations: List.generate(
-                  4,
-                  (i) => NavigationDestination(
-                    icon: Icon(_icons[i]),
-                    selectedIcon: Icon(_selectedIcons[i]),
-                    label: _labels[i],
-                  ),
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                child: SizedBox(
+                  height: 72,
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    final disableAnim =
+                        MediaQuery.of(context).disableAnimations;
+                    final itemWidth = constraints.maxWidth / 4;
+                    const pillWidth = 56.0;
+                    return Stack(
+                      children: [
+                        AnimatedPositioned(
+                          duration:
+                              disableAnim ? Duration.zero : AppMotion.normal,
+                          curve: Curves.easeOutCubic,
+                          left: _tab * itemWidth + (itemWidth - pillWidth) / 2,
+                          top: 10,
+                          width: pillWidth,
+                          height: 36,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.gold.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                          ),
+                        ),
+                        Row(
+                          children: List.generate(
+                            4,
+                            (i) => Expanded(
+                              child: _NavBarItem(
+                                icon: _icons[i],
+                                selectedIcon: _selectedIcons[i],
+                                label: _labels[i],
+                                selected: _tab == i,
+                                onTap: () => setState(() => _tab = i),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
                 ),
               ),
             ),
@@ -80,16 +111,122 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 }
 
+class _NavBarItem extends StatelessWidget {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _NavBarItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final disableAnim = MediaQuery.of(context).disableAnimations;
+    final color = selected ? AppColors.gold : theme.colorScheme.onSurfaceVariant;
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          AnimatedScale(
+            scale: selected ? 1.1 : 1.0,
+            duration: disableAnim ? Duration.zero : AppMotion.normal,
+            curve: Curves.easeOutCubic,
+            child: Icon(selected ? selectedIcon : icon, color: color),
+          ),
+          const SizedBox(height: 4),
+          AnimatedDefaultTextStyle(
+            duration: disableAnim ? Duration.zero : AppMotion.normal,
+            curve: Curves.easeOutCubic,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: color,
+            ),
+            child: Text(label),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Practice tab ──────────────────────────────────────────────────────────────
 
-class _PracticeTab extends ConsumerWidget {
+class _PracticeTab extends ConsumerStatefulWidget {
   const _PracticeTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PracticeTab> createState() => _PracticeTabState();
+}
+
+class _PracticeTabState extends ConsumerState<_PracticeTab>
+    with SingleTickerProviderStateMixin {
+  static const _staggerCount = 5;
+  static const _stagger = Duration(milliseconds: 50);
+  static const _itemDuration = Duration(milliseconds: 300);
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final totalMs = _itemDuration.inMilliseconds +
+        (_staggerCount - 1) * _stagger.inMilliseconds;
+    _controller =
+        AnimationController(vsync: this, duration: Duration(milliseconds: totalMs));
+    if (MediaQuery.of(context).disableAnimations) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _entranceFor(int index) {
+    final totalMs = _controller.duration!.inMilliseconds;
+    final start = (index * _stagger.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    final end = (start + _itemDuration.inMilliseconds / totalMs).clamp(start, 1.0);
+    return CurvedAnimation(
+      parent: _controller,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+  }
+
+  Widget _staggered(int index, Widget child) {
+    final entrance = _entranceFor(index);
+    return AnimatedBuilder(
+      animation: entrance,
+      builder: (context, child) => Opacity(
+        opacity: entrance.value,
+        child: Transform.translate(
+          offset: Offset(0, (1 - entrance.value) * 16),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final newCount = ref.watch(newCardCountProvider).valueOrNull ?? 0;
     final dueCount = ref.watch(dueCountProvider).valueOrNull ?? 0;
+    final learningCount = ref.watch(learningWordCountProvider).valueOrNull ?? 0;
+    final masteredCount = ref.watch(masteredWordCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -99,27 +236,45 @@ class _PracticeTab extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // SRS cards
-          _PracticeCard(
-            icon: Icons.add_circle_outline_rounded,
-            iconColor: AppColors.forestGreen,
-            title: 'নতুন শব্দ শিখুন',
-            subtitle: newCount > 0
-                ? '$newCount টি নতুন শব্দ অপেক্ষা করছে'
-                : 'এখন নতুন শব্দ নেই',
-            badge: newCount > 0 ? '$newCount' : null,
-            onTap: newCount > 0 ? () => context.push('/memorize') : null,
+          _staggered(
+            0,
+            Row(
+              children: [
+                Expanded(
+                    child: _PracticeStatChip(
+                        label: 'আজ ডিউ',
+                        value: '$dueCount',
+                        color: AppColors.gold)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: _PracticeStatChip(
+                        label: 'শিখছি',
+                        value: '$learningCount',
+                        color: AppColors.teal)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: _PracticeStatChip(
+                        label: 'আয়ত্ত',
+                        value: '$masteredCount',
+                        color: AppColors.forestGreen)),
+              ],
+            ),
           ),
+          const SizedBox(height: 16),
+          _staggered(1, _ReviewCard(dueCount: dueCount)),
           const SizedBox(height: 12),
-          _PracticeCard(
-            icon: Icons.refresh_rounded,
-            iconColor: Colors.orange,
-            title: 'রিভিউ করুন',
-            subtitle: dueCount > 0
-                ? '$dueCount টি কার্ড রিভিউ বাকি'
-                : 'আজকের রিভিউ শেষ!',
-            badge: dueCount > 0 ? '$dueCount' : null,
-            onTap: dueCount > 0 ? () => context.push('/review') : null,
+          _staggered(
+            2,
+            _PracticeCard(
+              icon: Icons.add_circle_outline_rounded,
+              iconColor: AppColors.forestGreen,
+              title: 'নতুন শব্দ শিখুন',
+              subtitle: newCount > 0
+                  ? '$newCount টি নতুন শব্দ অপেক্ষা করছে'
+                  : 'এখন নতুন শব্দ নেই',
+              badge: newCount > 0 ? '$newCount' : null,
+              onTap: newCount > 0 ? () => context.push('/memorize') : null,
+            ),
           ),
           const SizedBox(height: 24),
           Padding(
@@ -128,22 +283,176 @@ class _PracticeTab extends ConsumerWidget {
                 style: theme.textTheme.titleSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant)),
           ),
-          _PracticeCard(
-            icon: Icons.chat_bubble_outline_rounded,
-            iconColor: AppColors.teal,
-            title: 'কথোপকথন',
-            subtitle: 'আরবিতে কথা বলার অনুশীলন',
-            onTap: () => context.push('/conversation'),
+          _staggered(
+            3,
+            _PracticeCard(
+              icon: Icons.chat_bubble_outline_rounded,
+              iconColor: AppColors.teal,
+              title: 'কথোপকথন',
+              subtitle: 'আরবিতে কথা বলার অনুশীলন',
+              onTap: () => context.push('/conversation'),
+            ),
           ),
           const SizedBox(height: 12),
-          _PracticeCard(
-            icon: Icons.groups_2_outlined,
-            iconColor: Colors.purple,
-            title: 'হালাকা',
-            subtitle: 'গ্রুপ শিক্ষা কার্যক্রম',
-            onTap: () => context.push('/groups'),
+          _staggered(
+            4,
+            _PracticeCard(
+              icon: Icons.groups_2_outlined,
+              iconColor: Colors.purple,
+              title: 'হালাকা',
+              subtitle: 'গ্রুপ শিক্ষা কার্যক্রম',
+              onTap: () => context.push('/groups'),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PracticeStatChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _PracticeStatChip(
+      {required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: AppRadius.lgBorder,
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        children: [
+          Text(value,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              )),
+          const SizedBox(height: 2),
+          Text(label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final int dueCount;
+  const _ReviewCard({required this.dueCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDue = dueCount > 0;
+
+    if (!isDue) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer.withValues(alpha: 0.5),
+          borderRadius: AppRadius.lgBorder,
+          border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.forestGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.check_circle_rounded,
+                  color: AppColors.forestGreen.withValues(alpha: 0.7),
+                  size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('আজকের রিভিউ শেষ!',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      )),
+                  const SizedBox(height: 2),
+                  Text('চমৎকার! আগামীকাল আবার আসুন',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: () => context.push('/review'),
+      borderRadius: AppRadius.lgBorder,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.gold.withValues(alpha: 0.08),
+          borderRadius: AppRadius.lgBorder,
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.refresh_rounded,
+                  color: AppColors.gold, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('রিভিউ করুন',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      )),
+                  const SizedBox(height: 2),
+                  Text('$dueCount টি কার্ড রিভিউ বাকি',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.gold,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text('$dueCount',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppColors.gold, size: 20),
+          ],
+        ),
       ),
     );
   }

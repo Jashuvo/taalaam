@@ -129,58 +129,91 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
         physics: const BouncingScrollPhysics(),
         slivers: [
           _buildAppBar(trackGradient),
-          SliverToBoxAdapter(
-            child: allUnits.isEmpty
-                ? const _EmptyTierPlaceholder()
-                : Builder(builder: (_) {
-                    final items = <Widget>[];
-                    if (isQuranic) {
-                      // Flat Quranic layout — no tier banners, no UpNext cards
-                      // All units open; sorted by sort_order
-                      final sortedUnits = [...allUnits]
-                        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-                      final userId =
-                          ref.watch(currentUserProvider)?.id;
-                      if (userId != null) {
-                        items.add(QuranCoverageRing(userId: userId));
-                        items.add(TadabburCard(userId: userId));
-                      }
-                      items.add(const _QuranicCurriculumHeader());
-                      for (int ui = 0; ui < sortedUnits.length; ui++) {
-                        items.add(_UnitSection(
-                          unit: sortedUnits[ui],
-                          unitNumber: ui + 1,
-                          completedIds: completedIds,
-                          bookmarkedIds: bookmarkedIds,
-                          tierColors: const [Color(0xFF1B6B3A), Color(0xFF2E8B57)],
-                          isQuranic: true,
-                        ));
-                      }
-                    } else {
-                      for (int ti = 0; ti < sortedTiers.length; ti++) {
-                        final tier  = sortedTiers[ti];
-                        final units = tierGroups[tier]!;
-                        items.add(_TierSectionBanner(
-                            tier: tier, sectionIndex: ti + 1));
-                        for (int ui = 0; ui < units.length; ui++) {
-                          items.add(_UnitSection(
-                            unit: units[ui],
-                            unitNumber: ui + 1,
-                            completedIds: completedIds,
-                            bookmarkedIds: bookmarkedIds,
-                            tierColors: _tierColors(tier),
-                            isQuranic: false,
-                          ));
-                        }
-                      }
-                    }
-                    items.add(const SizedBox(height: 80));
-                    return Column(children: items);
-                  }),
-          ),
+          if (allUnits.isEmpty)
+            const SliverToBoxAdapter(child: _EmptyTierPlaceholder())
+          else if (isQuranic)
+            SliverToBoxAdapter(
+              child: Builder(builder: (_) {
+                final items = <Widget>[];
+                // Flat Quranic layout — no tier banners, no UpNext cards
+                // All units open; sorted by sort_order
+                final sortedUnits = [...allUnits]
+                  ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+                final userId = ref.watch(currentUserProvider)?.id;
+                if (userId != null) {
+                  items.add(QuranCoverageRing(userId: userId));
+                  items.add(TadabburCard(userId: userId));
+                }
+                items.add(const _QuranicCurriculumHeader());
+                for (int ui = 0; ui < sortedUnits.length; ui++) {
+                  items.add(_UnitSection(
+                    unit: sortedUnits[ui],
+                    unitNumber: ui + 1,
+                    completedIds: completedIds,
+                    bookmarkedIds: bookmarkedIds,
+                    tierColors: const [Color(0xFF1B6B3A), Color(0xFF2E8B57)],
+                    isQuranic: true,
+                  ));
+                }
+                items.add(const SizedBox(height: 80));
+                return Column(children: items);
+              }),
+            )
+          else
+            ..._buildConversationalSlivers(
+                sortedTiers, tierGroups, completedIds, bookmarkedIds),
         ],
       ),
     );
+  }
+
+  /// Conversational (non-Quranic) layout: each unit's banner becomes a
+  /// pinned [SliverPersistentHeader] that stacks/swaps natively as the
+  /// user scrolls through that unit's lesson path.
+  List<Widget> _buildConversationalSlivers(
+    List<int> sortedTiers,
+    Map<int, List<Unit>> tierGroups,
+    Set<String> completedIds,
+    Set<String> bookmarkedIds,
+  ) {
+    final slivers = <Widget>[];
+    for (int ti = 0; ti < sortedTiers.length; ti++) {
+      final tier  = sortedTiers[ti];
+      final units = tierGroups[tier]!;
+      final tierColors = _tierColors(tier);
+      slivers.add(SliverToBoxAdapter(
+        child: _TierSectionBanner(tier: tier, sectionIndex: ti + 1),
+      ));
+      for (int ui = 0; ui < units.length; ui++) {
+        final unit = units[ui];
+        final lessons =
+            ref.watch(lessonsForUnitProvider(unit.id)).valueOrNull ?? [];
+        final doneCount =
+            lessons.where((l) => completedIds.contains(l.id)).length;
+        slivers.add(SliverPersistentHeader(
+          pinned: true,
+          delegate: _UnitHeaderDelegate(
+            unit: unit,
+            unitNumber: ui + 1,
+            tierColors: tierColors,
+            doneCount: doneCount,
+            totalCount: lessons.length,
+          ),
+        ));
+        slivers.add(SliverToBoxAdapter(
+          child: _UnitSection(
+            unit: unit,
+            unitNumber: ui + 1,
+            completedIds: completedIds,
+            bookmarkedIds: bookmarkedIds,
+            tierColors: tierColors,
+            isQuranic: false,
+          ),
+        ));
+      }
+    }
+    slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 80)));
+    return slivers;
   }
 
   SliverAppBar _buildAppBar(List<Color> gradient) {
@@ -243,6 +276,92 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
         ),
       ),
     );
+  }
+}
+
+// ── Sticky unit header ───────────────────────────────────────────────────────
+
+/// Compact pinned header for the conversational path: shows the active
+/// unit's number/title + progress, pinning below the AppBar while its
+/// lessons scroll past, then swapping for the next unit's header.
+class _UnitHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Unit unit;
+  final int unitNumber;
+  final List<Color> tierColors;
+  final int doneCount;
+  final int totalCount;
+
+  const _UnitHeaderDelegate({
+    required this.unit,
+    required this.unitNumber,
+    required this.tierColors,
+    required this.doneCount,
+    required this.totalCount,
+  });
+
+  static const double _height = 52.0;
+
+  @override
+  double get minExtent => _height;
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final unitDone = totalCount > 0 && doneCount == totalCount;
+
+    return Material(
+      elevation: overlapsContent ? 4 : 0,
+      shadowColor: tierColors[0].withValues(alpha: 0.3),
+      color: isDark ? AppColors.darkCard : AppColors.lightCard,
+      child: Container(
+        height: _height,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: tierColors[0], width: 4),
+            bottom: BorderSide(
+              color: theme.dividerColor.withValues(alpha: 0.4),
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'ইউনিট $unitNumber · ${unit.titleBn}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (totalCount > 0)
+              Text(
+                unitDone ? 'সম্পন্ন' : '$doneCount/$totalCount',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: unitDone ? AppColors.brightGreen : tierColors[0],
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _UnitHeaderDelegate oldDelegate) {
+    return unit.id != oldDelegate.unit.id ||
+        unitNumber != oldDelegate.unitNumber ||
+        doneCount != oldDelegate.doneCount ||
+        totalCount != oldDelegate.totalCount ||
+        tierColors != oldDelegate.tierColors;
   }
 }
 
@@ -896,7 +1015,7 @@ class _UnitSection extends ConsumerWidget {
 
 // ── Winding path ──────────────────────────────────────────────────────────────
 
-class _LessonPath extends StatelessWidget {
+class _LessonPath extends StatefulWidget {
   final List<Lesson> lessons;
   final Set<String> completedIds;
   final List<Color> tierColors;
@@ -910,7 +1029,53 @@ class _LessonPath extends StatelessWidget {
   });
 
   @override
+  State<_LessonPath> createState() => _LessonPathState();
+}
+
+class _LessonPathState extends State<_LessonPath>
+    with SingleTickerProviderStateMixin {
+  static const _stagger = Duration(milliseconds: 40);
+  static const _itemDuration = Duration(milliseconds: 300);
+  late final AnimationController _entranceCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final n = widget.lessons.length;
+    final totalMs = _itemDuration.inMilliseconds +
+        (n > 1 ? (n - 1) * _stagger.inMilliseconds : 0);
+    _entranceCtrl =
+        AnimationController(vsync: this, duration: Duration(milliseconds: totalMs));
+    if (MediaQuery.of(context).disableAnimations) {
+      _entranceCtrl.value = 1;
+    } else {
+      _entranceCtrl.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _entranceCtrl.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _entranceFor(int index) {
+    final totalMs = _entranceCtrl.duration!.inMilliseconds;
+    final start = (index * _stagger.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    final end =
+        (start + _itemDuration.inMilliseconds / totalMs).clamp(start, 1.0);
+    return CurvedAnimation(
+      parent: _entranceCtrl,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final lessons = widget.lessons;
+    final completedIds = widget.completedIds;
+    final tierColors = widget.tierColors;
+    final isQuranic = widget.isQuranic;
     final firstUndone =
         lessons.indexWhere((l) => !completedIds.contains(l.id));
 
@@ -942,15 +1107,26 @@ class _LessonPath extends StatelessWidget {
             ),
             ...List.generate(lessons.length, (i) {
               final pos = positions[i];
+              final entrance = _entranceFor(i);
               return Positioned(
                 left: pos.dx - _nodeSize / 2,
                 top:  pos.dy - _nodeSize / 2,
-                child: _LessonNode(
-                  lesson: lessons[i],
-                  isDone: completedIds.contains(lessons[i].id),
-                  isCurrent: i == firstUndone,
-                  tierColors: tierColors,
-                  isQuranic: isQuranic,
+                child: AnimatedBuilder(
+                  animation: entrance,
+                  builder: (context, child) => Opacity(
+                    opacity: entrance.value,
+                    child: Transform.scale(
+                      scale: 0.6 + 0.4 * entrance.value,
+                      child: child,
+                    ),
+                  ),
+                  child: _LessonNode(
+                    lesson: lessons[i],
+                    isDone: completedIds.contains(lessons[i].id),
+                    isCurrent: i == firstUndone,
+                    tierColors: tierColors,
+                    isQuranic: isQuranic,
+                  ),
                 ),
               );
             }),
@@ -1044,7 +1220,7 @@ class _PathPainter extends CustomPainter {
 
 // ── Individual lesson node ────────────────────────────────────────────────────
 
-class _LessonNode extends ConsumerWidget {
+class _LessonNode extends ConsumerStatefulWidget {
   final Lesson lesson;
   final bool isDone;
   final bool isCurrent;
@@ -1060,7 +1236,49 @@ class _LessonNode extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LessonNode> createState() => _LessonNodeState();
+}
+
+class _LessonNodeState extends ConsumerState<_LessonNode>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _bounceCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _bounceCtrl =
+        AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
+    _syncBounce();
+  }
+
+  @override
+  void didUpdateWidget(_LessonNode old) {
+    super.didUpdateWidget(old);
+    _syncBounce();
+  }
+
+  void _syncBounce() {
+    if (widget.isCurrent && !MediaQuery.of(context).disableAnimations) {
+      if (!_bounceCtrl.isAnimating) _bounceCtrl.repeat(reverse: true);
+    } else {
+      _bounceCtrl.stop();
+      _bounceCtrl.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _bounceCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lesson = widget.lesson;
+    final isDone = widget.isDone;
+    final isCurrent = widget.isCurrent;
+    final tierColors = widget.tierColors;
+    final isQuranic = widget.isQuranic;
     final theme = Theme.of(context);
     final accuracyMap =
         ref.watch(lessonAccuracyMapProvider).valueOrNull ?? {};
@@ -1112,6 +1330,14 @@ class _LessonNode extends ConsumerWidget {
       shadows     = [];
     }
 
+    final iconKey = isDone
+        ? 'done'
+        : isCurrent
+            ? 'current'
+            : isQuranic
+                ? 'open'
+                : 'locked';
+
     return TapScale(
       child: GestureDetector(
       onTap:      () => context.push('/lesson/${lesson.id}'),
@@ -1121,7 +1347,14 @@ class _LessonNode extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
+            AnimatedBuilder(
+              animation: _bounceCtrl,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(
+                    0, -4 * Curves.easeInOut.transform(_bounceCtrl.value)),
+                child: child,
+              ),
+              child: Stack(
               clipBehavior: Clip.none,
               children: [
                 if (isCurrent) _PulsingGlow(glowColor: tierColors[0]),
@@ -1139,7 +1372,16 @@ class _LessonNode extends ConsumerWidget {
                     ),
                     boxShadow: shadows,
                   ),
-                  child: Center(child: nodeIcon),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder: (child, anim) => ScaleTransition(
+                        scale: anim,
+                        child: FadeTransition(opacity: anim, child: child),
+                      ),
+                      child: KeyedSubtree(key: ValueKey(iconKey), child: nodeIcon),
+                    ),
+                  ),
                 ),
                 if (accuracy != null && accuracy >= 50)
                   Positioned(
@@ -1169,15 +1411,13 @@ class _LessonNode extends ConsumerWidget {
                     ),
                   ),
               ],
+              ),
             ),
             const SizedBox(height: 5),
             SizedBox(
               width: _nodeSize + 18,
-              child: Text(
-                lesson.titleBn,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: AnimatedDefaultTextStyle(
+                duration: AppMotion.normal,
                 style: TextStyle(
                   fontSize: 11,
                   height: 1.3,
@@ -1188,33 +1428,50 @@ class _LessonNode extends ConsumerWidget {
                       : theme.colorScheme.onSurfaceVariant
                           .withValues(alpha: isDone ? 0.5 : 0.8),
                 ),
+                child: Text(
+                  lesson.titleBn,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
-            if (!isDone) ...[
-              const SizedBox(height: 3),
-              AnimatedContainer(
-                duration: AppMotion.normal,
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isCurrent
-                      ? tierColors[0].withValues(alpha: 0.12)
-                      : theme.colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${lesson.xpReward} XP',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: isCurrent
-                        ? tierColors[0]
-                        : theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: 0.6),
-                  ),
-                ),
-              ),
-            ],
+            AnimatedSize(
+              duration: AppMotion.normal,
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: isDone
+                  ? const SizedBox.shrink()
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: 3),
+                        AnimatedContainer(
+                          duration: AppMotion.normal,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isCurrent
+                                ? tierColors[0].withValues(alpha: 0.12)
+                                : theme.colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${lesson.xpReward} XP',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isCurrent
+                                  ? tierColors[0]
+                                  : theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
           ],
         ),
       ),
@@ -1240,15 +1497,18 @@ class _LessonNode extends ConsumerWidget {
             Row(
               children: [
                 _StatusChip(
-                    isDone: isDone, isCurrent: isCurrent, tierColor: tierColors[0], isQuranic: isQuranic),
+                    isDone: widget.isDone,
+                    isCurrent: widget.isCurrent,
+                    tierColor: widget.tierColors[0],
+                    isQuranic: widget.isQuranic),
                 const Spacer(),
-                Text('${lesson.xpReward} XP',
+                Text('${widget.lesson.xpReward} XP',
                     style: theme.textTheme.labelMedium?.copyWith(
                         color: AppColors.gold, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 12),
-            Text(lesson.titleBn,
+            Text(widget.lesson.titleBn,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
@@ -1257,10 +1517,10 @@ class _LessonNode extends ConsumerWidget {
               child: FilledButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  context.push('/lesson/${lesson.id}');
+                  context.push('/lesson/${widget.lesson.id}');
                 },
                 style: FilledButton.styleFrom(
-                  backgroundColor: tierColors[0],
+                  backgroundColor: widget.tierColors[0],
                 ),
                 child: const Text('শুরু করুন'),
               ),
