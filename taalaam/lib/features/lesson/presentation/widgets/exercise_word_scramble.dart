@@ -19,6 +19,9 @@ class _ExerciseWordScrambleState extends State<ExerciseWordScramble> {
   List<String> get _words =>
       List<String>.from(widget.exercise.correctAnswer['words'] as List);
   String get _correct => widget.exercise.correctAnswer['correct'] as String;
+  String? get _surahName =>
+      widget.exercise.correctAnswer['surah_name'] as String?;
+  Object? get _ayahNumber => widget.exercise.correctAnswer['ayah_number'];
 
   @override
   void initState() {
@@ -45,6 +48,16 @@ class _ExerciseWordScrambleState extends State<ExerciseWordScramble> {
           ),
         Text('সঠিক ক্রমে সাজান:',
             style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+        if (_surahName != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '— সূরা $_surahName, আয়াত $_ayahNumber',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
         const SizedBox(height: 16),
         // Built sentence area
         Container(

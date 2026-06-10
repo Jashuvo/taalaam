@@ -13,7 +13,8 @@
 //
 // Exercise types generated:
 //   Standard:      multiple_choice, drag_drop, true_false, fill_in_blank, tap_to_build, speak_arabic
-//   Quranic-only:  ayah_read, tafsir_read, ayah_context, surah_theme, reflection_card
+//   Quranic-only:  ayah_read, tafsir_read, ayah_context, surah_theme, reflection_card,
+//                  ayah_complete (real-ayah fill-in-blank), ayah_order (real-ayah word order)
 //
 // Deploy: supabase functions deploy curate-quran-lesson --no-verify-jwt
 
@@ -255,6 +256,57 @@ function formatAyahsForPrompt(ayahTexts: Map<string, string>, tafsirSnippets: Ma
     .join('\n');
 }
 
+// ── Authentic-ayah grounding for ayah_complete / ayah_order ─────────────────
+
+interface GroundedAyah { ar: string; answer?: string; surahName: string; ayahNumber: number; }
+
+// Pick a lesson word whose ayah (already fetched into ayahTexts) is short enough
+// for ayah_complete (<=12 words) or ayah_order (<=7 words). Used for salah/juz_amma
+// where words carry surah/ayah location.
+function findGroundedAyah(
+  words: WordRow[],
+  ayahTexts: Map<string, string>,
+  surahNumber: number | undefined,
+  surahNameBn: string,
+  maxWords: number,
+  excludeAyahNumber?: number,
+): GroundedAyah | null {
+  if (surahNumber == null) return null;
+  for (const w of words) {
+    if (w.ayah == null || w.ayah === excludeAyahNumber) continue;
+    const ar = ayahTexts.get(`${surahNumber}:${w.ayah}`);
+    if (!ar) continue;
+    const wordCount = ar.split(/\s+/).filter(Boolean).length;
+    if (wordCount >= 2 && wordCount <= maxWords) {
+      return { ar, answer: w.arabic, surahName: surahNameBn, ayahNumber: w.ayah };
+    }
+  }
+  return null;
+}
+
+// Find a short authentic ayah containing the given word — used for 'frequent'
+// where words have no surah/ayah location of their own.
+async function fetchShortAyahForWord(
+  sb: SupabaseClient,
+  wordArabic: string,
+  maxWords: number,
+): Promise<GroundedAyah | null> {
+  const { data, error } = await sb.rpc('find_short_ayah_for_word', { word_arabic: wordArabic, max_words: maxWords });
+  if (error || !data?.length) return null;
+  const row = data[0] as { surah: number; ayah: number };
+  const { data: ayahWords } = await sb.from('quran_words')
+    .select('arabic').eq('surah', row.surah).eq('ayah', row.ayah).order('position');
+  if (!ayahWords?.length) return null;
+  const { data: surahRow } = await sb.from('quran_surahs')
+    .select('name_bn').eq('number', row.surah).single();
+  return {
+    ar: (ayahWords as { arabic: string }[]).map(w => w.arabic).join(' '),
+    answer: wordArabic,
+    surahName: (surahRow as { name_bn: string } | null)?.name_bn ?? '',
+    ayahNumber: row.ayah,
+  };
+}
+
 // ── Lesson title helpers ─────────────────────────────────────────────────────
 
 function getLessonTitle(unitType: UnitType, surahNameBn: string, lessonIndex: number): string {
@@ -288,8 +340,10 @@ SCHEMAS (exact snake_case type strings, sequential sort_order):
 {"type":"aqeedah_true","sort_order":N,"prompt_bn":"এই বক্তব্যটি কি সঠিক?","correct_answer":{"statement_bn":"STMT_ABOUT_NAME","is_correct":false,"explanation_bn":"IBN_UTHAYMIN_CORRECTION_2_SENTENCES"},"difficulty":2}
 {"type":"ayah_cloze","sort_order":N,"prompt_bn":"শূন্যস্থানে কোন শব্দটি বসবে?","correct_answer":{"ayah_ar":"FULL_AYAH_EXACT","surah_name":"সূরা X","ayah_number":N,"blank_word":"WORD_IN_AYAH","blank_position":N,"options":["correct","w1","w2","w3"],"correct_index":0},"difficulty":2}
 {"type":"grammar_spot","sort_order":N,"prompt_bn":"কোনটি POSBENGALI (POSARABIC)?","correct_answer":{"target_pos_ar":"فِعْلٌ","target_pos_bn":"ক্রিয়াপদ","words":[{"arabic":"W","meaning_bn":"M","pos":"verb"},{"arabic":"W2","meaning_bn":"M2","pos":"noun"},{"arabic":"W3","meaning_bn":"M3","pos":"noun"},{"arabic":"W4","meaning_bn":"M4","pos":"particle"}],"correct_index":0},"difficulty":2}
+{"type":"ayah_complete","sort_order":N,"prompt_bn":"আয়াতের শূন্যস্থান পূরণ করুন:","correct_answer":{"sentence":"AYAH_TEXT_WITH_ONE_WORD_REPLACED_BY____","answer":"W","surah_name":"X","ayah_number":N},"distractors":{"options":["w1","w2","w3"]},"difficulty":2}
+{"type":"ayah_order","sort_order":N,"prompt_bn":"আয়াতের শব্দগুলো সঠিক ক্রমে সাজান:","correct_answer":{"words":["w1","w2","w3","..."],"correct":"w1 w2 w3 ...","surah_name":"X","ayah_number":N},"difficulty":2}
 
-RULES: Arabic always with full harakat (تشكيل). ayah_ar/highlighted_word/blank_word EXACT from provided texts. root_family: 3 words from stated root + 1 odd. aqeedah_true: test ta'wil or tashbih errors (is_correct usually false). grammar_spot: exactly 1 correct pos match among 4 words. Return ONLY valid JSON array.`;
+RULES: Arabic always with full harakat (تشكيل). ayah_ar/highlighted_word/blank_word EXACT from provided texts. root_family: 3 words from stated root + 1 odd. aqeedah_true: test ta'wil or tashbih errors (is_correct usually false). grammar_spot: exactly 1 correct pos match among 4 words. ayah_complete/ayah_order: sentence/words/correct MUST be copied EXACTLY (verbatim, full harakat) from the আয়াত block given in the prompt — NEVER reconstruct ayah text from memory. surah_name is the Bangla surah name WITHOUT the word "সূরা" prefix (the app adds it). Return ONLY valid JSON array.`;
 
 const VERB_EXERCISE_SYSTEM_PROMPT = `Quranic Arabic curriculum designer for Bengali-speaking Muslims. This lesson teaches verb ROOT FAMILIES.
 
@@ -315,10 +369,29 @@ function buildExerciseUserPrompt(opts: {
   ayahTexts: Map<string, string>;
   tafsirSnippets: Map<string, string>;
   passageTitleBn: string;
+  groundedAyahComplete: GroundedAyah | null;
+  groundedAyahOrder: GroundedAyah | null;
 }): string {
-  const { unitType, surahRow, surahNumber, lessonIndex, verbRoots, exWords, ayahTexts, tafsirSnippets, passageTitleBn } = opts;
+  const { unitType, surahRow, surahNumber, lessonIndex, verbRoots, exWords, ayahTexts, tafsirSnippets, passageTitleBn, groundedAyahComplete, groundedAyahOrder } = opts;
   const wordList = exWords.map((w, i) => `${i + 1}. ${w.arabic} (${w.transliteration ?? '?'}) = ${w.meaning_bn}`).join('\n');
   const ayahsBlock = formatAyahsForPrompt(ayahTexts, tafsirSnippets);
+
+  // Authentic-ayah grounding blocks/instructions for ayah_complete + ayah_order
+  const completeBlock = groundedAyahComplete
+    ? `\nআয়াত (ayah_complete-এর জন্য, EXACT কপি করুন):\n"${groundedAyahComplete.ar}" — সূরা ${groundedAyahComplete.surahName}, আয়াত ${groundedAyahComplete.ayahNumber}\n(এই আয়াতে শব্দ "${groundedAyahComplete.answer}" আছে)`
+    : '';
+  const orderBlock = groundedAyahOrder
+    ? `\nআয়াত (ayah_order-এর জন্য, EXACT কপি করুন):\n"${groundedAyahOrder.ar}" — সূরা ${groundedAyahOrder.surahName}, আয়াত ${groundedAyahOrder.ayahNumber}`
+    : '';
+  const completeInstruction = (idx: string) => groundedAyahComplete
+    ? `${idx}: ayah_complete — উপরের ayah_complete আয়াত থেকে EXACT কপি করুন; sentence-এ শব্দ "${groundedAyahComplete.answer}"-কে ___ দিয়ে প্রতিস্থাপন করুন (বাকি আয়াত অপরিবর্তিত); answer="${groundedAyahComplete.answer}"; surah_name="${groundedAyahComplete.surahName}"; ayah_number=${groundedAyahComplete.ayahNumber}; distractors.options = শব্দ তালিকা থেকে ৩টি ভিন্ন আরবি শব্দ`
+    : '';
+  const orderInstruction = (idx: string) => groundedAyahOrder
+    ? `${idx}: ayah_order — উপরের ayah_order আয়াত থেকে EXACT কপি করুন; words array-তে প্রতিটি শব্দ আলাদা element হিসেবে আয়াতের ক্রমানুসারে রাখুন; correct = সম্পূর্ণ আয়াত স্পেস দিয়ে যুক্ত (EXACT); surah_name="${groundedAyahOrder.surahName}"; ayah_number=${groundedAyahOrder.ayahNumber}`
+    : '';
+  const groundingRule = (groundedAyahComplete || groundedAyahOrder)
+    ? '\n\nSTRICT RULE: ayah_complete এর sentence ও ayah_order এর words/correct অবশ্যই উপরে দেওয়া আয়াত থেকে EXACT (verbatim, harakat সহ) কপি করুন — কখনো স্মৃতি থেকে আয়াত পুনর্গঠন করবেন না।'
+    : '';
 
   switch (unitType) {
 
@@ -365,6 +438,7 @@ ${ayahsBlock}
 
 শব্দ (${exWords.length}):
 ${wordList}
+${orderBlock}
 
 IMPORTANT: Output exercises in EXACTLY this order in the JSON array (first item = first exercise shown to learner):
 1st: ayah_read — ayah_ar=EXACTLY "${firstAyahAr}", ayah_bn=বাংলা অনুবাদ, surah_name="সূরা ${surahRow?.name_bn}", ayah_number=${firstAyahNum}, context_bn="${salahCtx}"
@@ -372,8 +446,9 @@ IMPORTANT: Output exercises in EXACTLY this order in the JSON array (first item 
 3rd: ayah_cloze — blank one lesson word from the first ayah above, 4 Arabic options (correct_index:0 first)
 4th: ayah_context — highlight one lesson word inside the same ayah, 4 Bengali meaning options
 5th: reflection_card — tadabbur prompt: what does this ayah mean when you recite it in Salah? Include a scholarly note (Ibn Sa'di or Ibn Uthaymin)
-6th: speak_arabic — a lesson word to pronounce
-
+${orderInstruction('6th')}
+${groundedAyahOrder ? '7th' : '6th'}: speak_arabic — a lesson word to pronounce
+${groundingRule}
 Return JSON array only.`;
     }
 
@@ -393,7 +468,8 @@ Return JSON array only.`;
       const themeSlot = numAyahReads + 2;
       const clozeSlot = numAyahReads + 3;
       const contextSlot = numAyahReads + 4;
-      const speakSlot = numAyahReads + 5;
+      const orderSlot = numAyahReads + 5;
+      const speakSlot = numAyahReads + (groundedAyahOrder ? 6 : 5);
       return `সূরা: ${surahRow?.name_bn} (${surahRow?.name_ar}) #${surahNumber} | আয়াত সংখ্যা: ${ayahCount}
 নাযিল: ${surahRow?.revelation ?? 'মাক্কী'}
 
@@ -402,15 +478,17 @@ ${ayahsBlock}
 
 শব্দ (${exWords.length}):
 ${wordList}
+${orderBlock}
 
-IMPORTANT: Output exercises in EXACTLY this order (${totalEx}টি):
+IMPORTANT: Output exercises in EXACTLY this order (${totalEx + (groundedAyahOrder ? 1 : 0)}টি):
 1st: tafsir_read — revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী, ২ বাক্য)
 ${ayahReadLines}
 ${themeSlot}th: surah_theme — প্রধান বিষয় ৪ অপশন
 ${clozeSlot}th: ayah_cloze — ayah_ar=EXACTLY "${clozeAyahAr}", ayah_number=${clozeAyahNum}, blank one lesson word, 4 Arabic options (correct_index:0 first)
 ${contextSlot}th: ayah_context — প্রথম আয়াত থেকে ১ শব্দ হাইলাইট — ৪ অপশন
+${orderInstruction(`${orderSlot}th`)}
 ${speakSlot}th: speak_arabic — a lesson word to pronounce
-
+${groundingRule}
 Return JSON array only.`;
     }
 
@@ -446,8 +524,9 @@ Return JSON array only.`;
 
 শব্দ তালিকা:
 ${wordList}
+${completeBlock}${orderBlock}
 
-IMPORTANT: Output exercises in EXACTLY this order (৯টি):
+IMPORTANT: Output exercises in EXACTLY this order (${groundedAyahOrder ? '১০' : '৯'}টি):
 1st: root_family — শব্দ তালিকা থেকে একটি ধাতু বেছে — ৩টি সেই ধাতু থেকে + ১টি ভিন্ন ধাতুর (odd_index=3)
 2nd: grammar_spot — ৪টি শব্দ — একটি فعل, একটি حرف, দুটি اسم
 3rd: multiple_choice — শব্দ → অর্থ
@@ -455,9 +534,10 @@ IMPORTANT: Output exercises in EXACTLY this order (৯টি):
 5th: ayah_context — শব্দ তালিকার একটি শব্দ Quranic ayah থেকে highlight করুন
 6th: tafsir_read — এই পাঠের শব্দগুলো যে সূরায় বেশি পাওয়া যায় সেই সূরার সংক্ষিপ্ত পরিচিতি — revelation+theme_bn+aqeedah_bn+tafsir_bn (ইবনু সা'দী পদ্ধতিতে, ২ বাক্য)
 7th: drag_drop — 3 শব্দ-অর্থ জোড়া
-8th: fill_in_blank — বাক্যে শূন্যস্থান পূরণ
-9th: speak_arabic — একটি শব্দ উচ্চারণ
-
+${groundedAyahComplete ? completeInstruction('8th') : '8th: fill_in_blank — বাক্যে শূন্যস্থান পূরণ'}
+${orderInstruction('9th')}
+${groundedAyahOrder ? '10th' : '9th'}: speak_arabic — একটি শব্দ উচ্চারণ
+${groundingRule}
 Return valid JSON array only.`;
     }
 
@@ -767,6 +847,27 @@ ${wordList}`;
     let exerciseError: string | null = null;
     const exWords = enrichedWords.slice(0, 15);
 
+    // ── 10b. Ground ayah_complete / ayah_order in a real, short ayah ────────
+    let groundedAyahComplete: GroundedAyah | null = null;
+    let groundedAyahOrder: GroundedAyah | null = null;
+    if (unitType === 'salah' || unitType === 'juz_amma') {
+      const surahWords = words as (WordRow & { ayah?: number })[];
+      groundedAyahComplete = findGroundedAyah(surahWords, ayahTexts, surahNumber, surahRow?.name_bn ?? '', 12);
+      groundedAyahOrder = findGroundedAyah(
+        surahWords, ayahTexts, surahNumber, surahRow?.name_bn ?? '', 7,
+        groundedAyahComplete?.ayahNumber,
+      );
+    } else if (unitType === 'frequent') {
+      for (const w of exWords) {
+        if (!groundedAyahComplete) groundedAyahComplete = await fetchShortAyahForWord(sb, w.arabic, 12);
+        if (groundedAyahComplete && !groundedAyahOrder) {
+          const candidate = await fetchShortAyahForWord(sb, w.arabic, 7);
+          if (candidate && candidate.ar !== groundedAyahComplete.ar) groundedAyahOrder = candidate;
+        }
+        if (groundedAyahComplete && groundedAyahOrder) break;
+      }
+    }
+
     if (exWords.length >= 2) {
       try {
         const isVerbLesson = unitType === 'verbs';
@@ -782,6 +883,8 @@ ${wordList}`;
           ayahTexts,
           tafsirSnippets,
           passageTitleBn: ATTRIBUTE_PASSAGES[lessonIndex]?.titleBn ?? `গুণাবলী পাঠ ${lessonIndex + 1}`,
+          groundedAyahComplete,
+          groundedAyahOrder,
         });
 
         const rawEx   = extractJsonArray(await geminiGenerate(geminiKey, `${systemPrompt}\n\n${userPrompt}`));
@@ -799,6 +902,7 @@ ${wordList}`;
           'true_false','chat_complete','translate_build','listen_select','speak_arabic',
           'ayah_read','tafsir_read','ayah_context','surah_theme','reflection_card',
           'root_family','aqeedah_true','ayah_cloze','grammar_spot',
+          'ayah_complete','ayah_order',
         ]);
         const toSnake = (s: string) => s.replace(/([A-Z])/g, m => `_${m.toLowerCase()}`);
 
@@ -817,7 +921,7 @@ ${wordList}`;
         const TYPE_PRIORITY: Record<string, number> = {
           salah: {
             ayah_read: 0, tafsir_read: 1, ayah_cloze: 2,
-            ayah_context: 3, reflection_card: 4, speak_arabic: 5,
+            ayah_context: 3, reflection_card: 4, ayah_order: 5, speak_arabic: 6,
           },
           azkaar: {
             ayah_read: 0, tafsir_read: 1, reflection_card: 2,
@@ -826,7 +930,7 @@ ${wordList}`;
           },
           juz_amma: {
             tafsir_read: 0, ayah_read: 1, surah_theme: 3,
-            ayah_cloze: 4, ayah_context: 5, speak_arabic: 6,
+            ayah_cloze: 4, ayah_context: 5, ayah_order: 6, speak_arabic: 7,
           },
           attributes: {
             ayah_read: 0, reflection_card: 1, aqeedah_true: 2,
@@ -834,7 +938,8 @@ ${wordList}`;
           },
           frequent: {
             root_family: 0, grammar_spot: 1, multiple_choice: 2,
-            ayah_context: 4, tafsir_read: 5, drag_drop: 6, fill_in_blank: 7, speak_arabic: 8,
+            ayah_context: 4, tafsir_read: 5, drag_drop: 6,
+            fill_in_blank: 7, ayah_complete: 7, ayah_order: 8, speak_arabic: 9,
           },
           verbs: {
             grammar_spot: 0, root_family: 1, multiple_choice: 2,

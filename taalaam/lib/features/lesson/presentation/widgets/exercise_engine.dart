@@ -80,6 +80,11 @@ class ExerciseEngine extends StatelessWidget {
         ExerciseAyahCloze(exercise: exercise, onAnswered: onAnswered),
       ExerciseType.grammarSpot =>
         ExerciseGrammarSpot(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.ayahComplete =>
+        ExerciseFillBlank(exercise: exercise, onAnswered: onAnswered,
+            vocab: vocab, extraWords: extraWords),
+      ExerciseType.ayahOrder =>
+        ExerciseWordScramble(exercise: exercise, onAnswered: onAnswered),
     };
   }
 }

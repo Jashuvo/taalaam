@@ -23,6 +23,9 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
   String get _sentence =>
       widget.exercise.correctAnswer['sentence'] as String;
   String get _answer => widget.exercise.correctAnswer['answer'] as String;
+  String? get _surahName =>
+      widget.exercise.correctAnswer['surah_name'] as String?;
+  Object? get _ayahNumber => widget.exercise.correctAnswer['ayah_number'];
 
   // Build distractor options: correct answer + up to 3 distractors.
   // Falls back to lesson vocabulary when the exercise has no distractors.
@@ -134,7 +137,18 @@ class _ExerciseFillBlankState extends State<ExerciseFillBlank> {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        if (_surahName != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              '— সূরা $_surahName, আয়াত $_ayahNumber',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant),
+            ),
+          )
+        else
+          const SizedBox(height: 16),
         Wrap(
           spacing: 10,
           runSpacing: 10,

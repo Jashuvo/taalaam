@@ -45,6 +45,8 @@ class LessonSessionState {
   // Previous-mistakes round
   final List<int> wrongIndices;
   final bool isMistakeRound;
+  // +2 XP bonus for each correctly-answered authentic-ayah exercise
+  final int bonusXp;
 
   const LessonSessionState({
     required this.exercises,
@@ -58,6 +60,7 @@ class LessonSessionState {
     this.showMilestone = false,
     this.wrongIndices = const [],
     this.isMistakeRound = false,
+    this.bonusXp = 0,
   });
 
   bool get isLastExercise => currentIndex >= exercises.length - 1;
@@ -76,6 +79,7 @@ class LessonSessionState {
     List<int>? wrongIndices,
     bool? isMistakeRound,
     List<dynamic>? exercises,
+    int? bonusXp,
   }) =>
       LessonSessionState(
         exercises: exercises ?? this.exercises,
@@ -89,6 +93,7 @@ class LessonSessionState {
         showMilestone: showMilestone ?? this.showMilestone,
         wrongIndices: wrongIndices ?? this.wrongIndices,
         isMistakeRound: isMistakeRound ?? this.isMistakeRound,
+        bonusXp: bonusXp ?? this.bonusXp,
       );
 }
 
@@ -111,6 +116,11 @@ class LessonSessionNotifier extends StateNotifier<LessonSessionState> {
     return shuffled;
   }
 
+  static const _authenticAyahTypes = {
+    ExerciseType.ayahComplete,
+    ExerciseType.ayahOrder,
+  };
+
   void answer(bool correct) {
     final newConsecutive = correct ? state.consecutiveCorrect + 1 : 0;
     final newWrong = correct
@@ -122,6 +132,11 @@ class LessonSessionNotifier extends StateNotifier<LessonSessionState> {
         !state.isMistakeRound &&
         (newConsecutive == 5 || newConsecutive == 10);
 
+    final exercise = state.exercises[state.currentIndex] as ExerciseModel;
+    final newBonusXp = correct && _authenticAyahTypes.contains(exercise.type)
+        ? state.bonusXp + 2
+        : state.bonusXp;
+
     state = state.copyWith(
       showFeedback: !milestone,
       showMilestone: milestone,
@@ -130,6 +145,7 @@ class LessonSessionNotifier extends StateNotifier<LessonSessionState> {
       correctCount: correct ? state.correctCount + 1 : state.correctCount,
       consecutiveCorrect: newConsecutive,
       wrongIndices: newWrong,
+      bonusXp: newBonusXp,
     );
   }
 

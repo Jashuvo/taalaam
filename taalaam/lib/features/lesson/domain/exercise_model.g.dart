@@ -60,4 +60,6 @@ const _$ExerciseTypeEnumMap = {
   ExerciseType.aqeedahTrue: 'aqeedahTrue',
   ExerciseType.ayahCloze: 'ayahCloze',
   ExerciseType.grammarSpot: 'grammarSpot',
+  ExerciseType.ayahComplete: 'ayahComplete',
+  ExerciseType.ayahOrder: 'ayahOrder',
 };

@@ -157,7 +157,9 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         if (next.lastCorrect == true) {
           HapticFeedback.lightImpact();
           if (!next.showFeedback) {
-            XpToast.show(context, AppConstants.xpPerExercise);
+            final earnedBonus = next.bonusXp - (prev?.bonusXp ?? 0);
+            XpToast.show(
+                context, AppConstants.xpPerExercise + earnedBonus);
           }
         } else {
           HapticFeedback.mediumImpact();
@@ -169,7 +171,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         final db = ref.read(appDatabaseProvider);
         final lessonId = widget.lesson.id as String;
         final xp = (widget.lesson.xpReward as int? ?? 10) +
-            next.correctCount * AppConstants.xpPerExercise;
+            next.correctCount * AppConstants.xpPerExercise +
+            next.bonusXp;
         final pct = next.exercises.isEmpty
             ? 0
             : (next.correctCount / next.exercises.length * 100).round();
@@ -249,7 +252,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
     // ── Lesson complete ────────────────────────────────────────────────────
     if (session.completed) {
       final xp = (widget.lesson.xpReward as int? ?? 10) +
-          session.correctCount * AppConstants.xpPerExercise;
+          session.correctCount * AppConstants.xpPerExercise +
+          session.bonusXp;
       return LessonCompleteScreen(
         lessonId: widget.lesson.id as String,
         unitId: widget.lesson.unitId as String,

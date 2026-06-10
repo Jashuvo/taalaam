@@ -24,6 +24,8 @@ enum ExerciseType {
   aqeedahTrue,    // tested: is this aqeedah statement about a Divine Name correct?
   ayahCloze,      // tested: ayah with one word blanked — pick the missing word
   grammarSpot,    // tested: identify which word is a verb/noun/particle
+  ayahComplete,   // tested: fill-in-the-blank using a real ayah fragment
+  ayahOrder,      // tested: arrange a real ayah's words in correct order
 }
 
 @freezed
