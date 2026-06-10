@@ -230,21 +230,24 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           Row(
             children: [
               _StatCard(
-                icon: '🔥',
+                icon: Icons.local_fire_department,
+                iconColor: AppColors.gold,
                 value: '${streak?.currentStreak ?? 0}',
                 label: 'স্ট্রিক',
                 color: AppColors.gold,
               ),
               const SizedBox(width: 10),
               _StatCard(
-                icon: '⭐',
+                icon: Icons.star_rounded,
+                iconColor: AppColors.gold,
                 value: '${streak?.totalXp ?? 0}',
                 label: 'মোট XP',
                 color: AppColors.brightGreen,
               ),
               const SizedBox(width: 10),
               _StatCard(
-                icon: '📖',
+                icon: Icons.menu_book,
+                iconColor: AppColors.teal,
                 value: '$completedCount',
                 label: 'পাঠ শেষ',
                 color: AppColors.tealLight,
@@ -363,12 +366,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 }
 
 class _StatCard extends StatelessWidget {
-  final String icon;
+  final IconData icon;
+  final Color iconColor;
   final String value;
   final String label;
   final Color color;
   const _StatCard(
       {required this.icon,
+      required this.iconColor,
       required this.value,
       required this.label,
       required this.color});
@@ -386,7 +391,7 @@ class _StatCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 22)),
+            Icon(icon, size: 22, color: iconColor),
             const SizedBox(height: 4),
             Text(value,
                 style: theme.textTheme.titleLarge?.copyWith(

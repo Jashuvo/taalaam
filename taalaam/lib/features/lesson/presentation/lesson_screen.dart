@@ -1,3 +1,4 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -142,6 +143,26 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
 
   @override
   Widget build(BuildContext context) {
+    final completed = ref.watch(_sessionProvider.select((s) => s.completed));
+    return PageTransitionSwitcher(
+      duration: AppMotion.route,
+      transitionBuilder: (child, animation, secondaryAnimation) {
+        if (MediaQuery.of(context).disableAnimations) return child;
+        return SharedAxisTransition(
+          animation: animation,
+          secondaryAnimation: secondaryAnimation,
+          transitionType: SharedAxisTransitionType.vertical,
+          child: child,
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey(completed),
+        child: _buildContent(context),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final session = ref.watch(_sessionProvider);
     final vocab =
         ref.watch(lessonVocabProvider(widget.lesson.id as String)).valueOrNull ??

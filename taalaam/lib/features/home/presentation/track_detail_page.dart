@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/tap_scale.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/shimmer_skeleton.dart';
 import '../../auth/presentation/auth_provider.dart';
@@ -170,9 +171,6 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
                             tierColors: _tierColors(tier),
                             isQuranic: false,
                           ));
-                        }
-                        if (ti < sortedTiers.length - 1) {
-                          items.add(_UpNextCard(nextTier: sortedTiers[ti + 1]));
                         }
                       }
                     }
@@ -932,12 +930,14 @@ class _LessonPath extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            CustomPaint(
-              size: Size(width, totalHeight),
-              painter: _PathPainter(
-                positions: positions,
-                isDoneList: lessons.map((l) => completedIds.contains(l.id)).toList(),
-                tierColor: tierColors[0],
+            RepaintBoundary(
+              child: CustomPaint(
+                size: Size(width, totalHeight),
+                painter: _PathPainter(
+                  positions: positions,
+                  isDoneList: lessons.map((l) => completedIds.contains(l.id)).toList(),
+                  tierColor: tierColors[0],
+                ),
               ),
             ),
             ...List.generate(lessons.length, (i) {
@@ -1026,7 +1026,20 @@ class _PathPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PathPainter old) => true;
+  bool shouldRepaint(_PathPainter old) {
+    if (tierColor != old.tierColor) return true;
+    if (positions.length != old.positions.length ||
+        isDoneList.length != old.isDoneList.length) {
+      return true;
+    }
+    for (int i = 0; i < positions.length; i++) {
+      if (positions[i] != old.positions[i]) return true;
+    }
+    for (int i = 0; i < isDoneList.length; i++) {
+      if (isDoneList[i] != old.isDoneList[i]) return true;
+    }
+    return false;
+  }
 }
 
 // ── Individual lesson node ────────────────────────────────────────────────────
@@ -1099,7 +1112,8 @@ class _LessonNode extends ConsumerWidget {
       shadows     = [];
     }
 
-    return GestureDetector(
+    return TapScale(
+      child: GestureDetector(
       onTap:      () => context.push('/lesson/${lesson.id}'),
       onLongPress: () => _showTooltip(context, theme),
       child: SizedBox(
@@ -1127,7 +1141,7 @@ class _LessonNode extends ConsumerWidget {
                   ),
                   child: Center(child: nodeIcon),
                 ),
-                if (accuracy != null)
+                if (accuracy != null && accuracy >= 50)
                   Positioned(
                     bottom: -4,
                     right: -4,
@@ -1136,16 +1150,18 @@ class _LessonNode extends ConsumerWidget {
                           horizontal: 5, vertical: 2),
                       decoration: BoxDecoration(
                         color: accuracy >= 80
-                            ? AppColors.brightGreen
-                            : theme.colorScheme.error,
+                            ? AppColors.gold
+                            : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                         border:
                             Border.all(color: Colors.white, width: 1.2),
                       ),
                       child: Text(
                         '$accuracy%',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: accuracy >= 80
+                              ? Colors.white
+                              : theme.colorScheme.onSurfaceVariant,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1160,10 +1176,10 @@ class _LessonNode extends ConsumerWidget {
               child: Text(
                 lesson.titleBn,
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 10.5,
+                  fontSize: 11,
                   height: 1.3,
                   fontWeight:
                       isCurrent ? FontWeight.w700 : FontWeight.w500,
@@ -1174,35 +1190,34 @@ class _LessonNode extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 3),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: isDone
-                    ? AppColors.brightGreen.withValues(alpha: 0.12)
-                    : isCurrent
-                        ? tierColors[0].withValues(alpha: 0.12)
-                        : theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '${lesson.xpReward} XP',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: isDone
-                      ? AppColors.brightGreen
-                      : isCurrent
-                          ? tierColors[0]
-                          : theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.6),
+            if (!isDone) ...[
+              const SizedBox(height: 3),
+              AnimatedContainer(
+                duration: AppMotion.normal,
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isCurrent
+                      ? tierColors[0].withValues(alpha: 0.12)
+                      : theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${lesson.xpReward} XP',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isCurrent
+                        ? tierColors[0]
+                        : theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: 0.6),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
+      ),
       ),
     );
   }
@@ -1609,86 +1624,6 @@ class _TierSectionBanner extends StatelessWidget {
                     ),
                   ),
                 ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── UP NEXT card (transition between tiers) ───────────────────────────────────
-
-class _UpNextCard extends StatelessWidget {
-  final int nextTier;
-  const _UpNextCard({required this.nextTier});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
-    final colors = _tierColors(nextTier);
-    final name   = _tierNames[nextTier] ?? 'পরবর্তী বিভাগ';
-    final desc   = _tierDescriptions[nextTier] ?? '';
-    final idx    = nextTier;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 32, 16, 8),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'পরবর্তী বিভাগ',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: colors,
-                      begin: Alignment.topLeft, end: Alignment.bottomRight),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(
-                    '$idx',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700)),
-                    if (desc.isNotEmpty)
-                      Text(desc,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
             ],
           ),
         ],

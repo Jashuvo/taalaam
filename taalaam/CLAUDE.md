@@ -121,6 +121,34 @@ Auto-sync: on first open, if `quran_words` table is empty, pulls from Supabase a
 - **User data** (progress/streaks/SRS): write Drift first, push Supabase fire-and-forget
 - On login: `SyncService.restoreUserData(userId)` pulls all user data to Drift
 
+## MOTION
+Two motion languages:
+- **Playful** (conversational track, home, gamification feedback): bouncier curves, `AppMotion.playful`/`tap`/`stagger` — confetti, XP toasts, streak animations.
+- **Calm / no-bounce** (Quranic track + reading surfaces): gentle fades/slides only, `AppMotion.gentle`/`breathe` — no scale-bounce, no playful overshoot curves.
+
+`AppMotion` constants (`lib/core/theme/app_theme.dart`):
+| Token | Duration | Use |
+|---|---|---|
+| `fast` | 150ms | micro state changes (chip selection) |
+| `normal` | 250ms | default UI transitions (XP pill, progress) |
+| `gentle` | 350ms | calm/Quranic transitions, podium entrance |
+| `playful` | 450ms | bouncy conversational feedback |
+| `breathe` | 2400ms | slow ambient pulses (glow) |
+| `tap` | 120ms | `TapScale` press-down (scale 0.97) |
+| `stagger` | 60ms | per-item entrance delay |
+| `route` | 300ms | page/route transitions (FadeThrough, SharedAxis) |
+
+Route transition mapping (`lib/core/router/app_router.dart` + `route_transitions.dart`):
+| Route type | Transition | Routes |
+|---|---|---|
+| Tab-level | `FadeThrough` (`AppMotion.route`) | `/home`, `/review`, `/leaderboard`, `/profile` |
+| Drill-down | `SharedAxis` horizontal | `/track/:id` → lesson, `/quran-reader`, `/settings` |
+| Lesson → completion | `SharedAxis` vertical | within `LessonScreen` (`PageTransitionSwitcher`, keyed by `session.completed`) |
+
+`MediaQuery.disableAnimations == true` → all of the above render the destination `child` instantly with no transition (checked in each `transitionsBuilder`).
+
+`TapScale` (`lib/core/widgets/tap_scale.dart`): visual-only press scale (0.97, `AppMotion.tap`), uses `Listener` so it never competes with an inner `InkWell`/button for the tap gesture. Applied to track cards, lesson nodes, and primary CTAs only.
+
 ## CRITICAL RULES
 - Arabic text: always `Directionality(textDirection: TextDirection.rtl, ...)`
 - Font: `NotoNaskhArabic`, fontSize ≥ 20, height 1.8

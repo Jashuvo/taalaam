@@ -87,6 +87,9 @@ class AppMotion {
   // Micro-interactions
   static const tap     = Duration(milliseconds: 120);
   static const stagger = Duration(milliseconds: 60);
+
+  // Page/route transitions (FadeThrough, SharedAxis)
+  static const route   = Duration(milliseconds: 300);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -250,6 +253,10 @@ class AppTheme {
       scaffoldBackgroundColor:
           isDark ? AppColors.darkBackground : AppColors.lightBackground,
       fontFamily: 'HindSiliguri',
+
+      // ── Splash / ripple ──────────────────────────────────────────────────
+      splashColor: cs.primary.withValues(alpha: 0.08),
+      highlightColor: cs.primary.withValues(alpha: 0.08),
 
       // ── AppBar ──────────────────────────────────────────────────────────
       appBarTheme: AppBarTheme(

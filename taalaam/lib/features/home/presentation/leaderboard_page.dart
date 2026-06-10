@@ -53,7 +53,7 @@ class LeaderboardPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.go('/home')),
-        title: const Text('সাপ্তাহিক র‍্যাংকিং'),
+        title: const Text('সর্বমোট র‍্যাংকিং'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -152,14 +152,54 @@ class LeaderboardPage extends ConsumerWidget {
 
 // ── Podium widget (top 3) ────────────────────────────────────────────────────
 
-class _Podium extends StatelessWidget {
+class _Podium extends StatefulWidget {
   final List<Map<String, dynamic>> entries;
   final String? currentUserId;
   const _Podium({required this.entries, this.currentUserId});
 
   @override
+  State<_Podium> createState() => _PodiumState();
+}
+
+class _PodiumState extends State<_Podium>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: AppMotion.gentle);
+    if (MediaQuery.of(context).disableAnimations) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Staggered rise-up entrance for the podium slot at [displayIdx]
+  /// (0 = left, 1 = centre, 2 = right).
+  Animation<double> _entranceFor(int displayIdx) {
+    final stagger = AppMotion.stagger.inMilliseconds /
+        AppMotion.gentle.inMilliseconds;
+    final start = (displayIdx * stagger).clamp(0.0, 1.0);
+    final end = (start + (1 - 2 * stagger)).clamp(start, 1.0);
+    return CurvedAnimation(
+      parent: _controller,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final entries = widget.entries;
+    final currentUserId = widget.currentUserId;
 
     Widget slot(int rank) {
       if (rank > entries.length) return const SizedBox.shrink();
@@ -167,7 +207,11 @@ class _Podium extends StatelessWidget {
       final isSelf = e['user_id'] == currentUserId;
       final name = _displayName(e, isSelf);
       final xp = e['total_xp'] as int? ?? 0;
-      final medals = ['🥇', '🥈', '🥉'];
+      final medalColors = [
+        AppColors.gold,
+        const Color(0xFF9E9E9E),
+        const Color(0xFFA9745B),
+      ];
       final heights = [100.0, 72.0, 56.0];
       // Show rank 2 left, rank 1 centre, rank 3 right
       final displayOrder = [2, 1, 3];
@@ -175,8 +219,19 @@ class _Podium extends StatelessWidget {
       if (displayIdx == -1) return const SizedBox.shrink();
       final height = heights[displayIdx];
 
+      final entrance = _entranceFor(displayIdx);
+
       return Expanded(
-        child: Column(
+        child: AnimatedBuilder(
+          animation: entrance,
+          builder: (context, child) => Opacity(
+            opacity: entrance.value,
+            child: Transform.translate(
+              offset: Offset(0, (1 - entrance.value) * 28),
+              child: child,
+            ),
+          ),
+          child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             // Avatar circle
@@ -236,11 +291,12 @@ class _Podium extends StatelessWidget {
                 ),
               ),
               child: Center(
-                child: Text(medals[rank - 1],
-                    style: const TextStyle(fontSize: 24)),
+                child: Icon(Icons.emoji_events,
+                    size: 24, color: medalColors[rank - 1]),
               ),
             ),
           ],
+          ),
         ),
       );
     }
@@ -329,7 +385,9 @@ class _RankRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Row(children: [
-                  const Text('🔥 ', style: TextStyle(fontSize: 11)),
+                  const Icon(Icons.local_fire_department,
+                      size: 12, color: AppColors.gold),
+                  const SizedBox(width: 2),
                   Text('$streak দিন',
                       style: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant)),

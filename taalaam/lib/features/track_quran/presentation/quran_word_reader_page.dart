@@ -868,7 +868,8 @@ class _WordView extends ConsumerWidget {
                 const SizedBox(height: 12),
 
                 // Word chips
-                Directionality(
+                RepaintBoundary(
+                  child: Directionality(
                   textDirection: TextDirection.rtl,
                   child: Wrap(
                     spacing: 8,
@@ -976,6 +977,7 @@ class _WordView extends ConsumerWidget {
                         ),
                       );
                     }).toList(),
+                  ),
                   ),
                 ),
 

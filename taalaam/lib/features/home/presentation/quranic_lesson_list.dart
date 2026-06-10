@@ -310,7 +310,7 @@ class _QuranicLessonCard extends ConsumerWidget {
       final vocab =
           ref.watch(_lessonVocabProvider(lesson.id)).valueOrNull ?? [];
       final parts = <String>[
-        if (accuracy != null) '$accuracy% নির্ভুলতা',
+        if (accuracy != null && accuracy >= 50) '$accuracy% নির্ভুলতা',
         if (vocab.isNotEmpty) '${vocab.length} শব্দ আয়ত্ত',
       ];
       card = _CardShell(

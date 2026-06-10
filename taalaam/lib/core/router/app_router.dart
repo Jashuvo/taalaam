@@ -27,6 +27,7 @@ import '../../features/community/presentation/groups_page.dart';
 import '../../features/track_conv/presentation/conversation_screen.dart';
 import '../../features/track_quran/presentation/quran_word_reader_page.dart';
 import '../../features/track_quran/presentation/tafsir_reader_page.dart';
+import 'route_transitions.dart';
 
 // Manual provider — avoids riverpod_generator/analyzer_plugin version conflict
 final appRouterProvider =
@@ -84,33 +85,42 @@ final appRouterProvider =
         ),
         GoRoute(
           path: '/home',
-          builder: (_, __) => const MainShell(),
+          pageBuilder: (_, state) =>
+              fadeThroughPage(key: state.pageKey, child: const MainShell()),
         ),
         GoRoute(
           path: '/track/:trackId',
-          builder: (_, state) =>
-              TrackDetailPage(slug: state.pathParameters['trackId']!),
+          pageBuilder: (_, state) => sharedAxisPage(
+            key: state.pageKey,
+            child: TrackDetailPage(slug: state.pathParameters['trackId']!),
+          ),
         ),
         GoRoute(
           path: '/lesson/:lessonId',
-          builder: (_, state) =>
-              LessonScreen(lessonId: state.pathParameters['lessonId']!),
+          pageBuilder: (_, state) => sharedAxisPage(
+            key: state.pageKey,
+            child: LessonScreen(lessonId: state.pathParameters['lessonId']!),
+          ),
         ),
         GoRoute(
           path: '/review',
-          builder: (_, __) => const ReviewScreen(),
+          pageBuilder: (_, state) =>
+              fadeThroughPage(key: state.pageKey, child: const ReviewScreen()),
         ),
         GoRoute(
           path: '/leaderboard',
-          builder: (_, __) => const LeaderboardPage(),
+          pageBuilder: (_, state) => fadeThroughPage(
+              key: state.pageKey, child: const LeaderboardPage()),
         ),
         GoRoute(
           path: '/settings',
-          builder: (_, __) => const SettingsPage(),
+          pageBuilder: (_, state) => sharedAxisPage(
+              key: state.pageKey, child: const SettingsPage()),
         ),
         GoRoute(
           path: '/profile',
-          builder: (_, __) => const ProfilePage(),
+          pageBuilder: (_, state) =>
+              fadeThroughPage(key: state.pageKey, child: const ProfilePage()),
         ),
         GoRoute(
           path: '/exam/:examLessonId',
@@ -145,7 +155,8 @@ final appRouterProvider =
         ),
         GoRoute(
           path: '/quran-reader',
-          builder: (_, __) => const QuranWordReaderPage(),
+          pageBuilder: (_, state) => sharedAxisPage(
+              key: state.pageKey, child: const QuranWordReaderPage()),
         ),
       ],
 

@@ -63,6 +63,9 @@ dependencies:
   flutter_tts: ^4.2.5
   flutter_svg: ^2.0.16
 
+  # Material motion transitions (FadeThrough, SharedAxis)
+  animations: ^2.0.11
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

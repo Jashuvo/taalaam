@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/tap_scale.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/services/gamification_service.dart';
 import '../../../shared/utils/xp_level.dart';
@@ -236,7 +237,8 @@ class _StreakXpCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             // Flame + streak count
-            const Text('🔥', style: TextStyle(fontSize: 40)),
+            const Icon(Icons.local_fire_department,
+                size: 40, color: AppColors.gold),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,24 +265,35 @@ class _StreakXpCard extends ConsumerWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  _Badge(label: '✨ $totalXp XP', color: Colors.white24),
+                  _Badge(
+                    icon: Icons.star_rounded,
+                    iconColor: AppColors.gold,
+                    label: '$totalXp XP',
+                    color: Colors.white24,
+                  ),
                   _Badge(
                     label: '${level.nameAr} Lv.${level.level}',
                     color: AppColors.gold.withValues(alpha: 0.35),
                   ),
                   if (longestStreak > 0)
                     _Badge(
-                      label: '🏆 $longestStreak সর্বোচ্চ',
+                      icon: Icons.emoji_events,
+                      iconColor: AppColors.gold,
+                      label: '$longestStreak সর্বোচ্চ',
                       color: Colors.white.withValues(alpha: 0.12),
                     ),
                   if (mastered > 0)
                     _Badge(
-                      label: '📖 $mastered মুখস্থ',
+                      icon: Icons.menu_book,
+                      iconColor: AppColors.teal,
+                      label: '$mastered মুখস্থ',
                       color: AppColors.brightGreen.withValues(alpha: 0.3),
                     ),
                   if (freezeCount > 0)
                     _Badge(
-                      label: '❄️ $freezeCount ফ্রিজ',
+                      icon: Icons.ac_unit,
+                      iconColor: AppColors.tealLight,
+                      label: '$freezeCount ফ্রিজ',
                       color: Colors.lightBlue.withValues(alpha: 0.25),
                     ),
                 ],
@@ -301,7 +314,8 @@ class _StreakXpCard extends ConsumerWidget {
               Tooltip(
                 message: 'স্ট্রিক ফ্রিজ',
                 child: IconButton(
-                  icon: const Text('❄️', style: TextStyle(fontSize: 22)),
+                  icon: const Icon(Icons.ac_unit,
+                      size: 22, color: AppColors.tealLight),
                   onPressed: () async {
                     final confirm = await showConfirmDialog(
                       context,
@@ -315,7 +329,16 @@ class _StreakXpCard extends ConsumerWidget {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text('❄️ স্ট্রিক ফ্রিজ সক্রিয়!')),
+                            content: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.ac_unit,
+                                    size: 18, color: AppColors.tealLight),
+                                SizedBox(width: 8),
+                                Text('স্ট্রিক ফ্রিজ সক্রিয়!'),
+                              ],
+                            ),
+                          ),
                         );
                       }
                     }
@@ -330,9 +353,11 @@ class _StreakXpCard extends ConsumerWidget {
 }
 
 class _Badge extends StatelessWidget {
+  final IconData? icon;
+  final Color? iconColor;
   final String label;
   final Color color;
-  const _Badge({required this.label, required this.color});
+  const _Badge({this.icon, this.iconColor, required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -342,9 +367,18 @@ class _Badge extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(label,
-          style: const TextStyle(
-              color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: iconColor ?? Colors.white),
+            const SizedBox(width: 4),
+          ],
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 }
@@ -587,9 +621,11 @@ class LearnTab extends ConsumerWidget {
         actions: [
           // Compact streak chip
           if (streak != null) ...[
-            _StatChip('🔥', '${streak.currentStreak}'),
-            _StatChip('⭐', '${streak.totalXp}'),
-            _StatChip('❤️', '${streak.hearts}/5'),
+            _StatChip(Icons.local_fire_department, AppColors.gold,
+                '${streak.currentStreak}'),
+            _StatChip(Icons.star_rounded, AppColors.gold,
+                '${streak.totalXp}'),
+            _StatChip(Icons.favorite, Colors.red, '${streak.hearts}/5'),
           ],
           const SizedBox(width: 4),
         ],
@@ -665,9 +701,10 @@ class LearnTab extends ConsumerWidget {
 }
 
 class _StatChip extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
+  final Color iconColor;
   final String value;
-  const _StatChip(this.emoji, this.value);
+  const _StatChip(this.icon, this.iconColor, this.value);
 
   @override
   Widget build(BuildContext context) {
@@ -679,13 +716,20 @@ class _StatChip extends StatelessWidget {
         color: theme.colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        '$emoji $value',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: theme.colorScheme.onSurface,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: iconColor),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -717,7 +761,8 @@ class _TrackCard extends ConsumerWidget {
     final subtitle =
         isQuranic ? 'কুরআনের শব্দ ও ব্যাকরণ' : 'দৈনন্দিন কথোপকথন';
 
-    return Card(
+    return TapScale(
+      child: Card(
       clipBehavior: Clip.antiAlias,
       shadowColor: gradientColors[0].withValues(alpha: 0.35),
       shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
@@ -850,24 +895,27 @@ class _TrackCard extends ConsumerWidget {
                     const SizedBox(height: 10),
                   ] else
                     const SizedBox(height: 10),
-                  FilledButton(
-                    onPressed: () => context.push('/track/${track.slug}'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: gradientColors[0],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  TapScale(
+                    child: FilledButton(
+                      onPressed: () => context.push('/track/${track.slug}'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: gradientColors[0],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(progress != null && progress.completed > 0
+                          ? 'চালিয়ে যান'
+                          : 'শুরু করুন'),
                     ),
-                    child: Text(progress != null && progress.completed > 0
-                        ? 'চালিয়ে যান'
-                        : 'শুরু করুন'),
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
       ),
     );
   }
