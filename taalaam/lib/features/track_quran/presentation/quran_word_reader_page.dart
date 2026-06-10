@@ -50,9 +50,9 @@ String _ayahAudioUrl(int surah, int ayah) {
 }
 
 // Tafsir sheet geometry
-const _tafsirPeekFraction = 0.09;
-const _tafsirMaxFraction  = 0.85;
-const _tafsirPeekPadding  = 64.0; // word area bottom inset so peek never covers it
+const _tafsirPeekBarHeight = 56.0; // px height of the peek bar (handle + label row)
+const _tafsirMaxFraction   = 0.85;
+const _tafsirPeekPadding   = 64.0; // word area bottom inset so peek never covers it
 
 class QuranWordReaderPage extends ConsumerStatefulWidget {
   final bool showBackButton;
@@ -73,6 +73,9 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
   bool _highlightEnabled = true;
   bool _immersive = false;
   bool _tafsirOpen = false;
+  // Recomputed each build from the available height so the peek bar
+  // (handle + label row) is never clipped on short viewports.
+  double _tafsirPeekFraction = 0.09;
   int _navDir = 1; // +1 forward (next ayah), -1 backward — drives slide direction
   String? _userId;
 
@@ -230,7 +233,12 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
 
             // ── Ayah area + persistent tafsir sheet ─────────────────────
             Expanded(
-              child: Stack(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _tafsirPeekFraction =
+                      (_tafsirPeekBarHeight / constraints.maxHeight)
+                          .clamp(0.05, 0.25);
+                  return Stack(
                 children: [
                   Positioned.fill(
                     child: AnimatedPadding(
@@ -284,12 +292,15 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
                           ayah: nav.ayah,
                           masteredInAyah: masteredInAyah,
                           controller: _sheetCtrl,
+                          peekFraction: _tafsirPeekFraction,
                           onPeekTap: _toggleTafsirSheet,
                         ),
                       ),
                     ),
                   ),
                 ],
+                  );
+                },
               ),
             ),
           ],
@@ -1356,6 +1367,7 @@ class _TafsirSheet extends ConsumerWidget {
   final int ayah;
   final List<QuranWord> masteredInAyah;
   final DraggableScrollableController controller;
+  final double peekFraction;
   final VoidCallback onPeekTap;
 
   const _TafsirSheet({
@@ -1363,6 +1375,7 @@ class _TafsirSheet extends ConsumerWidget {
     required this.ayah,
     required this.masteredInAyah,
     required this.controller,
+    required this.peekFraction,
     required this.onPeekTap,
   });
 
@@ -1375,8 +1388,8 @@ class _TafsirSheet extends ConsumerWidget {
 
     return DraggableScrollableSheet(
       controller: controller,
-      minChildSize: _tafsirPeekFraction,
-      initialChildSize: _tafsirPeekFraction,
+      minChildSize: peekFraction,
+      initialChildSize: peekFraction,
       maxChildSize: _tafsirMaxFraction,
       snap: true,
       builder: (context, scrollCtrl) => Container(
