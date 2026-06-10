@@ -887,82 +887,90 @@ class _WordView extends ConsumerWidget {
                         onLongPress: uid != null
                             ? () => _showAddToSrs(context, word, uid)
                             : null,
-                        child: AnimatedContainer(
-                          duration: AppMotion.fast,
-                          constraints: const BoxConstraints(
-                              minHeight: 44, minWidth: 44),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.gold.withValues(alpha: 0.15)
-                                : isMastered
-                                    ? AppColors.brightGreen
-                                        .withValues(alpha: 0.10)
-                                    : theme.colorScheme.surfaceContainer,
-                            border: isSelected
-                                ? Border.all(
-                                    color: AppColors.gold, width: 1.5)
-                                : Border(
-                                    top: isLearning
-                                        ? BorderSide.none
-                                        : BorderSide(
-                                            color: isMastered
-                                                ? AppColors.brightGreen
-                                                : theme.colorScheme
-                                                    .outlineVariant,
-                                            width: isMastered ? 1.5 : 0.8,
-                                          ),
-                                    bottom: isLearning
-                                        ? const BorderSide(
-                                            color: AppColors.gold, width: 2)
-                                        : BorderSide(
-                                            color: isMastered
-                                                ? AppColors.brightGreen
-                                                : theme.colorScheme
-                                                    .outlineVariant,
-                                            width: isMastered ? 1.5 : 0.8,
-                                          ),
-                                  ),
-                            borderRadius: BorderRadius.circular(
-                                isSelected ? AppRadius.full : 12),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                              isSelected ? AppRadius.full : 12),
+                          child: Stack(
                             children: [
-                              Text(
-                                word.arabic,
-                                style: TextStyle(
-                                  fontFamily: 'NotoNaskhArabic',
-                                  fontSize: 24,
-                                  height: 1.7,
+                              AnimatedContainer(
+                                duration: AppMotion.fast,
+                                constraints: const BoxConstraints(
+                                    minHeight: 44, minWidth: 44),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
                                   color: isSelected
-                                      ? AppColors.gold
+                                      ? AppColors.gold.withValues(alpha: 0.15)
                                       : isMastered
                                           ? AppColors.brightGreen
-                                          : theme.colorScheme.onSurface,
+                                              .withValues(alpha: 0.10)
+                                          : theme.colorScheme.surfaceContainer,
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.gold
+                                        : isMastered
+                                            ? AppColors.brightGreen
+                                            : theme.colorScheme.outlineVariant,
+                                    width: isSelected
+                                        ? 1.5
+                                        : isMastered
+                                            ? 1.5
+                                            : 0.8,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                      isSelected ? AppRadius.full : 12),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      word.arabic,
+                                      style: TextStyle(
+                                        fontFamily: 'NotoNaskhArabic',
+                                        fontSize: 24,
+                                        height: 1.7,
+                                        color: isSelected
+                                            ? AppColors.gold
+                                            : isMastered
+                                                ? AppColors.brightGreen
+                                                : theme.colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      _isAyahMarker(word.meaningBn)
+                                          ? '—'
+                                          : (word.meaningBn ?? '—'),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        height: 1.3,
+                                        color: isSelected
+                                            ? AppColors.gold
+                                                .withValues(alpha: 0.85)
+                                            : isMastered
+                                                ? AppColors.brightGreen
+                                                    .withValues(alpha: 0.85)
+                                                : theme
+                                                    .colorScheme.onSurfaceVariant,
+                                      ),
+                                      textDirection: TextDirection.ltr,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                _isAyahMarker(word.meaningBn)
-                                    ? '—'
-                                    : (word.meaningBn ?? '—'),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  height: 1.3,
-                                  color: isSelected
-                                      ? AppColors.gold.withValues(alpha: 0.85)
-                                      : isMastered
-                                          ? AppColors.brightGreen
-                                              .withValues(alpha: 0.85)
-                                          : theme.colorScheme.onSurfaceVariant,
+                              if (isLearning)
+                                const Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  child: SizedBox(
+                                    height: 2,
+                                    child: ColoredBox(color: AppColors.gold),
+                                  ),
                                 ),
-                                textDirection: TextDirection.ltr,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
                             ],
                           ),
                         ),
