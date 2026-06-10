@@ -26,6 +26,7 @@ enum ExerciseType {
   grammarSpot,    // tested: identify which word is a verb/noun/particle
   ayahComplete,   // tested: fill-in-the-blank using a real ayah fragment
   ayahOrder,      // tested: arrange a real ayah's words in correct order
+  patternMatch,   // tested: identify the wazn (morphological pattern) of a word
 }
 
 @freezed

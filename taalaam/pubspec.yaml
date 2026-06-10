@@ -61,6 +61,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   flutter_tts: ^4.2.5
+  flutter_svg: ^2.0.16
 
 dev_dependencies:
   flutter_test:
@@ -99,6 +100,7 @@ flutter:
     - assets/audio/
     - assets/images/
     - assets/fonts/
+    - assets/tpi/
 
   # FONTS: Download then uncomment.
   # NotoNaskhArabic: https://fonts.google.com/noto/specimen/Noto+Naskh+Arabic

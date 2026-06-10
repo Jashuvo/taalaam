@@ -342,8 +342,9 @@ SCHEMAS (exact snake_case type strings, sequential sort_order):
 {"type":"grammar_spot","sort_order":N,"prompt_bn":"কোনটি POSBENGALI (POSARABIC)?","correct_answer":{"target_pos_ar":"فِعْلٌ","target_pos_bn":"ক্রিয়াপদ","words":[{"arabic":"W","meaning_bn":"M","pos":"verb"},{"arabic":"W2","meaning_bn":"M2","pos":"noun"},{"arabic":"W3","meaning_bn":"M3","pos":"noun"},{"arabic":"W4","meaning_bn":"M4","pos":"particle"}],"correct_index":0},"difficulty":2}
 {"type":"ayah_complete","sort_order":N,"prompt_bn":"আয়াতের শূন্যস্থান পূরণ করুন:","correct_answer":{"sentence":"AYAH_TEXT_WITH_ONE_WORD_REPLACED_BY____","answer":"W","surah_name":"X","ayah_number":N},"distractors":{"options":["w1","w2","w3"]},"difficulty":2}
 {"type":"ayah_order","sort_order":N,"prompt_bn":"আয়াতের শব্দগুলো সঠিক ক্রমে সাজান:","correct_answer":{"words":["w1","w2","w3","..."],"correct":"w1 w2 w3 ...","surah_name":"X","ayah_number":N},"difficulty":2}
+{"type":"pattern_match","sort_order":N,"prompt_bn":"কোন ছাঁচে (وزن) এই শব্দটি?","prompt_ar":"WORD","correct_answer":{"word_ar":"WORD","root":"غ-ف-ر","pattern":"فَعِيلٌ","pattern_meaning_bn":"অতিশয়ার্থক বিশেষণ — যে গুণ স্থায়ী ও পূর্ণ","siblings":["قَدِيرٌ","شَكُورٌ"]},"distractors":{"options":["فَاعِلٌ","مَفْعُولٌ","فَعَّالٌ"]},"grammar_note_bn":"...","difficulty":2}
 
-RULES: Arabic always with full harakat (تشكيل). ayah_ar/highlighted_word/blank_word EXACT from provided texts. root_family: 3 words from stated root + 1 odd. aqeedah_true: test ta'wil or tashbih errors (is_correct usually false). grammar_spot: exactly 1 correct pos match among 4 words. ayah_complete/ayah_order: sentence/words/correct MUST be copied EXACTLY (verbatim, full harakat) from the আয়াত block given in the prompt — NEVER reconstruct ayah text from memory. surah_name is the Bangla surah name WITHOUT the word "সূরা" prefix (the app adds it). Return ONLY valid JSON array.`;
+RULES: Arabic always with full harakat (تشكيل). ayah_ar/highlighted_word/blank_word EXACT from provided texts. root_family: 3 words from stated root + 1 odd. aqeedah_true: test ta'wil or tashbih errors (is_correct usually false). grammar_spot: exactly 1 correct pos match among 4 words. ayah_complete/ayah_order: sentence/words/correct MUST be copied EXACTLY (verbatim, full harakat) from the আয়াত block given in the prompt — NEVER reconstruct ayah text from memory. surah_name is the Bangla surah name WITHOUT the word "সূরা" prefix (the app adds it). pattern_match: root MUST be hyphen-separated root letters (e.g. "غ-ف-ر"); pattern is the wazn of word_ar with full harakat (e.g. "فَعِيلٌ"); the wazn-letters correspondence MUST be linguistically correct — if unsure of a word's wazn, pick a different word from the list; siblings = 2 other real words sharing the same wazn (NOT necessarily the same root); distractors.options = 3 other wazn strings from {فَاعِلٌ، مَفْعُولٌ، فَعَّالٌ، تَفْعِيلٌ} excluding the correct pattern. Return ONLY valid JSON array.`;
 
 const VERB_EXERCISE_SYSTEM_PROMPT = `Quranic Arabic curriculum designer for Bengali-speaking Muslims. This lesson teaches verb ROOT FAMILIES.
 
@@ -354,8 +355,9 @@ SCHEMAS:
 {"type":"drag_drop","sort_order":N,"prompt_bn":"ধাতু «ROOT» — মেলাও:","correct_answer":{"pairs":[{"ar":"V1","bn":"M1"},{"ar":"V2","bn":"M2"},{"ar":"V3","bn":"M3"}]},"grammar_note_bn":"...","difficulty":2}
 {"type":"fill_in_blank","sort_order":N,"prompt_bn":"সঠিক ক্রিয়া বসাও (অর্থ:HINT):","correct_answer":{"sentence":"AR ___ REST","blank_index":N,"answer":"VERB"},"distractors":{"options":["w1","w2"]},"grammar_note_bn":"...","difficulty":3}
 {"type":"speak_arabic","sort_order":N,"prompt_bn":"বলুন:","correct_answer":{"expected_ar":"VERB","transliteration":"latin","meaning_bn":"BN"},"grammar_note_bn":"...","difficulty":2}
+{"type":"pattern_match","sort_order":N,"prompt_bn":"কোন ছাঁচে (وزن) এই শব্দটি?","prompt_ar":"WORD","correct_answer":{"word_ar":"WORD","root":"غ-ف-ر","pattern":"فَعِيلٌ","pattern_meaning_bn":"অতিশয়ার্থক বিশেষণ — যে গুণ স্থায়ী ও পূর্ণ","siblings":["قَدِيرٌ","شَكُورٌ"]},"distractors":{"options":["فَاعِلٌ","مَفْعُولٌ","فَعَّالٌ"]},"grammar_note_bn":"...","difficulty":2}
 
-RULES: All Arabic with full harakat. grammar_note_bn explains verb form/tense/root pattern. Return ONLY valid JSON array.`;
+RULES: All Arabic with full harakat. grammar_note_bn explains verb form/tense/root pattern. pattern_match: root MUST be hyphen-separated root letters (e.g. "غ-ف-ر"); pattern is the wazn of word_ar with full harakat (e.g. "فَعِيلٌ"); the wazn-letters correspondence MUST be linguistically correct — if unsure of a word's wazn, pick a different word from the list; siblings = 2 other real words sharing the same wazn; distractors.options = 3 other wazn strings from {فَاعِلٌ، مَفْعُولٌ، فَعَّالٌ، تَفْعِيلٌ} excluding the correct pattern. Return ONLY valid JSON array.`;
 
 // ── Build per-unit exercise user prompt ──────────────────────────────────────
 
@@ -505,15 +507,16 @@ ${ayahsBlock}
 নামসমূহ (${exWords.length}):
 ${wordList}
 
-IMPORTANT: Output exercises in EXACTLY this order (৮টি):
+IMPORTANT: Output exercises in EXACTLY this order (৯টি):
 1st: ayah_read — ayah_ar=EXACTLY "${firstAyahAr}", ayah_bn=অনুবাদ, surah_name=উপযুক্ত_সূরা, ayah_number=${firstAyahNum}, context_bn="এই আয়াতে আল্লাহর নাম ও গুণাবলী"
 2nd: reflection_card — এই নামগুলোর athar (মুমিনের হৃদয়ে প্রভাব) — ইবনু উসাইমীন পদ্ধতিতে ব্যক্তিগত প্রশ্ন
 3rd: aqeedah_true — সঠিক বক্তব্য (is_correct:true) — এই পাঠের নামগুলো সম্পর্কে
 4th: aqeedah_true — ta'wil বা tashbih ভুল বক্তব্য (is_correct:false)
 5th: multiple_choice — নাম → অর্থ
 6th: multiple_choice — নাম → অর্থ
-7th: drag_drop — 3 নাম-অর্থ জোড়া
-8th: speak_arabic — একটি নাম উচ্চারণ
+7th: pattern_match — এই পাঠের একটি নাম (اسم) এর وزن (ছাঁচ) চিনুন
+8th: drag_drop — 3 নাম-অর্থ জোড়া
+9th: speak_arabic — একটি নাম উচ্চারণ
 
 Return JSON array only.`;
     }
@@ -549,14 +552,15 @@ ${verbRoots.map(r => `• ${r.root}: ${r.forms.slice(0, 4).join(', ')}`).join('\
 শব্দ তালিকা:
 ${wordList}
 
-IMPORTANT: Output exercises in EXACTLY this order (৭টি):
+IMPORTANT: Output exercises in EXACTLY this order (৮টি):
 1st: grammar_spot — ৪টি শব্দ — কোনটি فعل? (ক্রিয়াপদ)
 2nd: root_family — একটি ধাতু থেকে ৩টি ক্রিয়ারূপ + ১টি ভিন্ন ধাতুর শব্দ (odd_index=3)
-3rd: multiple_choice — ক্রিয়া → ধাতু চিনুন
+3rd: pattern_match — এই পাঠের একটি ক্রিয়া বা শব্দের وزن (ছাঁচ) চিনুন
 4th: multiple_choice — ক্রিয়া → ধাতু চিনুন
-5th: drag_drop — ধাতু পরিবার মেলানো (3 pairs)
+5th: multiple_choice — ক্রিয়া → ধাতু চিনুন
 6th: drag_drop — ধাতু পরিবার মেলানো (3 pairs)
-7th: speak_arabic — একটি ক্রিয়াপদ উচ্চারণ
+7th: drag_drop — ধাতু পরিবার মেলানো (3 pairs)
+8th: speak_arabic — একটি ক্রিয়াপদ উচ্চারণ
 
 Return valid JSON array only.`;
     }
@@ -902,7 +906,7 @@ ${wordList}`;
           'true_false','chat_complete','translate_build','listen_select','speak_arabic',
           'ayah_read','tafsir_read','ayah_context','surah_theme','reflection_card',
           'root_family','aqeedah_true','ayah_cloze','grammar_spot',
-          'ayah_complete','ayah_order',
+          'ayah_complete','ayah_order','pattern_match',
         ]);
         const toSnake = (s: string) => s.replace(/([A-Z])/g, m => `_${m.toLowerCase()}`);
 
@@ -934,7 +938,7 @@ ${wordList}`;
           },
           attributes: {
             ayah_read: 0, reflection_card: 1, aqeedah_true: 2,
-            multiple_choice: 4, drag_drop: 6, speak_arabic: 7,
+            multiple_choice: 4, pattern_match: 5, drag_drop: 6, speak_arabic: 7,
           },
           frequent: {
             root_family: 0, grammar_spot: 1, multiple_choice: 2,
@@ -942,8 +946,8 @@ ${wordList}`;
             fill_in_blank: 7, ayah_complete: 7, ayah_order: 8, speak_arabic: 9,
           },
           verbs: {
-            grammar_spot: 0, root_family: 1, multiple_choice: 2,
-            drag_drop: 4, speak_arabic: 6,
+            grammar_spot: 0, root_family: 1, pattern_match: 2, multiple_choice: 3,
+            drag_drop: 5, speak_arabic: 7,
           },
           particles: {
             grammar_spot: 0, ayah_context: 1, multiple_choice: 2,

@@ -12,6 +12,7 @@ import 'exercise_drag_drop.dart';
 import 'exercise_fill_blank.dart';
 import 'exercise_listen_select.dart';
 import 'exercise_multiple_choice.dart';
+import 'exercise_pattern_match.dart';
 import 'exercise_reflection_card.dart';
 import 'exercise_speak_arabic.dart';
 import 'exercise_surah_theme.dart';
@@ -85,6 +86,8 @@ class ExerciseEngine extends StatelessWidget {
             vocab: vocab, extraWords: extraWords),
       ExerciseType.ayahOrder =>
         ExerciseWordScramble(exercise: exercise, onAnswered: onAnswered),
+      ExerciseType.patternMatch =>
+        ExercisePatternMatch(exercise: exercise, onAnswered: onAnswered),
     };
   }
 }

@@ -1,7 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
+
+// TPI gesture-icon lookup: pronoun (or tense marker) string → SVG asset.
+// Detection is a dumb exact-substring match against grammar_note_bn —
+// no NLP. Order matters only in that longer/more-specific keys come first.
+const Map<String, String> _tpiIcons = {
+  'أَنْتُمَا': 'assets/tpi/antumaa.svg',
+  'أَنْتُنَّ': 'assets/tpi/antunna.svg',
+  'أَنْتُمْ': 'assets/tpi/antum.svg',
+  'أَنْتَ': 'assets/tpi/anta.svg',
+  'أَنْتِ': 'assets/tpi/anti.svg',
+  'هُمَا': 'assets/tpi/humaa.svg',
+  'هُنَّ': 'assets/tpi/hunna.svg',
+  'هُمْ': 'assets/tpi/hum.svg',
+  'هُوَ': 'assets/tpi/huwa.svg',
+  'هِيَ': 'assets/tpi/hiya.svg',
+  'نَحْنُ': 'assets/tpi/nahnu.svg',
+  'أَنَا': 'assets/tpi/ana.svg',
+  'الماضي': 'assets/tpi/past_marker.svg',
+  'المضارع': 'assets/tpi/present_marker.svg',
+};
+
+const _tpiEligibleTypes = {ExerciseType.multipleChoice, ExerciseType.fillInBlank};
 
 class GrammarNoteSheet extends StatelessWidget {
   final bool correct;
@@ -124,12 +147,24 @@ class GrammarNoteSheet extends StatelessWidget {
           ],
           if (grammarNote != null && grammarNote!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Directionality(
-              textDirection: TextDirection.ltr,
-              child: Text(
-                grammarNote!.replaceAll('«', '').replaceAll('»', ''),
-                style: theme.textTheme.bodyMedium?.copyWith(color: color),
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text(
+                      grammarNote!.replaceAll('«', '').replaceAll('»', ''),
+                      style: theme.textTheme.bodyMedium?.copyWith(color: color),
+                    ),
+                  ),
+                ),
+                if (_tpiIconAsset() case final asset?) ...[
+                  const SizedBox(width: 8),
+                  SvgPicture.asset(asset, width: 32, height: 32,
+                      colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                ],
+              ],
             ),
           ],
           const SizedBox(height: 16),
@@ -141,6 +176,18 @@ class GrammarNoteSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String? _tpiIconAsset() {
+    if (exercise == null || !_tpiEligibleTypes.contains(exercise!.type)) {
+      return null;
+    }
+    final note = grammarNote;
+    if (note == null || note.isEmpty) return null;
+    for (final entry in _tpiIcons.entries) {
+      if (note.contains(entry.key)) return entry.value;
+    }
+    return null;
   }
 
   List<String> _resolveCorrectWords() {

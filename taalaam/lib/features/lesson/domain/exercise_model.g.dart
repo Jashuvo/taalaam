@@ -62,4 +62,5 @@ const _$ExerciseTypeEnumMap = {
   ExerciseType.grammarSpot: 'grammarSpot',
   ExerciseType.ayahComplete: 'ayahComplete',
   ExerciseType.ayahOrder: 'ayahOrder',
+  ExerciseType.patternMatch: 'patternMatch',
 };
