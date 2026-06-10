@@ -9,6 +9,7 @@ import '../../auth/presentation/auth_provider.dart';
 import '../../track_quran/presentation/widgets/quran_coverage_ring.dart';
 import '../../track_quran/presentation/widgets/tadabbur_card.dart';
 import 'home_provider.dart';
+import 'quranic_lesson_list.dart';
 
 // ── Path geometry ─────────────────────────────────────────────────────────────
 const _nodeSize   = 68.0;
@@ -659,6 +660,15 @@ class _UnitSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // ── Unit banner card ──────────────────────────────────────────────
+          if (isQuranic)
+            QuranicUnitPanel(
+              unit: unit,
+              unitNumber: unitNumber,
+              doneCount: doneCount,
+              totalCount: totalCount,
+              tierColor: tierColors[0],
+            )
+          else
           Container(
             decoration: BoxDecoration(
               color: isDark
@@ -830,6 +840,14 @@ class _UnitSection extends ConsumerWidget {
             error: (_, __) => const SizedBox.shrink(),
             data: (lessonList) {
               if (lessonList.isEmpty) return const SizedBox.shrink();
+              if (isQuranic) {
+                return QuranicLessonList(
+                  lessons: lessonList,
+                  examLesson: examAsync.valueOrNull,
+                  completedIds: completedIds,
+                  tierColor: tierColors[0],
+                );
+              }
               final allDone =
                   lessonList.every((l) => completedIds.contains(l.id));
               final examLesson = examAsync.valueOrNull;

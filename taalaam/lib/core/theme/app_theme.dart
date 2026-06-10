@@ -64,6 +64,29 @@ class AppColors {
   static const wrongText   = Colors.white;
   static const correctTile = Color(0xFF4CAF50); // green.shade600
   static const wrongTile   = Color(0xFFEF5350); // red.shade400
+
+  // ── Quranic track surfaces (base colour with baked-in alpha) ─────────────
+  static const quranicCardDone        = Color(0x144CAF82); // brightGreen @ 8%
+  static const quranicCardCurrentGlow = Color(0x2ED4A017); // gold @ 18%
+  static const quranicBorderSubtle    = Color(0x401B4332); // forestGreen @ 25%
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MOTION — every animation duration in the app comes from here
+// ════════════════════════════════════════════════════════════════════════════
+
+class AppMotion {
+  AppMotion._();
+
+  static const fast    = Duration(milliseconds: 150);
+  static const normal  = Duration(milliseconds: 250);
+  static const gentle  = Duration(milliseconds: 350);
+  static const playful = Duration(milliseconds: 450);
+  static const breathe = Duration(milliseconds: 2400);
+
+  // Micro-interactions
+  static const tap     = Duration(milliseconds: 120);
+  static const stagger = Duration(milliseconds: 60);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
