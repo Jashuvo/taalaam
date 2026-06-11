@@ -26,6 +26,10 @@ const Map<String, String> _tpiIcons = {
 
 const _tpiEligibleTypes = {ExerciseType.multipleChoice, ExerciseType.fillInBlank};
 
+// correctWords for these types represent an ordered RTL sentence (array[0]
+// = first word read), matching the RTL Wrap the exercise widgets build in.
+const _sequenceTypes = {ExerciseType.wordScramble, ExerciseType.tapToBuild};
+
 class GrammarNoteSheet extends StatelessWidget {
   final bool correct;
   final String? grammarNote;
@@ -87,17 +91,27 @@ class GrammarNoteSheet extends StatelessWidget {
                   ?.copyWith(color: color, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: correctWords.map((word) {
-                final entry = vocabMap[word];
-                return _CorrectWordTile(
-                  word: word,
-                  meaningBn: entry?.meaningBn,
-                  color: color,
-                );
-              }).toList(),
+            // word_scramble/tap_to_build correctWords are in RTL reading
+            // order (array[0] = first word read). The exercise widgets build
+            // the answer in an RTL Wrap, where array[0] renders rightmost —
+            // mirror that here so the hint visually matches the order a
+            // learner must tap, instead of showing it reversed in an LTR Wrap.
+            Directionality(
+              textDirection: _sequenceTypes.contains(exercise?.type)
+                  ? TextDirection.rtl
+                  : Directionality.of(context),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: correctWords.map((word) {
+                  final entry = vocabMap[word];
+                  return _CorrectWordTile(
+                    word: word,
+                    meaningBn: entry?.meaningBn,
+                    color: color,
+                  );
+                }).toList(),
+              ),
             ),
           ],
           if (!correct && correctPairs.isNotEmpty) ...[
