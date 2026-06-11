@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/utils/xp_level.dart';
 import '../../../shared/widgets/progress_share_card.dart';
 import '../../auth/presentation/auth_provider.dart';
+import '../../track_quran/presentation/quran_reader_provider.dart';
 import '../../track_quran/presentation/quran_word_reader_page.dart';
 import 'home_page.dart';
 import 'home_provider.dart';
@@ -34,73 +35,107 @@ class _MainShellState extends ConsumerState<MainShell> {
     Icons.person_rounded,
   ];
 
+  void _selectTab(int i) {
+    setState(() => _tab = i);
+    ref.read(quranNavBarVisibleProvider.notifier).state = true;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final navVisible = ref.watch(quranNavBarVisibleProvider);
+    final disableAnim = MediaQuery.of(context).disableAnimations;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    const navContentHeight = 72.0 + 12.0; // pill height + bottom padding
+    final navTotalHeight = navContentHeight + bottomInset;
+
     return PopScope(
       canPop: _tab == 0,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _tab != 0) setState(() => _tab = 0);
+        if (!didPop && _tab != 0) _selectTab(0);
       },
       child: Scaffold(
         body: IndexedStack(
           index: _tab,
           children: [
-            LearnTab(onPracticeTab: () => setState(() => _tab = 1)),
+            LearnTab(onPracticeTab: () => _selectTab(1)),
             const _PracticeTab(),
             const QuranWordReaderPage(showBackButton: false),
             const _ProfileTab(),
           ],
         ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: Material(
-                elevation: 8,
-                shadowColor: Colors.black38,
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                child: SizedBox(
-                  height: 72,
-                  child: LayoutBuilder(builder: (context, constraints) {
-                    final disableAnim =
-                        MediaQuery.of(context).disableAnimations;
-                    final itemWidth = constraints.maxWidth / 4;
-                    const pillWidth = 56.0;
-                    return Stack(
-                      children: [
-                        AnimatedPositioned(
-                          duration:
-                              disableAnim ? Duration.zero : AppMotion.normal,
-                          curve: Curves.easeOutCubic,
-                          left: _tab * itemWidth + (itemWidth - pillWidth) / 2,
-                          top: 10,
-                          width: pillWidth,
-                          height: 36,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: AppColors.gold.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
+        bottomNavigationBar: AnimatedContainer(
+          duration: disableAnim ? Duration.zero : AppMotion.fast,
+          curve: Curves.easeOutCubic,
+          height: navVisible ? navTotalHeight : 0,
+          clipBehavior: Clip.hardEdge,
+          decoration: const BoxDecoration(),
+          child: OverflowBox(
+            minHeight: navTotalHeight,
+            maxHeight: navTotalHeight,
+            alignment: Alignment.topCenter,
+            child: AnimatedSlide(
+              offset: navVisible ? Offset.zero : const Offset(0, 1),
+              duration: disableAnim ? Duration.zero : AppMotion.fast,
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: navVisible ? 1 : 0,
+                duration: disableAnim ? Duration.zero : AppMotion.fast,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: Material(
+                        elevation: 8,
+                        shadowColor: Colors.black38,
+                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        child: SizedBox(
+                          height: 72,
+                          child: LayoutBuilder(builder: (context, constraints) {
+                            final itemWidth = constraints.maxWidth / 4;
+                            const pillWidth = 56.0;
+                            return Stack(
+                              children: [
+                                AnimatedPositioned(
+                                  duration: disableAnim
+                                      ? Duration.zero
+                                      : AppMotion.normal,
+                                  curve: Curves.easeOutCubic,
+                                  left: _tab * itemWidth +
+                                      (itemWidth - pillWidth) / 2,
+                                  top: 10,
+                                  width: pillWidth,
+                                  height: 36,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: AppColors.gold
+                                          .withValues(alpha: 0.18),
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                  ),
+                                ),
+                                Row(
+                                  children: List.generate(
+                                    4,
+                                    (i) => Expanded(
+                                      child: _NavBarItem(
+                                        icon: _icons[i],
+                                        selectedIcon: _selectedIcons[i],
+                                        label: _labels[i],
+                                        selected: _tab == i,
+                                        onTap: () => _selectTab(i),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
                         ),
-                        Row(
-                          children: List.generate(
-                            4,
-                            (i) => Expanded(
-                              child: _NavBarItem(
-                                icon: _icons[i],
-                                selectedIcon: _selectedIcons[i],
-                                label: _labels[i],
-                                selected: _tab == i,
-                                onTap: () => setState(() => _tab = i),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

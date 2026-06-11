@@ -89,3 +89,7 @@ final quranTafsirProvider =
     FutureProvider.family<QuranTafsirData?, ({int surah, int ayah})>(
         (ref, a) =>
             ref.watch(quranLocalSourceProvider).getTafsir(a.surah, a.ayah));
+
+// Set by the Quran reader's tafsir sheet while expanded so MainShell can
+// hide the floating bottom nav and free up reading space.
+final quranNavBarVisibleProvider = StateProvider<bool>((ref) => true);
