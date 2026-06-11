@@ -10,6 +10,20 @@ supabase functions deploy <name> --no-verify-jwt
 supabase db push --linked
 ```
 
+### Running tests (apostrophe-path workaround)
+`flutter test` CANNOT run from this checkout: the apostrophe in the `Ta'allam`
+directory name breaks the Dart test runner's generated listener URIs. Run tests
+from an apostrophe-free clone instead:
+```bash
+git clone --depth 1 "file:///Volumes/WorK/Work FIles/Ta'allam" /tmp/taalaam-ci
+rsync -a --delete --exclude='.git' --exclude='build' --exclude='.dart_tool' \
+  "/Volumes/WorK/Work FIles/Ta'allam/taalaam/" /tmp/taalaam-ci/taalaam/
+cd /tmp/taalaam-ci/taalaam && flutter pub get && flutter test
+```
+Golden baselines live in `test/goldens/`; regenerate with
+`flutter test --update-goldens test/goldens/screens_golden_test.dart` (in the
+clone) and copy the PNGs back.
+
 ## ARCHITECTURE
 - State: **Riverpod** only (no Provider, no Bloc)
 - Routing: **go_router** → `lib/core/router/app_router.dart`

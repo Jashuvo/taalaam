@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -403,7 +404,7 @@ class _WeeklyXpCard extends ConsumerWidget {
     const weeklyGoal = 200;
     final pct = (weeklyXp / weeklyGoal).clamp(0.0, 1.0);
     final dayLabels = ['সো', 'মং', 'বু', 'বৃ', 'শু', 'শ', 'র'];
-    final today = DateTime.now().weekday; // 1=Mon … 7=Sun
+    final today = clock.now().weekday; // 1=Mon … 7=Sun
 
     return Container(
       padding: const EdgeInsets.all(16),

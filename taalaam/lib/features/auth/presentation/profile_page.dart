@@ -593,7 +593,7 @@ class _CountUpStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     return TweenAnimationBuilder<int>(
-      tween: IntTween(begin: 0, end: value),
+      tween: IntTween(begin: reduceMotion ? value : 0, end: value),
       duration: reduceMotion ? Duration.zero : AppMotion.statCountUp,
       curve: Curves.easeOutCubic,
       builder: (context, v, _) => Text('$v$suffix', style: style),

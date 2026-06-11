@@ -83,6 +83,10 @@ class LessonCompleteScreen extends ConsumerStatefulWidget {
   final int totalXpAfter;
   final String? weakHint;
 
+  /// Test-only: fixes the du'aa shown instead of picking one at random.
+  @visibleForTesting
+  final int? duaaIndex;
+
   const LessonCompleteScreen({
     required this.lessonId,
     required this.unitId,
@@ -94,6 +98,7 @@ class LessonCompleteScreen extends ConsumerStatefulWidget {
     this.firstDayBonus = 0,
     this.totalXpAfter = 0,
     this.weakHint,
+    this.duaaIndex,
     super.key,
   });
 
@@ -106,6 +111,9 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
     with SingleTickerProviderStateMixin {
   late final ConfettiController _confetti;
   late final AnimationController _entranceCtrl;
+  // Picked once in initState so the du'aa doesn't change when providers
+  // resolve and trigger a rebuild mid-view.
+  late final String _duaa;
 
   // Staggered reveal order: ring -> XP card -> du'aa card -> weak hint -> buttons.
   static const _staggerCount = 5;
@@ -117,6 +125,8 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
   @override
   void initState() {
     super.initState();
+    _duaa = AppConstants.completionDuaas[widget.duaaIndex ??
+        Random().nextInt(AppConstants.completionDuaas.length)];
     _confetti = ConfettiController(duration: const Duration(seconds: 3));
     _entranceCtrl = AnimationController(vsync: this, duration: _entranceDuration);
     // Start confetti + entrance reveal after first frame
@@ -180,9 +190,7 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
         widget.totalCount > 0
             ? (widget.correctCount / widget.totalCount * 100).round()
             : 0;
-    final duaa = AppConstants
-        .completionDuaas[Random().nextInt(AppConstants.completionDuaas.length)];
-    final parts = duaa.split(' — ');
+    final parts = _duaa.split(' — ');
 
     return Scaffold(
       body: Stack(
@@ -501,8 +509,12 @@ class _StatRow extends StatelessWidget {
       children: [
         Icon(icon, color: color, size: 22),
         const SizedBox(width: 12),
-        Text(label, style: theme.textTheme.bodyLarge),
-        const Spacer(),
+        Expanded(
+          child: Text(label,
+              style: theme.textTheme.bodyLarge,
+              overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
         value,
       ],
     );
@@ -526,7 +538,7 @@ class _CountUpNumber extends StatelessWidget {
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     return TweenAnimationBuilder<int>(
-      tween: IntTween(begin: 0, end: value),
+      tween: IntTween(begin: reduceMotion ? value : 0, end: value),
       duration: reduceMotion ? Duration.zero : AppMotion.countUp,
       curve: Curves.easeOutCubic,
       builder: (context, v, _) => Text('$prefix$v$suffix', style: style),
@@ -546,7 +558,7 @@ class _AccuracyRing extends StatelessWidget {
     final color = pct >= 80 ? AppColors.gold : theme.colorScheme.primary;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: pct / 100),
+      tween: Tween(begin: reduceMotion ? pct / 100 : 0.0, end: pct / 100),
       duration: reduceMotion ? Duration.zero : AppMotion.ringSweep,
       curve: Curves.easeOutCubic,
       builder: (context, value, _) => SizedBox(

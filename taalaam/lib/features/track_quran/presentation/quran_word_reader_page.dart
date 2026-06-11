@@ -79,6 +79,7 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
   double _tafsirPeekFraction = 0.09;
   int _navDir = 1; // +1 forward (next ayah), -1 backward — drives slide direction
   String? _userId;
+  late final StateController<bool> _navBarVisible;
 
   @override
   void initState() {
@@ -94,6 +95,8 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
     _sheetCtrl.addListener(_onSheetChanged);
 
     _userId = ref.read(currentUserProvider)?.id;
+    // Captured here because ref can't be used inside dispose().
+    _navBarVisible = ref.read(quranNavBarVisibleProvider.notifier);
 
     // Restore last reading position and highlight preference.
     SharedPreferences.getInstance().then((prefs) {
@@ -115,7 +118,8 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
     _shimmerCtrl.dispose();
     _immersiveCtrl.dispose();
     _sheetCtrl.dispose();
-    ref.read(quranNavBarVisibleProvider.notifier).state = true;
+    // ref is unusable in dispose(); _navBarVisible was captured in initState.
+    _navBarVisible.state = true;
     super.dispose();
   }
 

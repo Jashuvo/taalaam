@@ -41,6 +41,9 @@ dependencies:
   google_fonts: ^6.2.1
   confetti: ^0.7.0
 
+  # Testable clock (DateTime.now seam for golden tests)
+  clock: ^1.1.1
+
   # File picker (admin upload)
   file_picker: ^8.1.7
 
