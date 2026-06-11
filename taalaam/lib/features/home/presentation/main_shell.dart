@@ -21,6 +21,69 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell> {
   int _tab = 0;
 
+  void _selectTab(int i) {
+    setState(() => _tab = i);
+    ref.read(quranNavBarVisibleProvider.notifier).state = true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final navVisible = ref.watch(quranNavBarVisibleProvider);
+    final disableAnim = MediaQuery.of(context).disableAnimations;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
+    return PopScope(
+      canPop: _tab == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _tab != 0) _selectTab(0);
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: Stack(
+          children: [
+            IndexedStack(
+              index: _tab,
+              children: [
+                LearnTab(onPracticeTab: () => _selectTab(1)),
+                const _PracticeTab(),
+                const QuranWordReaderPage(showBackButton: false),
+                const _ProfileTab(),
+              ],
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomInset),
+                child: AnimatedSlide(
+                  offset: navVisible ? Offset.zero : const Offset(0, 1.5),
+                  duration: disableAnim ? Duration.zero : AppMotion.fast,
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedOpacity(
+                    opacity: navVisible ? 1 : 0,
+                    duration: disableAnim ? Duration.zero : AppMotion.fast,
+                    child: IgnorePointer(
+                      ignoring: !navVisible,
+                      child: _NavPill(tab: _tab, onSelect: _selectTab),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Floating bottom-nav pill ────────────────────────────────────────────────
+
+class _NavPill extends StatelessWidget {
+  final int tab;
+  final ValueChanged<int> onSelect;
+
+  const _NavPill({required this.tab, required this.onSelect});
+
   static const _labels = ['শিখুন', 'অনুশীলন', 'কুরআন', 'আমি'];
   static const _icons = [
     Icons.school_outlined,
@@ -35,111 +98,65 @@ class _MainShellState extends ConsumerState<MainShell> {
     Icons.person_rounded,
   ];
 
-  void _selectTab(int i) {
-    setState(() => _tab = i);
-    ref.read(quranNavBarVisibleProvider.notifier).state = true;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final navVisible = ref.watch(quranNavBarVisibleProvider);
+    final theme = Theme.of(context);
     final disableAnim = MediaQuery.of(context).disableAnimations;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    const navContentHeight = 72.0 + 12.0; // pill height + bottom padding
-    final navTotalHeight = navContentHeight + bottomInset;
-
-    return PopScope(
-      canPop: _tab == 0,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _tab != 0) _selectTab(0);
-      },
-      child: Scaffold(
-        body: IndexedStack(
-          index: _tab,
-          children: [
-            LearnTab(onPracticeTab: () => _selectTab(1)),
-            const _PracticeTab(),
-            const QuranWordReaderPage(showBackButton: false),
-            const _ProfileTab(),
-          ],
-        ),
-        bottomNavigationBar: AnimatedContainer(
-          duration: disableAnim ? Duration.zero : AppMotion.fast,
-          curve: Curves.easeOutCubic,
-          height: navVisible ? navTotalHeight : 0,
-          clipBehavior: Clip.hardEdge,
-          decoration: const BoxDecoration(),
-          child: OverflowBox(
-            minHeight: navTotalHeight,
-            maxHeight: navTotalHeight,
-            alignment: Alignment.topCenter,
-            child: AnimatedSlide(
-              offset: navVisible ? Offset.zero : const Offset(0, 1),
-              duration: disableAnim ? Duration.zero : AppMotion.fast,
-              curve: Curves.easeOutCubic,
-              child: AnimatedOpacity(
-                opacity: navVisible ? 1 : 0,
-                duration: disableAnim ? Duration.zero : AppMotion.fast,
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: Material(
-                        elevation: 8,
-                        shadowColor: Colors.black38,
-                        color: Theme.of(context).colorScheme.surfaceContainer,
-                        child: SizedBox(
-                          height: 72,
-                          child: LayoutBuilder(builder: (context, constraints) {
-                            final itemWidth = constraints.maxWidth / 4;
-                            const pillWidth = 56.0;
-                            return Stack(
-                              children: [
-                                AnimatedPositioned(
-                                  duration: disableAnim
-                                      ? Duration.zero
-                                      : AppMotion.normal,
-                                  curve: Curves.easeOutCubic,
-                                  left: _tab * itemWidth +
-                                      (itemWidth - pillWidth) / 2,
-                                  top: 10,
-                                  width: pillWidth,
-                                  height: 36,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.gold
-                                          .withValues(alpha: 0.18),
-                                      borderRadius: BorderRadius.circular(18),
-                                    ),
-                                  ),
-                                ),
-                                Row(
-                                  children: List.generate(
-                                    4,
-                                    (i) => Expanded(
-                                      child: _NavBarItem(
-                                        icon: _icons[i],
-                                        selectedIcon: _selectedIcons[i],
-                                        label: _labels[i],
-                                        selected: _tab == i,
-                                        onTap: () => _selectTab(i),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }),
-                        ),
+    return Container(
+      height: kNavPillHeight,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: Material(
+          type: MaterialType.transparency,
+          child: LayoutBuilder(builder: (context, constraints) {
+            final itemWidth = constraints.maxWidth / 4;
+            const pillWidth = 56.0;
+            return Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: disableAnim ? Duration.zero : AppMotion.normal,
+                  curve: Curves.easeOutCubic,
+                  left: tab * itemWidth + (itemWidth - pillWidth) / 2,
+                  top: (kNavPillHeight - 36) / 2,
+                  width: pillWidth,
+                  height: 36,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: List.generate(
+                    4,
+                    (i) => Expanded(
+                      child: _NavBarItem(
+                        icon: _icons[i],
+                        selectedIcon: _selectedIcons[i],
+                        label: _labels[i],
+                        selected: tab == i,
+                        onTap: () => onSelect(i),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
+              ],
+            );
+          }),
         ),
       ),
     );
@@ -269,7 +286,7 @@ class _PracticeTabState extends ConsumerState<_PracticeTab>
         centerTitle: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, navClearance(context)),
         children: [
           _staggered(
             0,
@@ -630,7 +647,7 @@ class _ProfileTab extends ConsumerWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, navClearance(context)),
         children: [
           // User info
           if (user != null && user.isAnonymous != true)

@@ -195,7 +195,9 @@ class HomePage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: navClearance(context)),
+                  ),
                 ],
               ),
             ),
@@ -939,7 +941,9 @@ class _LearnTabState extends ConsumerState<LearnTab>
                       child: _ReviewDueChip(),
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: navClearance(context)),
+                  ),
                 ],
               ),
             ),

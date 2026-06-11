@@ -237,6 +237,7 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             // ── Header — slides/fades away in immersive mode ────────────
@@ -264,9 +265,10 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  _tafsirPeekFraction =
-                      (_tafsirHeaderHeight / constraints.maxHeight)
-                          .clamp(0.05, 0.25);
+                  _tafsirPeekFraction = ((_tafsirHeaderHeight +
+                              navClearance(context)) /
+                          constraints.maxHeight)
+                      .clamp(0.05, 0.4);
                   final peekHeightPx =
                       _tafsirPeekFraction * constraints.maxHeight;
                   final contentBlocked = _tafsirScrim && !_immersive;
@@ -1487,9 +1489,9 @@ class _TafsirSheetState extends ConsumerState<_TafsirSheet> {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 16,
-                offset: const Offset(0, -4),
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
             ],
           ),

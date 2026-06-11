@@ -139,6 +139,19 @@ class AppRadius {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// FLOATING BOTTOM NAV
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Height of the floating bottom-nav pill in [MainShell].
+const kNavPillHeight = 64.0;
+
+/// Total vertical space the floating nav pill occupies, including its bottom
+/// margin and a breathing gap above it. Tab roots and the tafsir peek bar use
+/// this to keep content from hiding behind the pill.
+double navClearance(BuildContext context) =>
+    kNavPillHeight + 12 + 12 + MediaQuery.viewPaddingOf(context).bottom;
+
+// ════════════════════════════════════════════════════════════════════════════
 // TYPOGRAPHY
 // ════════════════════════════════════════════════════════════════════════════
 
