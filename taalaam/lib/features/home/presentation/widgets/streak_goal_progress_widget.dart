@@ -66,8 +66,9 @@ class StreakGoalProgressWidget extends StatelessWidget {
             runSpacing: 5,
             children: List.generate(totalDots, (i) {
               final filled = i < filledDots;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
+              final isToday = filled && i == filledDots - 1;
+              final dot = AnimatedContainer(
+                duration: AppMotion.gentle,
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
@@ -80,6 +81,17 @@ class StreakGoalProgressWidget extends StatelessWidget {
                       : Border.all(
                           color: theme.colorScheme.outlineVariant, width: 1),
                 ),
+              );
+              if (!isToday) return dot;
+              return TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: MediaQuery.of(context).disableAnimations
+                    ? Duration.zero
+                    : AppMotion.playful,
+                curve: Curves.elasticOut,
+                builder: (context, value, child) =>
+                    Transform.scale(scale: value, child: child),
+                child: dot,
               );
             }),
           ),

@@ -105,28 +105,65 @@ class LessonCompleteScreen extends ConsumerStatefulWidget {
 class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
     with SingleTickerProviderStateMixin {
   late final ConfettiController _confetti;
-  late final AnimationController _fadeIn;
-  late final Animation<double> _fadeAnim;
+  late final AnimationController _entranceCtrl;
+
+  // Staggered reveal order: ring -> XP card -> du'aa card -> weak hint -> buttons.
+  static const _staggerCount = 5;
+  static final _entranceDuration = Duration(
+    milliseconds: AppMotion.gentle.inMilliseconds +
+        (_staggerCount - 1) * AppMotion.completionStagger.inMilliseconds,
+  );
 
   @override
   void initState() {
     super.initState();
     _confetti = ConfettiController(duration: const Duration(seconds: 3));
-    _fadeIn = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
-    _fadeAnim = CurvedAnimation(parent: _fadeIn, curve: Curves.easeOut);
-    // Start confetti + fade in after first frame
+    _entranceCtrl = AnimationController(vsync: this, duration: _entranceDuration);
+    // Start confetti + entrance reveal after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _confetti.play();
-      _fadeIn.forward();
+      if (MediaQuery.of(context).disableAnimations) {
+        _entranceCtrl.value = 1;
+      } else {
+        _entranceCtrl.forward();
+      }
     });
   }
 
   @override
   void dispose() {
     _confetti.dispose();
-    _fadeIn.dispose();
+    _entranceCtrl.dispose();
     super.dispose();
+  }
+
+  /// Per-item entrance animation: fade + slide-up, staggered by
+  /// `AppMotion.completionStagger` per index.
+  Animation<double> _entranceFor(int index) {
+    final staggerMs = AppMotion.completionStagger.inMilliseconds;
+    final itemMs = AppMotion.gentle.inMilliseconds;
+    final totalMs = _entranceDuration.inMilliseconds;
+    final start = (index * staggerMs) / totalMs;
+    final end = ((start * totalMs + itemMs) / totalMs).clamp(start, 1.0);
+    return CurvedAnimation(
+      parent: _entranceCtrl,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+  }
+
+  Widget _staggered(int index, Widget child) {
+    return AnimatedBuilder(
+      animation: _entranceCtrl,
+      builder: (context, c) {
+        final v = _entranceFor(index).value;
+        if (MediaQuery.of(context).disableAnimations) return c!;
+        return Opacity(
+          opacity: v,
+          child: Transform.translate(offset: Offset(0, (1 - v) * 16), child: c),
+        );
+      },
+      child: child,
+    );
   }
 
   @override
@@ -170,149 +207,170 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
           ),
           // ── Main content ──────────────────────────────────────────────────
           SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Logo
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Logo
+                      Center(
+                        child: Image.asset(
+                          isDark
+                              ? 'assets/logo_dark-removebg-preview.png'
+                              : 'assets/logo_light-removebg-preview.png',
+                          height: 130,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'পাঠ সম্পন্ন!',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 28),
+                      // Accuracy ring
+                      _staggered(
+                        0,
                         Center(
-                          child: Image.asset(
-                            isDark
-                                ? 'assets/logo_dark-removebg-preview.png'
-                                : 'assets/logo_light-removebg-preview.png',
-                            height: 130,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'পাঠ সম্পন্ন!',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 28),
-                        // Stats card
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainer,
-                            borderRadius: AppRadius.lgBorder,
-                            border: Border.all(
-                                color: theme.colorScheme.outlineVariant),
-                          ),
                           child: Column(
                             children: [
-                              _StatRow(
-                                icon: Icons.stars_rounded,
-                                label: 'XP অর্জিত',
-                                value: '+${widget.xpEarned} XP',
-                                color: AppColors.gold,
-                              ),
-                              if (widget.perfectBonus > 0) ...[
-                                const Divider(height: 20),
-                                _StatRow(
-                                  icon: Icons.workspace_premium_rounded,
-                                  label: 'পারফেক্ট বোনাস',
-                                  value: '+${widget.perfectBonus} XP',
-                                  color: AppColors.gold,
-                                ),
-                              ],
-                              if (widget.firstDayBonus > 0) ...[
-                                const Divider(height: 20),
-                                _StatRow(
-                                  icon: Icons.wb_sunny_rounded,
-                                  label: 'প্রথম পাঠ বোনাস',
-                                  value: '+${widget.firstDayBonus} XP',
-                                  color: AppColors.brightGreen,
-                                ),
-                              ],
-                              if (widget.gemReward > 0) ...[
-                                const Divider(height: 20),
-                                _StatRow(
-                                  icon: Icons.diamond_outlined,
-                                  label: 'রত্ন অর্জিত',
-                                  value: '+${widget.gemReward} 💎',
-                                  color: AppColors.teal,
-                                ),
-                              ],
-                              const Divider(height: 20),
-                              _StatRow(
-                                icon: Icons.check_circle_outline_rounded,
-                                label: 'নির্ভুলতা',
-                                value: '$pct%',
-                                color: pct >= 80
-                                    ? AppColors.correctBg
-                                    : theme.colorScheme.error,
-                              ),
-                              const Divider(height: 20),
-                              _StatRow(
-                                icon: Icons.quiz_outlined,
-                                label: 'সঠিক উত্তর',
-                                value:
-                                    '${widget.correctCount} / ${widget.totalCount}',
-                                color: theme.colorScheme.primary,
-                              ),
-                              if (widget.totalXpAfter > 0) ...[
-                                const Divider(height: 20),
-                                _StatRow(
-                                  icon: Icons.trending_up_rounded,
-                                  label: 'মোট XP',
-                                  value: '${widget.totalXpAfter} XP',
+                              _AccuracyRing(pct: pct),
+                              const SizedBox(height: 8),
+                              Text(
+                                'নির্ভুলতা',
+                                style: theme.textTheme.labelMedium?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
-                              ],
+                              ),
                             ],
                           ),
                         ),
-                        if (widget.weakHint != null) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(14),
+                      ),
+                      const SizedBox(height: 24),
+                      // XP / stats card
+                      _staggered(
+                        1,
+                        _PerfectShimmer(
+                          active: pct == 100,
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.errorContainer
-                                  .withValues(alpha: 0.3),
+                              color: theme.colorScheme.surfaceContainer,
                               borderRadius: AppRadius.lgBorder,
                               border: Border.all(
-                                  color: theme.colorScheme.error
-                                      .withValues(alpha: 0.25)),
+                                  color: theme.colorScheme.outlineVariant),
                             ),
-                            child: Row(
+                            child: Column(
                               children: [
-                                Icon(Icons.lightbulb_outline_rounded,
-                                    color: theme.colorScheme.error, size: 18),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    widget.weakHint!,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onErrorContainer,
-                                    ),
+                                _StatRow(
+                                  icon: Icons.stars_rounded,
+                                  label: 'XP অর্জিত',
+                                  color: AppColors.gold,
+                                  value: _CountUpNumber(
+                                    value: widget.xpEarned,
+                                    suffix: ' XP',
+                                    prefix: '+',
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.gold),
                                   ),
                                 ),
+                                if (widget.perfectBonus > 0) ...[
+                                  const Divider(height: 20),
+                                  _StatRow(
+                                    icon: Icons.workspace_premium_rounded,
+                                    label: 'পারফেক্ট বোনাস',
+                                    color: AppColors.gold,
+                                    value: Text('+${widget.perfectBonus} XP',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.gold)),
+                                  ),
+                                ],
+                                if (widget.firstDayBonus > 0) ...[
+                                  const Divider(height: 20),
+                                  _StatRow(
+                                    icon: Icons.wb_sunny_rounded,
+                                    label: 'প্রথম পাঠ বোনাস',
+                                    color: AppColors.brightGreen,
+                                    value: Text('+${widget.firstDayBonus} XP',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.brightGreen)),
+                                  ),
+                                ],
+                                if (widget.gemReward > 0) ...[
+                                  const Divider(height: 20),
+                                  _StatRow(
+                                    icon: Icons.diamond_outlined,
+                                    label: 'রত্ন অর্জিত',
+                                    color: AppColors.teal,
+                                    value: Text('+${widget.gemReward} 💎',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.teal)),
+                                  ),
+                                ],
+                                const Divider(height: 20),
+                                _StatRow(
+                                  icon: Icons.quiz_outlined,
+                                  label: 'সঠিক উত্তর',
+                                  color: theme.colorScheme.primary,
+                                  value: Text(
+                                      '${widget.correctCount} / ${widget.totalCount}',
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: theme.colorScheme.primary)),
+                                ),
+                                if (widget.totalXpAfter > 0) ...[
+                                  const Divider(height: 20),
+                                  _StatRow(
+                                    icon: Icons.trending_up_rounded,
+                                    label: 'মোট XP',
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    value: Text('${widget.totalXpAfter} XP',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                                color: theme.colorScheme
+                                                    .onSurfaceVariant)),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 24),
-                        // Du'aa
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Du'aa — gold-tinted manuscript card
+                      _staggered(
+                        2,
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer
-                                .withValues(alpha: 0.25),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppColors.gold.withValues(alpha: 0.12),
+                                AppColors.gold.withValues(alpha: 0.05),
+                              ],
+                            ),
                             borderRadius: AppRadius.lgBorder,
                             border: Border.all(
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.2)),
+                                color: AppColors.gold.withValues(alpha: 0.35)),
                           ),
                           child: Column(
                             children: [
@@ -342,38 +400,78 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                             ],
                           ),
                         ),
-                        const SizedBox(height: 28),
-                        if (nextLesson != null) ...[
-                          FilledButton.icon(
-                            icon: const Icon(Icons.arrow_forward_rounded),
-                            label: Text('পরবর্তী: ${nextLesson.titleBn}',
-                                overflow: TextOverflow.ellipsis),
-                            onPressed: () =>
-                                context.push('/lesson/${nextLesson.id}'),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        FilledButton.icon(
-                          icon: const Icon(Icons.home_rounded),
-                          label: const Text('হোমে ফিরুন'),
-                          style: nextLesson != null
-                              ? FilledButton.styleFrom(
-                                  backgroundColor: theme
-                                      .colorScheme.surfaceContainerHighest,
-                                  foregroundColor:
-                                      theme.colorScheme.onSurface)
-                              : null,
-                          onPressed: () => context.go(
-                              needsStreakGoal ? '/streak-goal' : '/home'),
-                        ),
+                      ),
+                      if (widget.weakHint != null) ...[
                         const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('আজকের রিভিউ করুন'),
-                          onPressed: () => context.push('/review'),
+                        _staggered(
+                          3,
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.errorContainer
+                                  .withValues(alpha: 0.3),
+                              borderRadius: AppRadius.lgBorder,
+                              border: Border.all(
+                                  color: theme.colorScheme.error
+                                      .withValues(alpha: 0.25)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.lightbulb_outline_rounded,
+                                    color: theme.colorScheme.error, size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    widget.weakHint!,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onErrorContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 28),
+                      _staggered(
+                        4,
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (nextLesson != null) ...[
+                              FilledButton.icon(
+                                icon: const Icon(Icons.arrow_forward_rounded),
+                                label: Text('পরবর্তী: ${nextLesson.titleBn}',
+                                    overflow: TextOverflow.ellipsis),
+                                onPressed: () =>
+                                    context.push('/lesson/${nextLesson.id}'),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            FilledButton.icon(
+                              icon: const Icon(Icons.home_rounded),
+                              label: const Text('হোমে ফিরুন'),
+                              style: nextLesson != null
+                                  ? FilledButton.styleFrom(
+                                      backgroundColor: theme
+                                          .colorScheme.surfaceContainerHighest,
+                                      foregroundColor:
+                                          theme.colorScheme.onSurface)
+                                  : null,
+                              onPressed: () => context.go(
+                                  needsStreakGoal ? '/streak-goal' : '/home'),
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('আজকের রিভিউ করুন'),
+                              onPressed: () => context.push('/review'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -388,7 +486,7 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
 class _StatRow extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String value;
+  final Widget value;
   final Color color;
   const _StatRow(
       {required this.icon,
@@ -405,10 +503,177 @@ class _StatRow extends StatelessWidget {
         const SizedBox(width: 12),
         Text(label, style: theme.textTheme.bodyLarge),
         const Spacer(),
-        Text(value,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.bold, color: color)),
+        value,
       ],
+    );
+  }
+}
+
+/// XP/stat value that counts up from 0 on first build.
+class _CountUpNumber extends StatelessWidget {
+  final int value;
+  final String prefix;
+  final String suffix;
+  final TextStyle? style;
+  const _CountUpNumber({
+    required this.value,
+    this.prefix = '',
+    this.suffix = '',
+    this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    return TweenAnimationBuilder<int>(
+      tween: IntTween(begin: 0, end: value),
+      duration: reduceMotion ? Duration.zero : AppMotion.countUp,
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => Text('$prefix$v$suffix', style: style),
+    );
+  }
+}
+
+/// Animated accuracy ring: sweeps from 0 to [pct]% over [AppMotion.ringSweep].
+/// Color is gold for >=80% and theme primary otherwise (never red).
+class _AccuracyRing extends StatelessWidget {
+  final int pct;
+  const _AccuracyRing({required this.pct});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = pct >= 80 ? AppColors.gold : theme.colorScheme.primary;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: pct / 100),
+      duration: reduceMotion ? Duration.zero : AppMotion.ringSweep,
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) => SizedBox(
+        width: 120,
+        height: 120,
+        child: CustomPaint(
+          painter: _RingPainter(
+            progress: value,
+            color: color,
+            trackColor: theme.colorScheme.surfaceContainerHighest,
+          ),
+          child: Center(
+            child: Text(
+              '${(value * 100).round()}%',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color trackColor;
+  const _RingPainter(
+      {required this.progress, required this.color, required this.trackColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const strokeWidth = 10.0;
+    final center = size.center(Offset.zero);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    final progressPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, trackPaint);
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawArc(rect, -pi / 2, 2 * pi * progress, false, progressPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.trackColor != trackColor;
+}
+
+/// One-shot gold shimmer sweep across [child], played once for a perfect run.
+class _PerfectShimmer extends StatefulWidget {
+  final bool active;
+  final Widget child;
+  const _PerfectShimmer({required this.active, required this.child});
+
+  @override
+  State<_PerfectShimmer> createState() => _PerfectShimmerState();
+}
+
+class _PerfectShimmerState extends State<_PerfectShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl =
+      AnimationController(vsync: this, duration: AppMotion.ringSweep);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (MediaQuery.of(context).disableAnimations) return;
+        _ctrl.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active) return widget.child;
+    return ClipRRect(
+      borderRadius: AppRadius.lgBorder,
+      child: Stack(
+        children: [
+          widget.child,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _ctrl,
+                builder: (context, _) => FractionalTranslation(
+                  translation: Offset(-1.5 + 3.0 * _ctrl.value, 0),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        stops: const [0.35, 0.5, 0.65],
+                        colors: [
+                          Colors.transparent,
+                          AppColors.gold.withValues(alpha: 0.35),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

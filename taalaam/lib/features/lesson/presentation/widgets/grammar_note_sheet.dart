@@ -74,7 +74,19 @@ class GrammarNoteSheet extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(correct ? Icons.check_circle : Icons.cancel, color: color),
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: AppMotion.playful,
+                curve: Curves.elasticOut,
+                builder: (context, value, child) => Transform.scale(
+                  scale: MediaQuery.of(context).disableAnimations
+                      ? 1.0
+                      : value,
+                  child: child,
+                ),
+                child: Icon(correct ? Icons.check_circle : Icons.cancel,
+                    color: color),
+              ),
               const SizedBox(width: 8),
               Text(
                 correct ? 'সঠিক! চমৎকার!' : 'ভুল হয়েছে',
@@ -161,24 +173,41 @@ class GrammarNoteSheet extends StatelessWidget {
           ],
           if (grammarNote != null && grammarNote!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Directionality(
-                    textDirection: TextDirection.ltr,
-                    child: Text(
-                      grammarNote!.replaceAll('«', '').replaceAll('»', ''),
-                      style: theme.textTheme.bodyMedium?.copyWith(color: color),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: AppMotion.normal,
+              curve: Curves.easeOut,
+              builder: (context, value, child) {
+                final v = MediaQuery.of(context).disableAnimations
+                    ? 1.0
+                    : value;
+                return Opacity(
+                  opacity: v,
+                  child: Transform.translate(
+                    offset: Offset(0, (1 - v) * 12),
+                    child: child,
+                  ),
+                );
+              },
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        grammarNote!.replaceAll('«', '').replaceAll('»', ''),
+                        style: theme.textTheme.bodyMedium?.copyWith(color: color),
+                      ),
                     ),
                   ),
-                ),
-                if (_tpiIconAsset() case final asset?) ...[
-                  const SizedBox(width: 8),
-                  SvgPicture.asset(asset, width: 32, height: 32,
-                      colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                  if (_tpiIconAsset() case final asset?) ...[
+                    const SizedBox(width: 8),
+                    SvgPicture.asset(asset, width: 32, height: 32,
+                        colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                  ],
                 ],
-              ],
+              ),
             ),
           ],
           const SizedBox(height: 16),

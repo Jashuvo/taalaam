@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/tap_scale.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
 import 'arabic_word_tooltip.dart' show ArabicSentenceWithTooltips, ArabicWordTooltip;
@@ -92,6 +93,11 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
             tileColor = theme.colorScheme.primaryContainer.withValues(alpha: 0.5);
             textColor = theme.colorScheme.primary;
           }
+          // After check: fade out tiles that are neither correct nor the
+          // (wrong) selected answer, so the learner's focus narrows to the
+          // tiles that matter.
+          final isDimmed = _checked && !isCorrect && !isSelected;
+
           return TweenAnimationBuilder<double>(
             key: ValueKey(i),
             tween: Tween(begin: 0.0, end: 1.0),
@@ -106,19 +112,36 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
             ),
             child: Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Material(
-                color: tileColor ?? theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  // Allow changing selection until Check is pressed
-                  onTap: _checked ? null : () => setState(() => _selected = i),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 16, horizontal: 20),
-                    child: _OptionText(
-                      _options[i],
-                      color: textColor ?? theme.colorScheme.onSurface,
+              child: AnimatedOpacity(
+                opacity: isDimmed ? 0.5 : 1.0,
+                duration: AppMotion.fast,
+                child: TapScale(
+                  child: AnimatedContainer(
+                    duration: AppMotion.fast,
+                    curve: Curves.easeOut,
+                    decoration: BoxDecoration(
+                      color: tileColor ??
+                          theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        // Allow changing selection until Check is pressed
+                        onTap: _checked
+                            ? null
+                            : () => setState(() => _selected = i),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 20),
+                          child: _OptionText(
+                            _options[i],
+                            color: textColor ?? theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

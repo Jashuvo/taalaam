@@ -1,3 +1,4 @@
+import 'dart:math' show sin, pi;
 import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +42,24 @@ const _typeLabels = <ExerciseType, (String, Color)>{
   ExerciseType.aqeedahTrue:     ('আকীদাহ যাচাই',             Color(0xFF7B4F00)),
   ExerciseType.ayahCloze:       ('আয়াত পূরণ করুন',          Color(0xFF2E7D32)),
   ExerciseType.grammarSpot:     ('শব্দ-শ্রেণী চিহ্নিত করুন', Color(0xFF1565C0)),
+};
+
+/// Exercise types that render Quranic verse / tafsir content. The wrong-answer
+/// shake (item 1c) is suppressed for these — shaking ayah text reads as
+/// disrespectful, so only the feedback banner appears.
+const _quranicVerseTypes = {
+  ExerciseType.ayahRead,
+  ExerciseType.tafsirRead,
+  ExerciseType.ayahContext,
+  ExerciseType.surahTheme,
+  ExerciseType.reflectionCard,
+  ExerciseType.rootFamily,
+  ExerciseType.aqeedahTrue,
+  ExerciseType.ayahCloze,
+  ExerciseType.grammarSpot,
+  ExerciseType.ayahComplete,
+  ExerciseType.ayahOrder,
+  ExerciseType.patternMatch,
 };
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -317,8 +336,8 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
           borderRadius: AppRadius.xxlBorder,
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: progress),
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
+            duration: AppMotion.progress,
+            curve: Curves.easeOutCubic,
             builder: (_, val, __) => LinearProgressIndicator(
               value: val,
               minHeight: 10,
@@ -337,9 +356,22 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
                 (i) => Padding(
                   padding: const EdgeInsets.only(left: 2),
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (child, anim) =>
-                        ScaleTransition(scale: anim, child: child),
+                    duration: AppMotion.fast,
+                    transitionBuilder: (child, anim) => ScaleTransition(
+                      scale: TweenSequence<double>([
+                        TweenSequenceItem(
+                          tween: Tween(begin: 1.0, end: 0.6)
+                              .chain(CurveTween(curve: Curves.easeIn)),
+                          weight: 50,
+                        ),
+                        TweenSequenceItem(
+                          tween: Tween(begin: 0.6, end: 1.0)
+                              .chain(CurveTween(curve: Curves.easeOut)),
+                          weight: 50,
+                        ),
+                      ]).animate(anim),
+                      child: child,
+                    ),
                     child: Icon(
                       Icons.favorite_rounded,
                       key: ValueKey('heart_${i}_${i < session.hearts}'),
@@ -414,30 +446,35 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
                       child: ArabicAudioButton(audioUrl: exercise.audioUrl),
                     ),
                   RepaintBoundary(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 350),
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      transitionBuilder: (child, animation) =>
-                          FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0.06, 0),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: child,
+                    child: _ShakeOnWrong(
+                      shake: session.showFeedback &&
+                          session.lastCorrect == false &&
+                          !_quranicVerseTypes.contains(exercise.type),
+                      child: PageTransitionSwitcher(
+                        duration: AppMotion.route,
+                        transitionBuilder:
+                            (child, animation, secondaryAnimation) {
+                          if (MediaQuery.of(context).disableAnimations) {
+                            return child;
+                          }
+                          return SharedAxisTransition(
+                            animation: animation,
+                            secondaryAnimation: secondaryAnimation,
+                            transitionType:
+                                SharedAxisTransitionType.horizontal,
+                            child: child,
+                          );
+                        },
+                        child: ExerciseEngine(
+                          key: ValueKey(session.currentIndex),
+                          exercise: exercise,
+                          vocab: vocab,
+                          extraWords: exerciseWords,
+                          onAnswered: (correct) =>
+                              ref.read(_sessionProvider.notifier).answer(correct),
+                          onWrongPairs: (pairs) =>
+                              setState(() => _lastWrongPairs = pairs),
                         ),
-                      ),
-                      child: ExerciseEngine(
-                        key: ValueKey(session.currentIndex),
-                        exercise: exercise,
-                        vocab: vocab,
-                        extraWords: exerciseWords,
-                        onAnswered: (correct) =>
-                            ref.read(_sessionProvider.notifier).answer(correct),
-                        onWrongPairs: (pairs) =>
-                            setState(() => _lastWrongPairs = pairs),
                       ),
                     ),
                   ),
@@ -643,6 +680,55 @@ class _MilestoneScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Wrong-answer shake ────────────────────────────────────────────────────────
+
+/// Wraps the answer area and gives it a gentle horizontal shake (3 oscillations
+/// over `AppMotion.gentle`) when [shake] flips to true. Suppressed for Quranic
+/// verse content by the caller and for `MediaQuery.disableAnimations`.
+class _ShakeOnWrong extends StatefulWidget {
+  final bool shake;
+  final Widget child;
+  const _ShakeOnWrong({required this.shake, required this.child});
+
+  @override
+  State<_ShakeOnWrong> createState() => _ShakeOnWrongState();
+}
+
+class _ShakeOnWrongState extends State<_ShakeOnWrong>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller =
+      AnimationController(vsync: this, duration: AppMotion.gentle);
+
+  @override
+  void didUpdateWidget(covariant _ShakeOnWrong oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shake &&
+        !oldWidget.shake &&
+        !MediaQuery.of(context).disableAnimations) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final t = _controller.value;
+        final dx = sin(t * 3 * 2 * pi) * (1 - t) * 8;
+        return Transform.translate(offset: Offset(dx, 0), child: child);
+      },
+      child: widget.child,
     );
   }
 }

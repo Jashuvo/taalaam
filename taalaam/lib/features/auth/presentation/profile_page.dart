@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../home/presentation/home_provider.dart';
+import '../../home/presentation/widgets/streak_goal_progress_widget.dart';
 import 'auth_provider.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
@@ -14,14 +15,65 @@ class ProfilePage extends ConsumerStatefulWidget {
   ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends ConsumerState<ProfilePage> {
+class _ProfilePageState extends ConsumerState<ProfilePage>
+    with SingleTickerProviderStateMixin {
   String? _displayName;
   bool _loadingName = true;
+  late final AnimationController _entranceCtrl;
+
+  // Staggered reveal order: stat grid -> weekly XP -> streak goal -> longest streak.
+  static const _staggerCount = 4;
+  static final _entranceDuration = Duration(
+    milliseconds: AppMotion.gentle.inMilliseconds +
+        (_staggerCount - 1) * AppMotion.completionStagger.inMilliseconds,
+  );
 
   @override
   void initState() {
     super.initState();
     _loadName();
+    _entranceCtrl = AnimationController(vsync: this, duration: _entranceDuration);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (MediaQuery.of(context).disableAnimations) {
+        _entranceCtrl.value = 1;
+      } else {
+        _entranceCtrl.forward();
+      }
+    });
+  }
+
+  Animation<double> _entranceFor(int index) {
+    final staggerMs = AppMotion.completionStagger.inMilliseconds;
+    final itemMs = AppMotion.gentle.inMilliseconds;
+    final totalMs = _entranceDuration.inMilliseconds;
+    final start = (index * staggerMs) / totalMs;
+    final end = ((start * totalMs + itemMs) / totalMs).clamp(start, 1.0);
+    return CurvedAnimation(
+      parent: _entranceCtrl,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+  }
+
+  Widget _staggered(int index, Widget child) {
+    return AnimatedBuilder(
+      animation: _entranceCtrl,
+      builder: (context, c) {
+        final v = _entranceFor(index).value;
+        if (MediaQuery.of(context).disableAnimations) return c!;
+        return Opacity(
+          opacity: v,
+          child: Transform.translate(offset: Offset(0, (1 - v) * 16), child: c),
+        );
+      },
+      child: child,
+    );
+  }
+
+  @override
+  void dispose() {
+    _entranceCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadName() async {
@@ -143,6 +195,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final user = ref.watch(currentUserProvider);
     final streak = ref.watch(streakProvider).valueOrNull;
     final completedCount = ref.watch(completedLessonIdsProvider).valueOrNull?.length ?? 0;
+    final weeklyXp = ref.watch(weeklyXpProvider).valueOrNull ?? 0;
+    final masteredCount = ref.watch(masteredWordCountProvider).valueOrNull ?? 0;
+    final learningCount = ref.watch(learningWordCountProvider).valueOrNull ?? 0;
     final isAnon = user?.isAnonymous ?? false;
 
     final email = user?.email ?? '';
@@ -162,15 +217,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           Center(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 44,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: Text(
-                    initials,
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onPrimaryContainer,
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: theme.colorScheme.primary, width: 2.5),
+                  ),
+                  child: CircleAvatar(
+                    radius: 44,
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    child: Text(
+                      initials,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
                     ),
                   ),
                 ),
@@ -226,33 +289,146 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
           const SizedBox(height: 28),
 
-          // ── Stats row ─────────────────────────────────────────────────
-          Row(
-            children: [
-              _StatCard(
-                icon: Icons.local_fire_department,
-                iconColor: AppColors.gold,
-                value: '${streak?.currentStreak ?? 0}',
-                label: 'স্ট্রিক',
-                color: AppColors.gold,
+          // ── 2x3 metric grid ────────────────────────────────────────────
+          _staggered(
+            0,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: AppColors.gradientStreak,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: AppRadius.lgBorder,
               ),
-              const SizedBox(width: 10),
-              _StatCard(
-                icon: Icons.star_rounded,
-                iconColor: AppColors.gold,
-                value: '${streak?.totalXp ?? 0}',
-                label: 'মোট XP',
-                color: AppColors.brightGreen,
+              child: GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.95,
+                children: [
+                  _MetricTile(
+                    icon: Icons.local_fire_department_rounded,
+                    value: streak?.currentStreak ?? 0,
+                    label: 'স্ট্রিক',
+                  ),
+                  _MetricTile(
+                    icon: Icons.star_rounded,
+                    value: streak?.totalXp ?? 0,
+                    label: 'মোট XP',
+                  ),
+                  _MetricTile(
+                    icon: Icons.task_alt_rounded,
+                    value: completedCount,
+                    label: 'পাঠ শেষ',
+                  ),
+                  _MetricTile(
+                    icon: Icons.emoji_events_rounded,
+                    value: streak?.longestStreak ?? 0,
+                    label: 'সর্বোচ্চ ধারা',
+                  ),
+                  _MetricTile(
+                    icon: Icons.menu_book_rounded,
+                    value: masteredCount,
+                    label: 'মুখস্থ শব্দ',
+                  ),
+                  _MetricTile(
+                    icon: Icons.auto_stories_rounded,
+                    value: learningCount,
+                    label: 'শেখার শব্দ',
+                  ),
+                ],
               ),
-              const SizedBox(width: 10),
-              _StatCard(
-                icon: Icons.menu_book,
-                iconColor: AppColors.teal,
-                value: '$completedCount',
-                label: 'পাঠ শেষ',
-                color: AppColors.tealLight,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Weekly XP card ─────────────────────────────────────────────
+          _staggered(
+            1,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainer,
+                borderRadius: AppRadius.lgBorder,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
               ),
-            ],
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.brightGreen.withValues(alpha: 0.15),
+                    ),
+                    child: const Icon(Icons.bar_chart_rounded,
+                        color: AppColors.brightGreen),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('এই সপ্তাহের XP', style: theme.textTheme.bodyLarge),
+                  const Spacer(),
+                  _CountUpStat(
+                    value: weeklyXp,
+                    suffix: ' XP',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.brightGreen),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Streak goal calendar ───────────────────────────────────────
+          if ((streak?.streakGoal ?? 0) > 0)
+            _staggered(
+              2,
+              StreakGoalProgressWidget(
+                currentStreak: streak?.currentStreak ?? 0,
+                streakGoal: streak!.streakGoal!,
+              ),
+            ),
+          if ((streak?.streakGoal ?? 0) > 0) const SizedBox(height: 10),
+
+          // ── Longest streak highlight ───────────────────────────────────
+          _staggered(
+            3,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainer,
+                borderRadius: AppRadius.lgBorder,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.gold.withValues(alpha: 0.15),
+                    ),
+                    child: const Icon(Icons.emoji_events_rounded,
+                        color: AppColors.gold),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('সর্বোচ্চ ধারা', style: theme.textTheme.bodyLarge),
+                  const Spacer(),
+                  _CountUpStat(
+                    value: streak?.longestStreak ?? 0,
+                    suffix: ' দিন',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold, color: AppColors.gold),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 28),
 
@@ -365,43 +541,62 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 }
 
-class _StatCard extends StatelessWidget {
+/// One tile of the 2x3 profile metric grid: icon in a tinted circle,
+/// a value that counts up from 0 on first build, and a muted label.
+class _MetricTile extends StatelessWidget {
   final IconData icon;
-  final Color iconColor;
-  final String value;
+  final int value;
   final String label;
-  final Color color;
-  const _StatCard(
-      {required this.icon,
-      required this.iconColor,
-      required this.value,
-      required this.label,
-      required this.color});
+  const _MetricTile(
+      {required this.icon, required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: theme.cardTheme.color,
-          borderRadius: AppRadius.lgBorder,
-          border: Border.all(color: theme.colorScheme.outlineVariant),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.15),
+          ),
+          child: Icon(icon, size: 18, color: Colors.white),
         ),
-        child: Column(
-          children: [
-            Icon(icon, size: 22, color: iconColor),
-            const SizedBox(height: 4),
-            Text(value,
-                style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold, color: color)),
-            Text(label,
-                style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant)),
-          ],
+        const SizedBox(height: 6),
+        _CountUpStat(
+          value: value,
+          style: const TextStyle(
+              fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
         ),
-      ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontSize: 11, color: Colors.white.withValues(alpha: 0.85)),
+        ),
+      ],
+    );
+  }
+}
+
+/// Stat value that counts up from 0 once on first build.
+class _CountUpStat extends StatelessWidget {
+  final int value;
+  final String suffix;
+  final TextStyle? style;
+  const _CountUpStat({required this.value, this.suffix = '', this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    return TweenAnimationBuilder<int>(
+      tween: IntTween(begin: 0, end: value),
+      duration: reduceMotion ? Duration.zero : AppMotion.statCountUp,
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => Text('$v$suffix', style: style),
     );
   }
 }

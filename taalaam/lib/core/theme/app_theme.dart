@@ -90,6 +90,15 @@ class AppMotion {
 
   // Page/route transitions (FadeThrough, SharedAxis)
   static const route   = Duration(milliseconds: 300);
+
+  // Lesson flow + completion screen
+  static const progress = Duration(milliseconds: 400); // top progress bar fill
+  static const countUp  = Duration(milliseconds: 800); // XP/stat count-up
+  static const ringSweep = Duration(milliseconds: 900); // accuracy ring sweep
+  static const completionStagger = Duration(milliseconds: 120); // completion screen reveal
+
+  // Profile screen
+  static const statCountUp = Duration(milliseconds: 600); // profile stat tile count-up
 }
 
 // ════════════════════════════════════════════════════════════════════════════

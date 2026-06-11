@@ -137,6 +137,11 @@ Two motion languages:
 | `tap` | 120ms | `TapScale` press-down (scale 0.97) |
 | `stagger` | 60ms | per-item entrance delay |
 | `route` | 300ms | page/route transitions (FadeThrough, SharedAxis) |
+| `progress` | 400ms | lesson top progress bar fill (easeOutCubic) |
+| `countUp` | 800ms | XP/stat count-up (easeOutCubic) |
+| `ringSweep` | 900ms | accuracy ring sweep + perfect-run shimmer |
+| `completionStagger` | 120ms | lesson completion / profile section stagger |
+| `statCountUp` | 600ms | profile metric tile count-up |
 
 Route transition mapping (`lib/core/router/app_router.dart` + `route_transitions.dart`):
 | Route type | Transition | Routes |
