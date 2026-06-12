@@ -41,6 +41,13 @@ class AuthService {
   Future<void> updatePassword(String newPassword) =>
       _client.auth.updateUser(UserAttributes(password: newPassword));
 
+  /// Upgrades the current anonymous session to a permanent email/password
+  /// account, keeping the same user id (and all of their progress).
+  Future<UserResponse> linkEmailAccount(String email, String password) =>
+      _client.auth.updateUser(
+        UserAttributes(email: email, password: password),
+      );
+
   Future<void> updateDisplayName(String name) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;

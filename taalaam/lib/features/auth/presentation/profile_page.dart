@@ -184,6 +184,84 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     }
   }
 
+  Future<void> _createAccount() async {
+    final emailCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          backgroundColor: cs.surfaceContainerHigh,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.xlBorder),
+          title: const Text('অ্যাকাউন্ট তৈরি করুন'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: emailCtrl,
+                decoration: const InputDecoration(labelText: 'ইমেইল'),
+                keyboardType: TextInputType.emailAddress,
+                autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                decoration: const InputDecoration(labelText: 'পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)'),
+                obscureText: true,
+              ),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('বাতিল')),
+                const SizedBox(width: 8),
+                FilledButton(
+                  style: FilledButton.styleFrom(minimumSize: const Size(88, 44)),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('তৈরি করুন'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+    final email = emailCtrl.text.trim();
+    final pass = passCtrl.text.trim();
+    emailCtrl.dispose();
+    passCtrl.dispose();
+    if (saved != true) return;
+    if (email.isEmpty || pass.length < 6) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('সঠিক ইমেইল ও কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন।')),
+        );
+      }
+      return;
+    }
+    try {
+      await ref.read(authServiceProvider).linkEmailAccount(email, pass);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('যাচাইকরণ লিংক ইমেইলে পাঠানো হয়েছে। ইমেইল চেক করুন।')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ত্রুটি: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Navigate to login the instant the user signs out — catches all sign-out paths
@@ -458,7 +536,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                   FilledButton.icon(
                     icon: const Icon(Icons.person_add_outlined, size: 18),
                     label: const Text('অ্যাকাউন্ট তৈরি করুন'),
-                    onPressed: () => context.go('/login'),
+                    onPressed: _createAccount,
                   ),
                 ],
               ),
