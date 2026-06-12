@@ -87,7 +87,7 @@
 - [x] Lesson bookmarking
 
 ### Quranic Track Specifics
-- [ ] Word-by-word Quran reading mode — requires Quran word dataset
+- [x] Word-by-word Quran reading mode — QPC Hafs Uthmani + GTAF Bangla word meanings, tafsir peek sheet, Mishary Al-Afasy audio (`/quran-reader`)
 - [ ] I'rab (grammatical analysis) display toggle — requires morphology data
 - [x] Root letter display for each word
 - [x] Quran frequency rank shown on vocabulary

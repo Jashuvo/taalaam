@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
@@ -80,7 +81,11 @@ class AuthService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  static const _redirectUrl = 'https://jashuvo.github.io/taalaam/';
+  // Web uses the hosted app URL; mobile uses a custom scheme so the OAuth
+  // browser redirect deep-links back into the app (see AndroidManifest.xml).
+  static const _redirectUrl = kIsWeb
+      ? 'https://jashuvo.github.io/taalaam/'
+      : 'com.taalaam.taalaam://login-callback/';
 }
 
 final authService = AuthService(Supabase.instance.client);
