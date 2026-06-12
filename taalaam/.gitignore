@@ -25,6 +25,7 @@ migrate_working_dir/
 
 # Supabase local secrets — never commit
 supabase/functions/.env
+.env.production
 
 # Flutter/Dart/Pub related
 **/doc/api/
