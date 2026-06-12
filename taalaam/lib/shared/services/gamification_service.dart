@@ -21,6 +21,14 @@ class GamificationService {
     return true;
   }
 
+  // Read-only check (does not mark as claimed) for whether today's
+  // first-lesson 2x XP bonus is still available.
+  static Future<bool> firstLessonBonusAvailable(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = '$_firstLessonPrefix$userId';
+    return prefs.getString(key) != _dateKey(DateTime.now());
+  }
+
   // Returns whether goal reward is available and marks it claimed.
   static Future<bool> claimGoalRewardIfDue(
       String userId, int currentStreak, int? streakGoal) async {

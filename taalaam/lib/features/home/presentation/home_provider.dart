@@ -5,6 +5,7 @@ import '../../../data/local/database.dart';
 import '../../../shared/services/gamification_service.dart';
 import '../../../shared/services/sync_service.dart';
 import '../../auth/presentation/auth_provider.dart';
+import 'leaderboard_page.dart';
 
 final syncServiceProvider = Provider<SyncService>((ref) {
   return SyncService(
@@ -217,6 +218,23 @@ final weeklyXpProvider = FutureProvider<int>((ref) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) return 0;
   return GamificationService.getWeeklyXp(user.id);
+});
+
+/// Whether today's first-lesson 2x XP bonus is still unclaimed.
+final firstLessonBonusAvailableProvider = FutureProvider<bool>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return false;
+  return GamificationService.firstLessonBonusAvailable(user.id);
+});
+
+/// The current user's 1-based leaderboard rank by total XP, or null if
+/// they're not signed in or not present in the (top-50) leaderboard.
+final leaderboardRankProvider = FutureProvider<int?>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return null;
+  final board = await ref.watch(leaderboardProvider.future);
+  final idx = board.indexWhere((e) => e['user_id'] == user.id);
+  return idx == -1 ? null : idx + 1;
 });
 
 /// Count of SRS cards the user has mastered (state >= 2).

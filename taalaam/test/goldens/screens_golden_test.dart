@@ -213,9 +213,9 @@ void main() {
       // Fixed Monday so the weekly-XP "today" column is stable.
       await withClock(Clock.fixed(DateTime(2026, 6, 8, 10)), () async {
         final db = await _seedDb();
-        await pumpScreen(tester, const HomePage(), db, mode);
+        await pumpScreen(tester, const LearnTab(), db, mode);
         await expectLater(
-          find.byType(HomePage),
+          find.byType(LearnTab),
           matchesGoldenFile('home_$suffix.png'),
         );
         await cleanupScreen(tester, db);

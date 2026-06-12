@@ -1,22 +1,21 @@
 import 'package:animations/animations.dart';
-import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hijri/hijri_calendar.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show User;
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/tap_scale.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/services/gamification_service.dart';
-import '../../../shared/utils/xp_level.dart';
-import '../../../shared/widgets/confirm_dialog.dart';
+import '../../../shared/utils/bn_digits.dart';
 import '../../../shared/widgets/offline_banner.dart';
+import '../../../shared/widgets/misbaha/gold_pill_button.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../auth/presentation/onboarding_page.dart';
-import '../../../shared/widgets/progress_share_card.dart';
 import 'home_provider.dart';
 import 'track_detail_page.dart';
 import 'widgets/streak_goal_completion_dialog.dart';
-import 'widgets/streak_goal_progress_widget.dart';
 
 // Tier accent colours, mirroring track_detail_page._tierGradients (first colour).
 const _heroTierColors = <int, Color>{
@@ -26,394 +25,55 @@ const _heroTierColors = <int, Color>{
   4: Color(0xFF3B0764),
 };
 
-class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
+const _weekdaysBn = [
+  'রবিবার',
+  'সোমবার',
+  'মঙ্গলবার',
+  'বুধবার',
+  'বৃহস্পতিবার',
+  'শুক্রবার',
+  'শনিবার',
+];
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen<AsyncValue<bool>>(onboardingDoneProvider, (_, next) {
-      if (next.valueOrNull == false && context.mounted) {
-        context.go('/onboarding');
-      }
-    });
-    final user = ref.watch(currentUserProvider);
-    // Show streak goal completion dialog once when goal is reached.
-    ref.listen<AsyncValue<Streak?>>(streakProvider, (_, next) {
-      final streakData = next.valueOrNull;
-      final userId = user?.id;
-      if (streakData == null || userId == null) return;
-      final goal = streakData.streakGoal;
-      if (goal == null) return;
-      GamificationService.claimGoalRewardIfDue(
-              userId, streakData.currentStreak, goal)
-          .then((awarded) {
-        if (awarded && context.mounted) {
-          showStreakGoalCompletionDialog(context, goal);
-        }
-      });
-    });
-    final tracks = ref.watch(tracksProvider);
-    final streak = ref.watch(streakProvider);
-    final dueCount = ref.watch(dueCountProvider);
+const _hijriMonthsBn = [
+  'মুহাররম',
+  'সফর',
+  'রবিউল আউয়াল',
+  'রবিউস সানি',
+  'জমাদিউল আউয়াল',
+  'জমাদিউস সানি',
+  'রজব',
+  'শাবান',
+  'রমজান',
+  'শাওয়াল',
+  'জিলকদ',
+  'জিলহজ',
+];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Builder(builder: (ctx) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return Image.asset(
-            isDark
-                ? 'assets/logo_dark-removebg-preview.png'
-                : 'assets/logo_light-removebg-preview.png',
-            height: 44,
-          );
-        }),
-        centerTitle: false,
-        actions: [
-          dueCount.when(
-            data: (count) => count > 0
-                ? Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: IconButton(
-                      tooltip: '$count টি রিভিউ বাকি',
-                      icon: Badge(
-                        label: Text('$count'),
-                        child: const Icon(Icons.refresh),
-                      ),
-                      onPressed: () => context.push('/review'),
-                    ),
-                  )
-                : const SizedBox.shrink(),
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'অগ্রগতি শেয়ার করুন',
-            onPressed: () => showProgressShareDialog(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.leaderboard_outlined),
-            tooltip: 'র‍্যাংকিং',
-            onPressed: () => context.push('/leaderboard'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'সেটিংস',
-            onPressed: () => context.push('/settings'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'প্রোফাইল',
-            onPressed: () => context.push('/profile'),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                final sync = ref.read(syncServiceProvider);
-                final knownTracks = ref.read(tracksProvider).valueOrNull ?? [];
-                await sync.syncTracks();
-                ref.invalidate(tracksProvider);
-                for (final t in knownTracks) {
-                  await sync.syncUnits(t.id);
-                  ref.invalidate(unitsForTrackProvider(t.id));
-                }
-              },
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                      child: _StreakXpCard(streak: streak, user: user),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                      child: _WeeklyXpCard(),
-                    ),
-                  ),
-                  if ((streak.valueOrNull?.streakGoal ?? 0) > 0)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                        child: StreakGoalProgressWidget(
-                          currentStreak:
-                              streak.valueOrNull?.currentStreak ?? 0,
-                          streakGoal: streak.valueOrNull!.streakGoal!,
-                        ),
-                      ),
-                    ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                      child: _QuickAccessRow(),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-                      child: Text(
-                        'শেখার পথ',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ),
-                  ),
-                  tracks.when(
-                    data: (list) => list.isEmpty
-                        ? const SliverToBoxAdapter(child: _EmptyTracksState())
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (ctx, i) => Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                                child: _TrackCard(track: list[i]),
-                              ),
-                              childCount: list.length,
-                            ),
-                          ),
-                    loading: () => const SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(48),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                    ),
-                    error: (e, _) => SliverToBoxAdapter(
-                      child: Center(
-                        child: Text('পাঠ লোড হচ্ছে না।',
-                            style: TextStyle(
-                                color:
-                                    Theme.of(context).colorScheme.error)),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(height: navClearance(context)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Streak / XP card ──────────────────────────────────────────────────────────
-
-class _StreakXpCard extends ConsumerWidget {
-  final AsyncValue<Streak?> streak;
-  final dynamic user;
-  const _StreakXpCard({required this.streak, required this.user});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final streakData = streak.valueOrNull;
-    final currentStreak = streakData?.currentStreak ?? 0;
-    final longestStreak = streakData?.longestStreak ?? 0;
-    final totalXp = streakData?.totalXp ?? 0;
-    final freezeCount = streakData?.freezeCount ?? 0;
-    final isAnon = user?.isAnonymous == true;
-    final userId = user?.id as String?;
-    final mastered = ref.watch(masteredWordCountProvider).valueOrNull ?? 0;
-    final level = XpLevel.forXp(totalXp);
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppColors.gradientStreak,
-        ),
-        borderRadius: AppRadius.xlBorder,
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.35),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Flame + streak count
-            const Icon(Icons.local_fire_department,
-                size: 40, color: AppColors.gold),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$currentStreak',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
-                    fontWeight: FontWeight.bold,
-                    height: 1,
-                  ),
-                ),
-                const Text(
-                  'দিনের ধারা',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(width: 16),
-            // XP / level / streak / mastered badges
-            Expanded(
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  _Badge(
-                    icon: Icons.star_rounded,
-                    iconColor: AppColors.gold,
-                    label: '$totalXp XP',
-                    color: Colors.white24,
-                  ),
-                  _Badge(
-                    label: '${level.nameAr} Lv.${level.level}',
-                    color: AppColors.gold.withValues(alpha: 0.35),
-                  ),
-                  if (longestStreak > 0)
-                    _Badge(
-                      icon: Icons.emoji_events,
-                      iconColor: AppColors.gold,
-                      label: '$longestStreak সর্বোচ্চ',
-                      color: Colors.white.withValues(alpha: 0.12),
-                    ),
-                  if (mastered > 0)
-                    _Badge(
-                      icon: Icons.menu_book,
-                      iconColor: AppColors.teal,
-                      label: '$mastered মুখস্থ',
-                      color: AppColors.brightGreen.withValues(alpha: 0.3),
-                    ),
-                  if (freezeCount > 0)
-                    _Badge(
-                      icon: Icons.ac_unit,
-                      iconColor: AppColors.tealLight,
-                      label: '$freezeCount ফ্রিজ',
-                      color: Colors.lightBlue.withValues(alpha: 0.25),
-                    ),
-                ],
-              ),
-            ),
-            if (isAnon)
-              OutlinedButton(
-                onPressed: () => context.go('/login'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white54),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                ),
-                child: const Text('সংরক্ষণ'),
-              )
-            else if (userId != null && currentStreak > 0)
-              Tooltip(
-                message: 'স্ট্রিক ফ্রিজ',
-                child: IconButton(
-                  icon: const Icon(Icons.ac_unit,
-                      size: 22, color: AppColors.tealLight),
-                  onPressed: () async {
-                    final confirm = await showConfirmDialog(
-                      context,
-                      title: 'স্ট্রিক ফ্রিজ',
-                      body: 'একটি ফ্রিজ ব্যবহার করবেন? একদিন মিস হলেও স্ট্রিক বজায় থাকবে।',
-                    );
-                    if (confirm == true) {
-                      await ref
-                          .read(streakFreezeProvider(userId).notifier)
-                          .freeze();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.ac_unit,
-                                    size: 18, color: AppColors.tealLight),
-                                SizedBox(width: 8),
-                                Text('স্ট্রিক ফ্রিজ সক্রিয়!'),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final IconData? icon;
-  final Color? iconColor;
-  final String label;
-  final Color color;
-  const _Badge({this.icon, this.iconColor, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: iconColor ?? Colors.white),
-            const SizedBox(width: 4),
-          ],
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-}
-
+const _encouragements = [
+  'আজকের ছোট একটি পাঠ আগামীর বড় পরিবর্তন',
+  'ধারাবাহিকতাই বরকতের চাবি — চালিয়ে যান',
+  'এক আয়াত শেখাও একটি অর্জন',
+];
 // ── Weekly XP card ────────────────────────────────────────────────────────────
 
 class _WeeklyXpCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final weeklyXp = ref.watch(weeklyXpProvider).valueOrNull ?? 0;
+    final rank = ref.watch(leaderboardRankProvider).valueOrNull;
     const weeklyGoal = 200;
     final pct = (weeklyXp / weeklyGoal).clamp(0.0, 1.0);
-    final dayLabels = ['সো', 'মং', 'বু', 'বৃ', 'শু', 'শ', 'র'];
-    final today = clock.now().weekday; // 1=Mon … 7=Sun
+    final remaining = (weeklyGoal - weeklyXp).clamp(0, weeklyGoal);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: AppRadius.lgBorder,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: AppRadius.mdBorder,
+        border: Border.all(color: isDark ? AppColors.darkOutlineVariant : AppColors.line),
+        boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,181 +82,52 @@ class _WeeklyXpCard extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'এই সপ্তাহ',
-                style: theme.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                'সাপ্তাহিক XP · ${bnDigits(weeklyXp)}/${bnDigits(weeklyGoal)}',
+                style: TextStyle(
+                  fontFamily: 'HindSiliguri',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? AppColors.darkOnSurface : AppColors.ink,
+                ),
               ),
-              Text(
-                '$weeklyXp / $weeklyGoal XP',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.gold,
-                  fontWeight: FontWeight.bold,
+              GestureDetector(
+                onTap: () => context.push('/leaderboard'),
+                child: Text(
+                  rank != null ? 'লিডারবোর্ড #${bnDigits(rank)} ›' : 'লিডারবোর্ড ›',
+                  style: const TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.goldDeep,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 9),
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 6,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+            borderRadius: BorderRadius.circular(99),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: pct),
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut,
+              builder: (_, val, __) => LinearProgressIndicator(
+                value: val,
+                minHeight: 7,
+                backgroundColor: const Color(0xFFE9E2D2),
+                valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+              ),
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(7, (i) {
-              final dayNum = i + 1;
-              final isPast = dayNum < today;
-              final isToday = dayNum == today;
-              return Column(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isPast
-                          ? AppColors.brightGreen
-                          : isToday
-                              ? AppColors.gold
-                              : theme.colorScheme.surfaceContainerHighest,
-                    ),
-                    child: Icon(
-                      isPast ? Icons.check : isToday ? Icons.star : null,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    dayLabels[i],
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: isToday ? FontWeight.bold : FontWeight.w400,
-                      color: isToday
-                          ? AppColors.gold
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Quick access row ──────────────────────────────────────────────────────────
-
-class _QuickAccessRow extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final newCount = ref.watch(newCardCountProvider).valueOrNull ?? 0;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        _QuickAccessButton(
-          icon: Icons.chat_bubble_outline_rounded,
-          label: 'কথোপকথন',
-          color: AppColors.teal,
-          onTap: () => context.push('/conversation'),
-        ),
-        _QuickAccessButton(
-          icon: Icons.psychology_outlined,
-          label: 'মুখস্থ',
-          color: const Color(0xFF5B4FCF),
-          badge: newCount,
-          onTap: () => context.push('/memorize'),
-        ),
-        _QuickAccessButton(
-          icon: Icons.groups_outlined,
-          label: 'হালাকা',
-          color: AppColors.midGreen,
-          onTap: () => context.push('/groups'),
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickAccessButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  final int badge;
-  const _QuickAccessButton(
-      {required this.icon,
-      required this.label,
-      required this.color,
-      required this.onTap,
-      this.badge = 0});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [color, color.withValues(alpha: 0.7)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, size: 26, color: Colors.white),
-              ),
-              if (badge > 0)
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    child: Text(
-                      '$badge',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 7),
+          const SizedBox(height: 6),
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
+            remaining > 0
+                ? 'লক্ষ্য পূরণে আর ${bnDigits(remaining)} XP — ইনশাআল্লাহ হয়ে যাবে'
+                : 'এই সপ্তাহের লক্ষ্য পূর্ণ হয়েছে — মাশাআল্লাহ!',
+            style: const TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontSize: 10.5,
+              color: AppColors.ink2,
             ),
           ),
         ],
@@ -705,73 +236,139 @@ class _ContinueLearningCard extends ConsumerWidget {
   }
 }
 
-// ── SRS due chip ─────────────────────────────────────────────────────────────
+// ── SRS row (মুখস্থ / রিভিউ) ──────────────────────────────────────────────────
 
-class _ReviewDueChip extends ConsumerWidget {
-  const _ReviewDueChip();
+class _SrsRow extends ConsumerWidget {
+  const _SrsRow();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+    final newCount = ref.watch(newCardCountProvider).valueOrNull ?? 0;
     final dueCount = ref.watch(dueCountProvider).valueOrNull ?? 0;
-    final isDue = dueCount > 0;
 
+    return Row(
+      children: [
+        Expanded(
+          child: _SrsCard(
+            icon: '✍️',
+            iconBg: const Color(0xFFFBF3DE),
+            iconColor: AppColors.goldDeep,
+            title: 'মুখস্থ',
+            subtitle: 'নতুন শব্দ',
+            count: newCount,
+            onTap: () => context.push('/memorize'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _SrsCard(
+            icon: '↻',
+            iconBg: const Color(0xFFE2EFEA),
+            iconColor: AppColors.midGreen,
+            title: 'রিভিউ',
+            subtitle: 'আজ বাকি',
+            count: dueCount,
+            onTap: dueCount > 0 ? () => context.push('/review') : null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SrsCard extends StatelessWidget {
+  final String icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final int count;
+  final VoidCallback? onTap;
+
+  const _SrsCard({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.count,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TapScale(
       child: Material(
-        color: isDue
-            ? AppColors.gold.withValues(alpha: 0.08)
-            : theme.colorScheme.surfaceContainer.withValues(alpha: 0.5),
-        borderRadius: AppRadius.lgBorder,
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: AppRadius.mdBorder,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: isDue ? () => context.push('/review') : null,
+          onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             decoration: BoxDecoration(
-              borderRadius: AppRadius.lgBorder,
-              border: Border.all(
-                color: isDue
-                    ? AppColors.gold.withValues(alpha: 0.3)
-                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-              ),
+              borderRadius: AppRadius.mdBorder,
+              border:
+                  Border.all(color: isDark ? AppColors.darkOutlineVariant : AppColors.line),
+              boxShadow: AppShadows.card,
             ),
             child: Row(
               children: [
-                Icon(
-                  isDue ? Icons.refresh_rounded : Icons.check_circle_rounded,
-                  color: isDue
-                      ? AppColors.gold
-                      : AppColors.forestGreen.withValues(alpha: 0.7),
-                  size: 20,
+                Container(
+                  width: 33,
+                  height: 33,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Text(icon, style: TextStyle(fontSize: 15, color: iconColor)),
+                  ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 9),
                 Expanded(
-                  child: Text(
-                    isDue ? 'আজকের রিভিউ: $dueCount কার্ড' : 'রিভিউ শেষ ✓',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: isDue
-                          ? theme.colorScheme.onSurface
-                          : theme.colorScheme.onSurfaceVariant,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontFamily: 'HindSiliguri',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? AppColors.darkOnSurface : AppColors.ink,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                            fontFamily: 'HindSiliguri', fontSize: 10.5, color: AppColors.ink2),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 22),
+                  height: 22,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.forestGreen,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Center(
+                    child: Text(
+                      bnDigits(count),
+                      style: const TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.goldLight,
+                      ),
                     ),
                   ),
                 ),
-                if (isDue)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '$dueCount',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -827,9 +424,30 @@ class _LearnTabState extends ConsumerState<LearnTab>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<bool>>(onboardingDoneProvider, (_, next) {
+      if (next.valueOrNull == false && context.mounted) {
+        context.go('/onboarding');
+      }
+    });
+    final user = ref.watch(currentUserProvider);
+    // Show streak goal completion dialog once when goal is reached.
+    ref.listen<AsyncValue<Streak?>>(streakProvider, (_, next) {
+      final streakData = next.valueOrNull;
+      final userId = user?.id;
+      if (streakData == null || userId == null) return;
+      final goal = streakData.streakGoal;
+      if (goal == null) return;
+      GamificationService.claimGoalRewardIfDue(
+              userId, streakData.currentStreak, goal)
+          .then((awarded) {
+        if (awarded && context.mounted) {
+          showStreakGoalCompletionDialog(context, goal);
+        }
+      });
+    });
+
     final tracks = ref.watch(tracksProvider);
     final streak = ref.watch(streakProvider).valueOrNull;
-    final theme = Theme.of(context);
     _maybePulseFlame(streak);
 
     final flameScale = TweenSequence<double>([
@@ -844,155 +462,243 @@ class _LearnTabState extends ConsumerState<LearnTab>
     ]).animate(_flameController);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Builder(builder: (ctx) {
-          final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          return Image.asset(
-            isDark
-                ? 'assets/logo_dark-removebg-preview.png'
-                : 'assets/logo_light-removebg-preview.png',
-            height: 44,
-          );
-        }),
-        centerTitle: false,
-        actions: [
-          // Compact streak chip
-          if (streak != null) ...[
-            ScaleTransition(
-              scale: flameScale,
-              child: _StatChip(Icons.local_fire_department, AppColors.gold,
-                  '${streak.currentStreak}'),
-            ),
-            _StatChip(Icons.star_rounded, AppColors.gold,
-                '${streak.totalXp}'),
-            _StatChip(Icons.favorite, Colors.red, '${streak.hearts}/5'),
-          ],
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                final sync = ref.read(syncServiceProvider);
-                final knownTracks =
-                    ref.read(tracksProvider).valueOrNull ?? [];
-                await sync.syncTracks();
-                ref.invalidate(tracksProvider);
-                for (final t in knownTracks) {
-                  await sync.syncUnits(t.id);
-                  ref.invalidate(unitsForTrackProvider(t.id));
-                }
-              },
-              child: CustomScrollView(
-                slivers: [
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
-                      child: _ContinueLearningCard(),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                      child: Text(
-                        'শেখার পথ',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? null
+          : AppColors.paper,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            const OfflineBanner(),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  final sync = ref.read(syncServiceProvider);
+                  final knownTracks =
+                      ref.read(tracksProvider).valueOrNull ?? [];
+                  await sync.syncTracks();
+                  ref.invalidate(tracksProvider);
+                  for (final t in knownTracks) {
+                    await sync.syncUnits(t.id);
+                    ref.invalidate(unitsForTrackProvider(t.id));
+                  }
+                },
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                        child: _HomeHeaderRow(
+                          user: user,
+                          streak: streak,
+                          flameScale: flameScale,
                         ),
                       ),
                     ),
-                  ),
-                  tracks.when(
-                    data: (list) => list.isEmpty
-                        ? const SliverToBoxAdapter(
-                            child: _EmptyTracksState())
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (ctx, i) => Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                    20, 0, 20, 14),
-                                child: _TrackCard(track: list[i]),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 13, 20, 9),
+                        child: _GreetingBlock(user: user),
+                      ),
+                    ),
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
+                        child: _ContinueLearningCard(),
+                      ),
+                    ),
+                    tracks.when(
+                      data: (list) => list.isEmpty
+                          ? const SliverToBoxAdapter(
+                              child: _EmptyTracksState())
+                          : SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (ctx, i) => Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      20, 0, 20, 11),
+                                  child: _TrackCard(track: list[i]),
+                                ),
+                                childCount: list.length,
                               ),
-                              childCount: list.length,
                             ),
+                      loading: () => const SliverToBoxAdapter(
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(48),
+                            child: CircularProgressIndicator(),
                           ),
-                    loading: () => const SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(48),
-                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (e, _) => SliverToBoxAdapter(
+                        child: Center(
+                          child: Text('পাঠ লোড হচ্ছে না।',
+                              style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error)),
                         ),
                       ),
                     ),
-                    error: (e, _) => SliverToBoxAdapter(
-                      child: Center(
-                        child: Text('পাঠ লোড হচ্ছে না।',
-                            style: TextStyle(
-                                color: Theme.of(context).colorScheme.error)),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 11),
+                        child: _WeeklyXpCard(),
                       ),
                     ),
-                  ),
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(20, 0, 20, 14),
-                      child: _ReviewDueChip(),
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(20, 1, 20, 16),
+                        child: _SrsRow(),
+                      ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(height: navClearance(context)),
-                  ),
-                ],
+                    SliverToBoxAdapter(
+                      child: SizedBox(height: navClearance(context)),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StatChip extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String value;
-  const _StatChip(this.icon, this.iconColor, this.value);
+// ── Header row (avatar + streak/XP/hearts chips) ────────────────────────────
+
+class _HomeHeaderRow extends StatelessWidget {
+  final User? user;
+  final Streak? streak;
+  final Animation<double> flameScale;
+
+  const _HomeHeaderRow({required this.user, required this.streak, required this.flameScale});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(left: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: iconColor),
-          const SizedBox(width: 4),
-          AnimatedSwitcher(
-            duration: AppMotion.normal,
-            transitionBuilder: (child, anim) => ScaleTransition(
-              scale: anim,
-              child: FadeTransition(opacity: anim, child: child),
+    final email = user?.email;
+    final initial =
+        (email != null && email.isNotEmpty) ? email[0].toUpperCase() : 'আ';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.forestGreen, AppColors.midGreen],
             ),
+            border: Border.all(color: AppColors.gold, width: 2),
+          ),
+          child: Center(
             child: Text(
-              value,
-              key: ValueKey(value),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: theme.colorScheme.onSurface,
+              initial,
+              style: const TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.goldLight,
               ),
             ),
           ),
-        ],
-      ),
+        ),
+        Row(
+          children: [
+            if (streak != null) ...[
+              ScaleTransition(
+                scale: flameScale,
+                child: StatChip(
+                  icon: '🔥',
+                  iconColor: AppColors.gold,
+                  label: bnDigits(streak!.currentStreak),
+                ),
+              ),
+              const SizedBox(width: 7),
+              StatChip(
+                icon: '✦',
+                iconColor: AppColors.tealLight,
+                label: '${bnDigits(streak!.totalXp)} XP',
+              ),
+              const SizedBox(width: 7),
+              StatChip(
+                icon: '❤️',
+                label: '${bnDigits(streak!.hearts)}/${bnDigits(5)}',
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Greeting block (Hijri date + greeting + sub-line) ───────────────────────
+
+class _GreetingBlock extends ConsumerWidget {
+  final User? user;
+  const _GreetingBlock({required this.user});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final now = DateTime.now();
+    final hijri = HijriCalendar.now();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final dateLine =
+        '${_weekdaysBn[now.weekday % 7]} · ${bnDigits(hijri.hDay)} ${_hijriMonthsBn[hijri.hMonth - 1]} ${bnDigits(hijri.hYear)}';
+
+    final email = user?.email;
+    final firstName = (email != null && email.contains('@'))
+        ? email.split('@').first
+        : 'শিক্ষার্থী';
+
+    final greeting = now.weekday == DateTime.friday
+        ? "জুমু'আ মুবারাকাহ, $firstName"
+        : 'আসসালামু আলাইকুম, $firstName';
+
+    final bonusAvailable =
+        ref.watch(firstLessonBonusAvailableProvider).valueOrNull ?? false;
+    final subLine = bonusAvailable
+        ? '⚡ দিনের প্রথম পাঠে ২× XP — আজকের পাঠ শুরু করুন'
+        : _encouragements[now.day % _encouragements.length];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          dateLine,
+          style: const TextStyle(
+            fontFamily: 'HindSiliguri',
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.goldDeep,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          greeting,
+          style: TextStyle(
+            fontFamily: 'HindSiliguri',
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+            color: isDark ? AppColors.darkOnSurface : AppColors.ink,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          subLine,
+          style: const TextStyle(
+            fontFamily: 'HindSiliguri',
+            fontSize: 12.5,
+            color: AppColors.ink2,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1037,7 +743,7 @@ class _TrackCard extends ConsumerWidget {
           children: [
             // Gradient header
             Container(
-              height: 96,
+              height: 88,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -1091,17 +797,13 @@ class _TrackCard extends ConsumerWidget {
                                   fontSize: 17,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Directionality(
-                                textDirection: TextDirection.rtl,
-                                child: Text(
-                                  track.nameAr,
-                                  style: const TextStyle(
-                                    fontFamily: 'NotoNaskhArabic',
-                                    fontSize: 14,
-                                    height: 1.4,
-                                    color: Colors.white70,
-                                  ),
+                              const SizedBox(height: 1),
+                              Text(
+                                subtitle,
+                                style: const TextStyle(
+                                  fontFamily: 'HindSiliguri',
+                                  fontSize: 11.5,
+                                  color: Colors.white70,
                                 ),
                               ),
                             ],
@@ -1115,50 +817,43 @@ class _TrackCard extends ConsumerWidget {
             ),
             // Bottom row
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(16, 10, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          subtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                  if (progress != null && progress.total > 0)
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: AppRadius.xxlBorder,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: progress.fraction),
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.easeOut,
+                          builder: (_, val, __) => LinearProgressIndicator(
+                            value: val,
+                            minHeight: 6,
+                            backgroundColor: const Color(0xFFE9E2D2),
+                            valueColor:
+                                AlwaysStoppedAnimation(gradientColors[0]),
                           ),
                         ),
                       ),
-                      if (progress != null && progress.total > 0)
-                        Text(
-                          '${progress.completed}/${progress.total} পাঠ',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                    ],
-                  ),
+                    )
+                  else
+                    const Spacer(),
                   if (progress != null && progress.total > 0) ...[
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: AppRadius.xxlBorder,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: progress.fraction),
-                        duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeOut,
-                        builder: (_, val, __) => LinearProgressIndicator(
-                          value: val,
-                          minHeight: 6,
-                          backgroundColor:
-                              theme.colorScheme.surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation(
-                              gradientColors[0]),
-                        ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '${bnDigits(progress.completed)}/${bnDigits(progress.total)} পাঠ',
+                      style: const TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink2,
                       ),
                     ),
                   ],
+                  const SizedBox(width: 6),
+                  const Text('›', style: TextStyle(fontSize: 15, color: Color(0xFFC2B89F))),
                 ],
               ),
             ),

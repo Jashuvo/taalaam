@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/utils/bn_digits.dart';
 import '../../../shared/utils/xp_level.dart';
 import '../../../shared/widgets/progress_share_card.dart';
 import '../../auth/presentation/auth_provider.dart';
@@ -78,7 +79,7 @@ class _MainShellState extends ConsumerState<MainShell> {
 
 // ── Floating bottom-nav pill ────────────────────────────────────────────────
 
-class _NavPill extends StatelessWidget {
+class _NavPill extends ConsumerWidget {
   final int tab;
   final ValueChanged<int> onSelect;
 
@@ -99,16 +100,17 @@ class _NavPill extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final disableAnim = MediaQuery.of(context).disableAnimations;
+    final dueCount = ref.watch(dueCountProvider).valueOrNull ?? 0;
     return Container(
       height: kNavPillHeight,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
+        color: isDark ? AppColors.darkCard : AppColors.paper,
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            color: isDark ? AppColors.darkOutlineVariant : AppColors.line),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -135,7 +137,7 @@ class _NavPill extends StatelessWidget {
                   height: 36,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: AppColors.gold.withValues(alpha: 0.18),
+                      color: AppColors.gold.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
@@ -149,6 +151,7 @@ class _NavPill extends StatelessWidget {
                         selectedIcon: _selectedIcons[i],
                         label: _labels[i],
                         selected: tab == i,
+                        badge: i == 1 ? dueCount : 0,
                         onTap: () => onSelect(i),
                       ),
                     ),
@@ -168,6 +171,7 @@ class _NavBarItem extends StatelessWidget {
   final IconData selectedIcon;
   final String label;
   final bool selected;
+  final int badge;
   final VoidCallback onTap;
 
   const _NavBarItem({
@@ -176,32 +180,68 @@ class _NavBarItem extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badge = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final disableAnim = MediaQuery.of(context).disableAnimations;
-    final color = selected ? AppColors.gold : theme.colorScheme.onSurfaceVariant;
+    final color = selected
+        ? AppColors.goldDeep
+        : (isDark ? AppColors.darkOnSurfaceVariant : AppColors.ink2);
     return InkWell(
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          AnimatedScale(
-            scale: selected ? 1.1 : 1.0,
-            duration: disableAnim ? Duration.zero : AppMotion.normal,
-            curve: Curves.easeOutCubic,
-            child: Icon(selected ? selectedIcon : icon, color: color),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              AnimatedScale(
+                scale: selected ? 1.1 : 1.0,
+                duration: disableAnim ? Duration.zero : AppMotion.normal,
+                curve: Curves.easeOutCubic,
+                child: Icon(selected ? selectedIcon : icon, color: color),
+              ),
+              if (badge > 0)
+                Positioned(
+                  top: -4,
+                  right: -8,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 16),
+                    height: 16,
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFC0392B),
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                    child: Center(
+                      child: Text(
+                        bnDigits(badge),
+                        style: const TextStyle(
+                          fontFamily: 'HindSiliguri',
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 4),
           AnimatedDefaultTextStyle(
             duration: disableAnim ? Duration.zero : AppMotion.normal,
             curve: Curves.easeOutCubic,
             style: TextStyle(
+              fontFamily: 'HindSiliguri',
               fontSize: 11,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: color,
+              color: selected
+                  ? AppColors.forestGreen
+                  : (isDark ? AppColors.darkOnSurfaceVariant : AppColors.ink2),
             ),
             child: Text(label),
           ),
