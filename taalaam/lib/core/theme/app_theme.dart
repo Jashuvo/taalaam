@@ -69,6 +69,57 @@ class AppColors {
   static const quranicCardDone        = Color(0x144CAF82); // brightGreen @ 8%
   static const quranicCardCurrentGlow = Color(0x2ED4A017); // gold @ 18%
   static const quranicBorderSubtle    = Color(0x401B4332); // forestGreen @ 25%
+
+  // ── Misbaha design system (UI-6) ──────────────────────────────────────────
+  static const goldLight    = Color(0xFFE9C25B);
+  static const goldDeep     = Color(0xFFA87B0A);
+  static const misbahaCord  = Color(0xFFC9A23E);
+  static const paper        = Color(0xFFFAF8F3);
+  static const ink          = Color(0xFF1A2E22);
+  static const ink2         = Color(0xFF4A6355);
+  static const line         = Color(0xFFE4DCCB);
+  static const okGreen      = Color(0xFF2E7D32);
+  static const okBg         = Color(0xFFE4F2E5);
+  static const wrongRed     = Color(0xFFB3261E);
+  // Distinct from the existing dark `wrongBg` (feedback banner background);
+  // this is the new light-pink wrong-answer sheet background.
+  static const wrongBgSoft  = Color(0xFFFAE4E2);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// SHADOWS — Misbaha design system (UI-6)
+// ════════════════════════════════════════════════════════════════════════════
+
+class AppShadows {
+  AppShadows._();
+
+  static final card = [
+    BoxShadow(
+      color: AppColors.ink.withValues(alpha: 0.06),
+      offset: const Offset(0, 1),
+      blurRadius: 2,
+    ),
+    BoxShadow(
+      color: AppColors.ink.withValues(alpha: 0.14),
+      offset: const Offset(0, 6),
+      blurRadius: 18,
+      spreadRadius: -8,
+    ),
+  ];
+
+  static final pop = [
+    BoxShadow(
+      color: AppColors.ink.withValues(alpha: 0.12),
+      offset: const Offset(0, 2),
+      blurRadius: 6,
+    ),
+    BoxShadow(
+      color: AppColors.ink.withValues(alpha: 0.35),
+      offset: const Offset(0, 18),
+      blurRadius: 40,
+      spreadRadius: -16,
+    ),
+  ];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -99,6 +150,12 @@ class AppMotion {
 
   // Profile screen
   static const statCountUp = Duration(milliseconds: 600); // profile stat tile count-up
+
+  // Misbaha design system (UI-6)
+  static const stampIn = Duration(milliseconds: 550); // ۞ ornament stamp
+  static const beadPulse = Duration(milliseconds: 2200); // current-lesson bead ring pulse
+  static const feedbackSheet = Duration(milliseconds: 350); // answer feedback bottom sheet
+  static const screenFade = Duration(milliseconds: 260);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
