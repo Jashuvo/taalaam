@@ -15,6 +15,7 @@
 - [x] Environment config (.env handling)
 - [x] Arabic RTL text rendering verified
 - [x] Theme system (Islamic color palette, both light/dark)
+- [x] UI-6 "Misbaha" design-parity redesign (presentation-layer restyle of all learner screens to match `docs/design/TaallamComplete.jsx`)
 
 ### Auth
 - [x] Anonymous login (learner can start without account)
