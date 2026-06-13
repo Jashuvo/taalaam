@@ -160,74 +160,84 @@ class _ContinueLearningCard extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => context.push('/lesson/${current.lesson.id}'),
-            child: IntrinsicHeight(
-              child: Row(
-                children: [
-                  Container(width: 5, color: accent),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'চালিয়ে যাও',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: accent,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            current.lesson.titleBn,
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            current.unit.titleBn,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: AppRadius.xxlBorder,
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0, end: fraction),
-                              duration: const Duration(milliseconds: 600),
-                              curve: Curves.easeOut,
-                              builder: (_, val, __) => LinearProgressIndicator(
-                                value: val,
-                                minHeight: 5,
-                                backgroundColor:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                valueColor: AlwaysStoppedAnimation(accent),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                        width: 5, height: double.infinity, color: accent),
+                  ),
+                ),
+                Row(
+                  children: [
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'চালিয়ে যাও',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: accent,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              current.lesson.titleBn,
+                              style: theme.textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              current.unit.titleBn,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: AppRadius.xxlBorder,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: fraction),
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.easeOut,
+                                builder: (_, val, __) =>
+                                    LinearProgressIndicator(
+                                  value: val,
+                                  minHeight: 5,
+                                  backgroundColor: theme
+                                      .colorScheme.surfaceContainerHighest,
+                                  valueColor: AlwaysStoppedAnimation(accent),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 14),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
+                    Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.play_arrow_rounded,
+                            color: accent, size: 26),
                       ),
-                      child: Icon(Icons.play_arrow_rounded,
-                          color: accent, size: 26),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
