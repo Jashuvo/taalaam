@@ -898,11 +898,14 @@ class _LessonPathState extends State<_LessonPath>
         (n > 1 ? (n - 1) * _stagger.inMilliseconds : 0);
     _entranceCtrl =
         AnimationController(vsync: this, duration: Duration(milliseconds: totalMs));
-    if (MediaQuery.of(context).disableAnimations) {
-      _entranceCtrl.value = 1;
-    } else {
-      _entranceCtrl.forward();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (MediaQuery.of(context).disableAnimations) {
+        _entranceCtrl.value = 1;
+      } else {
+        _entranceCtrl.forward();
+      }
+    });
   }
 
   @override
@@ -1138,8 +1141,8 @@ class _CurrentLessonBeadState extends State<_CurrentLessonBead>
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: 60,
-          height: 60,
+          width: 52,
+          height: 52,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -1152,8 +1155,8 @@ class _CurrentLessonBeadState extends State<_CurrentLessonBead>
                           (0.55 - 0.08) *
                               (0.5 + 0.5 * cos(_pulse.value * 2 * pi));
                   return Container(
-                    width: 60,
-                    height: 60,
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
@@ -1204,7 +1207,7 @@ class _CurrentLessonBeadState extends State<_CurrentLessonBead>
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 3),
         SizedBox(
           width: _nodeSize + 18,
           child: Text(
@@ -1214,7 +1217,7 @@ class _CurrentLessonBeadState extends State<_CurrentLessonBead>
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontFamily: 'HindSiliguri',
-              fontSize: 12.5,
+              fontSize: 11.5,
               fontWeight: FontWeight.w700,
               color: AppColors.ink,
             ),
