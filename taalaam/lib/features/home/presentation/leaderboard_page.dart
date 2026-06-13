@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/misbaha/ornament_stamp.dart';
 import '../../auth/presentation/auth_provider.dart';
 
 final leaderboardProvider =
@@ -23,10 +24,8 @@ final leaderboardProvider =
   // Fetch profiles for those user IDs in one query
   final ids = streaks.map((s) => s['user_id'] as String).toList();
   final profiles = List<Map<String, dynamic>>.from(
-    await client
-        .from('profiles')
-        .select('id, display_name')
-        .inFilter('id', ids) as List,
+    await client.from('profiles').select('id, display_name').inFilter('id', ids)
+        as List,
   );
 
   final nameMap = {
@@ -35,10 +34,12 @@ final leaderboardProvider =
   };
 
   // Merge display_name into each streak row
-  return streaks.map((s) => {
-        ...s,
-        'display_name': nameMap[s['user_id'] as String] ?? '',
-      }).toList();
+  return streaks
+      .map((s) => {
+            ...s,
+            'display_name': nameMap[s['user_id'] as String] ?? '',
+          })
+      .toList();
 });
 
 class LeaderboardPage extends ConsumerWidget {
@@ -51,100 +52,193 @@ class LeaderboardPage extends ConsumerWidget {
     final board = ref.watch(leaderboardProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: () => context.go('/home')),
-        title: const Text('সর্বমোট র‍্যাংকিং'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.refresh(leaderboardProvider),
+      body: Column(
+        children: [
+          _LeaderboardHeader(
+            onBack: () => context.go('/home'),
+            onRefresh: () => ref.refresh(leaderboardProvider),
+          ),
+          Expanded(
+            child: _buildBody(context, theme, board, currentUser,
+                () => ref.refresh(leaderboardProvider)),
           ),
         ],
       ),
-      body: board.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
+    );
+  }
+
+  Widget _buildBody(
+      BuildContext context,
+      ThemeData theme,
+      AsyncValue<List<Map<String, dynamic>>> board,
+      User? currentUser,
+      VoidCallback onRetry) {
+    return board.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.wifi_off,
+                  size: 48, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(height: 16),
+              const Text('র‍্যাংকিং লোড হয়নি।', textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: onRetry,
+                child: const Text('আবার চেষ্টা করুন'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (entries) {
+        if (entries.isEmpty) {
+          return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.wifi_off,
-                    size: 48, color: theme.colorScheme.onSurfaceVariant),
+                Icon(Icons.emoji_events_outlined,
+                    size: 64, color: theme.colorScheme.outline),
                 const SizedBox(height: 16),
-                const Text('র‍্যাংকিং লোড হয়নি।',
+                const Text('এখনো কেউ নেই।\nপ্রথম পাঠ শেষ করুন!',
                     textAlign: TextAlign.center),
-                const SizedBox(height: 8),
-                FilledButton(
-                  onPressed: () => ref.refresh(leaderboardProvider),
-                  child: const Text('আবার চেষ্টা করুন'),
-                ),
               ],
             ),
-          ),
+          );
+        }
+
+        // Separate top 3 from the rest
+        final top3 = entries.take(3).toList();
+        final rest = entries.skip(3).toList();
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          children: [
+            // ── Podium ────────────────────────────────────────────────
+            if (top3.length >= 2)
+              _Podium(
+                entries: top3,
+                currentUserId: currentUser?.id,
+              ),
+            const SizedBox(height: 16),
+
+            // ── Your rank highlight (if outside top 3) ───────────────
+            () {
+              final selfIdx =
+                  entries.indexWhere((e) => e['user_id'] == currentUser?.id);
+              if (selfIdx >= 3) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _RankRow(
+                      entry: entries[selfIdx],
+                      rank: selfIdx + 1,
+                      isSelf: true,
+                      theme: theme,
+                    ),
+                    Divider(color: theme.colorScheme.outlineVariant),
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
+            }(),
+
+            // ── Rest of the list ──────────────────────────────────────
+            ...rest.asMap().entries.map((e) => _RankRow(
+                  entry: e.value,
+                  rank: e.key + 4,
+                  isSelf: e.value['user_id'] == currentUser?.id,
+                  theme: theme,
+                )),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ── Header (.lbh) ─────────────────────────────────────────────────────────────
+
+/// Forest→mid-green gradient header with a faint ornament watermark, matching
+/// the demo's `.lbh` leaderboard header.
+class _LeaderboardHeader extends StatelessWidget {
+  final VoidCallback onBack;
+  final VoidCallback onRefresh;
+  const _LeaderboardHeader({required this.onBack, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+          8, MediaQuery.of(context).padding.top + 6, 12, 15),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.forestGreen, AppColors.midGreen],
         ),
-        data: (entries) {
-          if (entries.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(26),
+          bottomRight: Radius.circular(26),
+        ),
+        boxShadow: AppShadows.pop,
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Positioned(
+            right: -8,
+            top: -28,
+            child: Opacity(
+              opacity: 0.13,
+              child: OrnamentStamp(size: 88, color: AppColors.gold),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Icon(Icons.emoji_events_outlined,
-                      size: 64, color: theme.colorScheme.outline),
-                  const SizedBox(height: 16),
-                  const Text('এখনো কেউ নেই।\nপ্রথম পাঠ শেষ করুন!',
-                      textAlign: TextAlign.center),
+                  IconButton(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: onRefresh,
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                  ),
                 ],
               ),
-            );
-          }
-
-          // Separate top 3 from the rest
-          final top3 = entries.take(3).toList();
-          final rest = entries.skip(3).toList();
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-            children: [
-              // ── Podium ────────────────────────────────────────────────
-              if (top3.length >= 2)
-                _Podium(
-                  entries: top3,
-                  currentUserId: currentUser?.id,
+              const Padding(
+                padding: EdgeInsets.only(left: 16),
+                child: Text(
+                  'লিডারবোর্ড',
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
-              const SizedBox(height: 16),
-
-              // ── Your rank highlight (if outside top 3) ───────────────
-              () {
-                final selfIdx = entries
-                    .indexWhere((e) => e['user_id'] == currentUser?.id);
-                if (selfIdx >= 3) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _RankRow(
-                        entry: entries[selfIdx],
-                        rank: selfIdx + 1,
-                        isSelf: true,
-                        theme: theme,
-                      ),
-                      Divider(color: theme.colorScheme.outlineVariant),
-                    ],
-                  );
-                }
-                return const SizedBox.shrink();
-              }(),
-
-              // ── Rest of the list ──────────────────────────────────────
-              ...rest.asMap().entries.map((e) => _RankRow(
-                    entry: e.value,
-                    rank: e.key + 4,
-                    isSelf: e.value['user_id'] == currentUser?.id,
-                    theme: theme,
-                  )),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 16, top: 2),
+                child: Text(
+                  'সর্বমোট XP অনুযায়ী র‍্যাংকিং',
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 11,
+                    color: Color(0xBFF5F0E8),
+                  ),
+                ),
+              ),
             ],
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -161,8 +255,7 @@ class _Podium extends StatefulWidget {
   State<_Podium> createState() => _PodiumState();
 }
 
-class _PodiumState extends State<_Podium>
-    with SingleTickerProviderStateMixin {
+class _PodiumState extends State<_Podium> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
   @override
@@ -185,8 +278,8 @@ class _PodiumState extends State<_Podium>
   /// Staggered rise-up entrance for the podium slot at [displayIdx]
   /// (0 = left, 1 = centre, 2 = right).
   Animation<double> _entranceFor(int displayIdx) {
-    final stagger = AppMotion.stagger.inMilliseconds /
-        AppMotion.gentle.inMilliseconds;
+    final stagger =
+        AppMotion.stagger.inMilliseconds / AppMotion.gentle.inMilliseconds;
     final start = (displayIdx * stagger).clamp(0.0, 1.0);
     final end = (start + (1 - 2 * stagger)).clamp(start, 1.0);
     return CurvedAnimation(
@@ -232,70 +325,70 @@ class _PodiumState extends State<_Podium>
             ),
           ),
           child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Avatar circle
-            CircleAvatar(
-              radius: rank == 1 ? 28 : 22,
-              backgroundColor: isSelf
-                  ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.surfaceContainerHighest,
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: TextStyle(
-                  fontSize: rank == 1 ? 20 : 16,
-                  fontWeight: FontWeight.bold,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Avatar circle
+              CircleAvatar(
+                radius: rank == 1 ? 28 : 22,
+                backgroundColor: isSelf
+                    ? theme.colorScheme.primaryContainer
+                    : theme.colorScheme.surfaceContainerHighest,
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: TextStyle(
+                    fontSize: rank == 1 ? 20 : 16,
+                    fontWeight: FontWeight.bold,
+                    color: isSelf
+                        ? theme.colorScheme.onPrimaryContainer
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                name,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: isSelf ? FontWeight.bold : FontWeight.normal,
                   color: isSelf
-                      ? theme.colorScheme.onPrimaryContainer
-                      : theme.colorScheme.onSurfaceVariant,
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              Text(
+                '$xp XP',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              name,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: isSelf ? FontWeight.bold : FontWeight.normal,
-                color: isSelf
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-            Text(
-              '$xp XP',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 4),
-            // Podium block
-            Container(
-              height: height,
-              decoration: BoxDecoration(
-                color: rank == 1
-                    ? AppColors.gold.withValues(alpha: 0.25)
-                    : rank == 2
-                        ? const Color(0xFFC0C0C0).withValues(alpha: 0.2)
-                        : const Color(0xFFCD7F32).withValues(alpha: 0.2),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  topRight: Radius.circular(8),
-                ),
-                border: Border.all(
+              const SizedBox(height: 4),
+              // Podium block
+              Container(
+                height: height,
+                decoration: BoxDecoration(
                   color: rank == 1
-                      ? AppColors.gold.withValues(alpha: 0.5)
-                      : theme.colorScheme.outlineVariant,
+                      ? AppColors.gold.withValues(alpha: 0.25)
+                      : rank == 2
+                          ? const Color(0xFFC0C0C0).withValues(alpha: 0.2)
+                          : const Color(0xFFCD7F32).withValues(alpha: 0.2),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                  ),
+                  border: Border.all(
+                    color: rank == 1
+                        ? AppColors.gold.withValues(alpha: 0.5)
+                        : theme.colorScheme.outlineVariant,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(Icons.emoji_events,
+                      size: 24, color: medalColors[rank - 1]),
                 ),
               ),
-              child: Center(
-                child: Icon(Icons.emoji_events,
-                    size: 24, color: medalColors[rank - 1]),
-              ),
-            ),
-          ],
+            ],
           ),
         ),
       );
@@ -305,7 +398,13 @@ class _PodiumState extends State<_Podium>
       height: 220,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        children: [slot(2), const SizedBox(width: 8), slot(1), const SizedBox(width: 8), slot(3)],
+        children: [
+          slot(2),
+          const SizedBox(width: 8),
+          slot(1),
+          const SizedBox(width: 8),
+          slot(3)
+        ],
       ),
     );
   }
@@ -330,17 +429,21 @@ class _RankRow extends StatelessWidget {
     final streak = entry['current_streak'] as int? ?? 0;
     final name = _displayName(entry, isSelf);
 
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
       decoration: BoxDecoration(
         color: isSelf
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-            : theme.colorScheme.surfaceContainer,
-        borderRadius: AppRadius.lgBorder,
-        border: isSelf
-            ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.5))
-            : null,
+            ? (isDark ? AppColors.darkCard : const Color(0xFFFFFDF4))
+            : (isDark ? AppColors.darkCard : Colors.white),
+        borderRadius: AppRadius.mdBorder,
+        border: Border.all(
+          color: isSelf
+              ? AppColors.gold
+              : (isDark ? AppColors.darkOutlineVariant : AppColors.line),
+        ),
+        boxShadow: AppShadows.card,
       ),
       child: Row(
         children: [
@@ -348,8 +451,8 @@ class _RankRow extends StatelessWidget {
             width: 36,
             child: Text(
               '#$rank',
-              style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
             ),
           ),
@@ -378,8 +481,7 @@ class _RankRow extends StatelessWidget {
                 Text(
                   name,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight:
-                        isSelf ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelf ? FontWeight.bold : FontWeight.normal,
                     color: isSelf ? theme.colorScheme.primary : null,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -418,8 +520,16 @@ String _displayName(Map<String, dynamic> entry, bool isSelf) {
   final uid = entry['user_id'] as String? ?? '';
   final hash = uid.hashCode.abs();
   const prefixes = [
-    'ইমানদার', 'মুত্তাকী', 'সাবের', 'শাকের', 'মুজাহিদ',
-    'তালিবুল', 'মুত্তাসিম', 'মুখলিস', 'সালিক', 'আবিদ'
+    'ইমানদার',
+    'মুত্তাকী',
+    'সাবের',
+    'শাকের',
+    'মুজাহিদ',
+    'তালিবুল',
+    'মুত্তাসিম',
+    'মুখলিস',
+    'সালিক',
+    'আবিদ'
   ];
   const suffixes = ['শিক্ষার্থী', 'পাঠক', 'মুসাফির', 'তালিব', 'মুরিদ'];
   return '${prefixes[hash % prefixes.length]} ${suffixes[(hash ~/ prefixes.length) % suffixes.length]}';

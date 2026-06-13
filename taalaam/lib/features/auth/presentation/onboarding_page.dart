@@ -256,7 +256,7 @@ class _IntroView extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(4),
                     color: active
-                        ? theme.colorScheme.primary
+                        ? AppColors.gold
                         : theme.colorScheme.outlineVariant,
                   ),
                 );
@@ -432,12 +432,14 @@ class _QuizView extends StatelessWidget {
                               horizontal: 20, vertical: 16),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? theme.colorScheme.primaryContainer
+                                ? (theme.brightness == Brightness.dark
+                                    ? AppColors.teal.withValues(alpha: 0.18)
+                                    : const Color(0xFFEAF4F2))
                                 : theme.colorScheme.surfaceContainer,
                             borderRadius: AppRadius.lgBorder,
                             border: Border.all(
                               color: isSelected
-                                  ? theme.colorScheme.primary
+                                  ? AppColors.teal
                                   : theme.colorScheme.outlineVariant,
                               width: isSelected ? 2 : 1,
                             ),
@@ -454,9 +456,7 @@ class _QuizView extends StatelessWidget {
                                         fontFamily: 'NotoNaskhArabic',
                                         fontSize: 22,
                                         height: 1.6,
-                                        color: isSelected
-                                            ? theme.colorScheme.onPrimaryContainer
-                                            : theme.colorScheme.onSurface,
+                                        color: theme.colorScheme.onSurface,
                                       ),
                                       textAlign: TextAlign.center,
                                     ),
@@ -467,16 +467,13 @@ class _QuizView extends StatelessWidget {
                                   child: Text(
                                     q.options[i],
                                     style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: isSelected
-                                          ? theme.colorScheme.onPrimaryContainer
-                                          : theme.colorScheme.onSurface,
+                                      color: theme.colorScheme.onSurface,
                                     ),
                                   ),
                                 ),
                               if (isSelected)
-                                Icon(Icons.check_circle_rounded,
-                                    color: theme.colorScheme.primary,
-                                    size: 20),
+                                const Icon(Icons.check_circle_rounded,
+                                    color: AppColors.teal, size: 20),
                             ],
                           ),
                         ),

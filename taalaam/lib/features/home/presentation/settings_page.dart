@@ -219,39 +219,44 @@ class SettingsPage extends ConsumerWidget {
   }
 }
 
+/// `.sh2` — uppercase gold-deep section label.
 class _SectionHeader extends StatelessWidget {
   final String title;
   const _SectionHeader(this.title);
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
       child: Text(
         title,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.primary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
+        style: const TextStyle(
+          fontFamily: 'HindSiliguri',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.4,
+          color: AppColors.goldDeep,
         ),
       ),
     );
   }
 }
 
+/// `.srow`-style card group.
 class _SettingsCard extends StatelessWidget {
   final List<Widget> children;
   const _SettingsCard({required this.children});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: AppRadius.lgBorder,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: AppRadius.mdBorder,
+        border: Border.all(
+            color: isDark ? AppColors.darkOutlineVariant : AppColors.line),
+        boxShadow: AppShadows.card,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(

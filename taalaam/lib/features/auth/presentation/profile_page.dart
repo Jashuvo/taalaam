@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
+import '../../../shared/widgets/misbaha/ornament_stamp.dart';
 import '../../home/presentation/home_provider.dart';
 import '../../home/presentation/widgets/streak_goal_progress_widget.dart';
 import 'auth_provider.dart';
@@ -284,13 +285,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
         : (email.isNotEmpty ? email[0].toUpperCase() : '?');
 
     return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: () => context.go('/home')),
-        title: const Text('প্রোফাইল'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      body: Column(
         children: [
+          _ProfileHeader(onBack: () => context.go('/home')),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              children: [
           // ── Avatar + name ──────────────────────────────────────────────
           Center(
             child: Column(
@@ -613,6 +614,76 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             ]),
           ],
           const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Gradient header with ornament watermark, matching the leaderboard header.
+class _ProfileHeader extends StatelessWidget {
+  final VoidCallback onBack;
+  const _ProfileHeader({required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 6, 12, 15),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.forestGreen, AppColors.midGreen],
+        ),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(26),
+          bottomRight: Radius.circular(26),
+        ),
+        boxShadow: AppShadows.pop,
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Positioned(
+            right: -8,
+            top: -28,
+            child: Opacity(
+              opacity: 0.13,
+              child: OrnamentStamp(size: 88, color: AppColors.gold),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                      onPressed: onBack,
+                      icon: const Icon(Icons.arrow_back, color: Colors.white)),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 16),
+                child: Text('প্রোফাইল',
+                    style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 16, top: 2),
+                child: Text('আপনার অগ্রগতি ও সেটিংস',
+                    style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 11,
+                        color: Color(0xBFF5F0E8))),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -685,12 +756,14 @@ class _SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: AppRadius.lgBorder,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: AppRadius.mdBorder,
+        border: Border.all(
+            color: isDark ? AppColors.darkOutlineVariant : AppColors.line),
+        boxShadow: AppShadows.card,
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(mainAxisSize: MainAxisSize.min, children: children),
