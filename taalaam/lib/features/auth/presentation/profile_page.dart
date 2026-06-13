@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/tap_scale.dart';
+import '../../../shared/utils/bn_digits.dart';
+import '../../../shared/utils/xp_level.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/misbaha/ornament_stamp.dart';
+import '../../../shared/widgets/progress_share_card.dart';
 import '../../home/presentation/home_provider.dart';
 import '../../home/presentation/widgets/streak_goal_progress_widget.dart';
 import 'auth_provider.dart';
@@ -22,8 +26,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
   bool _loadingName = true;
   late final AnimationController _entranceCtrl;
 
-  // Staggered reveal order: stat grid -> weekly XP -> streak goal -> longest streak.
-  static const _staggerCount = 4;
+  // Staggered reveal order: tier card -> action buttons -> weekly streak ->
+  // badges -> stat grid -> streak goal -> bookmarks.
+  static const _staggerCount = 7;
   static final _entranceDuration = Duration(
     milliseconds: AppMotion.gentle.inMilliseconds +
         (_staggerCount - 1) * AppMotion.completionStagger.inMilliseconds,
@@ -273,10 +278,25 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     final theme = Theme.of(context);
     final user = ref.watch(currentUserProvider);
     final streak = ref.watch(streakProvider).valueOrNull;
-    final completedCount = ref.watch(completedLessonIdsProvider).valueOrNull?.length ?? 0;
     final weeklyXp = ref.watch(weeklyXpProvider).valueOrNull ?? 0;
     final masteredCount = ref.watch(masteredWordCountProvider).valueOrNull ?? 0;
-    final learningCount = ref.watch(learningWordCountProvider).valueOrNull ?? 0;
+    final accuracyMap = ref.watch(lessonAccuracyMapProvider).valueOrNull ?? {};
+    final avgAccuracy = accuracyMap.isEmpty
+        ? 0
+        : (accuracyMap.values.reduce((a, b) => a + b) / accuracyMap.length).round();
+    final perfectRuns = accuracyMap.values.where((v) => v >= 100).length;
+    final bookmarkCount =
+        ref.watch(bookmarkedLessonIdsProvider).valueOrNull?.length ?? 0;
+    final totalXp = streak?.totalXp ?? 0;
+    final tier = XpLevel.forXp(totalXp);
+    final longestStreak = streak?.longestStreak ?? 0;
+    final badges = <_BadgeData>[
+      if (longestStreak >= 7) const _BadgeData('🔥', '৭ দিনের ধারা'),
+      if (longestStreak >= 30) const _BadgeData('🔥', '৩০ দিনের ধারা'),
+      if (perfectRuns >= 1) _BadgeData('💯', 'পারফেক্ট পাঠ · ${bnDigits(perfectRuns)}'),
+      if (masteredCount >= 25) const _BadgeData('📚', 'শব্দ সংগ্রাহক'),
+      if (masteredCount >= 100) const _BadgeData('📖', 'শব্দ পণ্ডিত'),
+    ];
     final isAnon = user?.isAnonymous ?? false;
 
     final email = user?.email ?? '';
@@ -368,11 +388,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
           ),
           const SizedBox(height: 28),
 
-          // ── 2x3 metric grid ────────────────────────────────────────────
+          // ── Tier / level card ───────────────────────────────────────────
           _staggered(
             0,
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: AppColors.gradientStreak,
@@ -380,44 +400,75 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: AppRadius.lgBorder,
+                boxShadow: AppShadows.pop,
               ),
-              child: GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 14,
-                crossAxisSpacing: 8,
-                childAspectRatio: 0.95,
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  _MetricTile(
-                    icon: Icons.local_fire_department_rounded,
-                    value: streak?.currentStreak ?? 0,
-                    label: 'স্ট্রিক',
+                  const Positioned(
+                    right: -10,
+                    top: -22,
+                    child: Opacity(
+                      opacity: 0.13,
+                      child: OrnamentStamp(size: 80, color: AppColors.gold),
+                    ),
                   ),
-                  _MetricTile(
-                    icon: Icons.star_rounded,
-                    value: streak?.totalXp ?? 0,
-                    label: 'মোট XP',
-                  ),
-                  _MetricTile(
-                    icon: Icons.task_alt_rounded,
-                    value: completedCount,
-                    label: 'পাঠ শেষ',
-                  ),
-                  _MetricTile(
-                    icon: Icons.emoji_events_rounded,
-                    value: streak?.longestStreak ?? 0,
-                    label: 'সর্বোচ্চ ধারা',
-                  ),
-                  _MetricTile(
-                    icon: Icons.menu_book_rounded,
-                    value: masteredCount,
-                    label: 'মুখস্থ শব্দ',
-                  ),
-                  _MetricTile(
-                    icon: Icons.auto_stories_rounded,
-                    value: learningCount,
-                    label: 'শেখার শব্দ',
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 60,
+                        height: 60,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              value: tier.progressFraction(totalXp),
+                              strokeWidth: 5,
+                              backgroundColor: Colors.white.withValues(alpha: 0.2),
+                              valueColor: const AlwaysStoppedAnimation(AppColors.gold),
+                            ),
+                            Text('${tier.level}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 20)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Directionality(
+                              textDirection: TextDirection.rtl,
+                              child: Text(
+                                tier.nameAr,
+                                style: const TextStyle(
+                                  fontFamily: 'NotoNaskhArabic',
+                                  fontSize: 22,
+                                  height: 1.8,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            Text(tier.nameBn,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            const SizedBox(height: 4),
+                            Text(
+                              tier.maxXp == -1
+                                  ? '${bnDigits(totalXp)} XP'
+                                  : '${bnDigits(totalXp)} / ${bnDigits(tier.maxXp)} XP',
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -425,90 +476,183 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
           ),
           const SizedBox(height: 10),
 
-          // ── Weekly XP card ─────────────────────────────────────────────
+          // ── Action buttons ──────────────────────────────────────────────
           _staggered(
             1,
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                borderRadius: AppRadius.lgBorder,
-                border: Border.all(color: theme.colorScheme.outlineVariant),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.brightGreen.withValues(alpha: 0.15),
-                    ),
-                    child: const Icon(Icons.bar_chart_rounded,
-                        color: AppColors.brightGreen),
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    icon: Icons.share_outlined,
+                    label: 'শেয়ার',
+                    onTap: () => showProgressShareDialog(context),
                   ),
-                  const SizedBox(width: 12),
-                  Text('এই সপ্তাহের XP', style: theme.textTheme.bodyLarge),
-                  const Spacer(),
-                  _CountUpStat(
-                    value: weeklyXp,
-                    suffix: ' XP',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.brightGreen),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionButton(
+                    icon: Icons.leaderboard_outlined,
+                    label: 'র‍্যাংকিং',
+                    onTap: () => context.go('/leaderboard'),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionButton(
+                    icon: Icons.settings_outlined,
+                    label: 'সেটিংস',
+                    onTap: () => context.go('/settings'),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 10),
 
-          // ── Streak goal calendar ───────────────────────────────────────
-          if ((streak?.streakGoal ?? 0) > 0)
+          // ── Weekly streak calendar ──────────────────────────────────────
+          _staggered(
+            2,
+            _WeeklyStreakCard(
+              currentStreak: streak?.currentStreak ?? 0,
+              lastActivityDate: streak?.lastActivityDate,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Badges ───────────────────────────────────────────────────────
+          if (badges.isNotEmpty) ...[
             _staggered(
-              2,
+              3,
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: badges
+                    .map((b) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.12),
+                            borderRadius: AppRadius.lgBorder,
+                            border: Border.all(
+                                color: AppColors.gold.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(b.emoji, style: const TextStyle(fontSize: 16)),
+                              const SizedBox(width: 6),
+                              Text(b.label,
+                                  style: theme.textTheme.labelMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // ── 2x2 stat grid ────────────────────────────────────────────────
+          _staggered(
+            4,
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.5,
+              children: [
+                _StatTile(
+                  icon: Icons.menu_book_rounded,
+                  color: AppColors.brightGreen,
+                  value: masteredCount,
+                  label: 'মুখস্থ শব্দ',
+                ),
+                _StatTile(
+                  icon: Icons.emoji_events_rounded,
+                  color: AppColors.gold,
+                  value: streak?.longestStreak ?? 0,
+                  suffix: ' দিন',
+                  label: 'সর্বোচ্চ ধারা',
+                ),
+                _StatTile(
+                  icon: Icons.bar_chart_rounded,
+                  color: AppColors.teal,
+                  value: weeklyXp,
+                  suffix: ' XP',
+                  label: 'এই সপ্তাহের XP',
+                ),
+                _StatTile(
+                  icon: Icons.track_changes_rounded,
+                  color: AppColors.midGreen,
+                  value: avgAccuracy,
+                  suffix: '%',
+                  label: 'সঠিকতার হার',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Streak goal calendar ─────────────────────────────────────────
+          if ((streak?.streakGoal ?? 0) > 0) ...[
+            _staggered(
+              5,
               StreakGoalProgressWidget(
                 currentStreak: streak?.currentStreak ?? 0,
                 streakGoal: streak!.streakGoal!,
               ),
             ),
-          if ((streak?.streakGoal ?? 0) > 0) const SizedBox(height: 10),
+            const SizedBox(height: 10),
+          ],
 
-          // ── Longest streak highlight ───────────────────────────────────
-          _staggered(
-            3,
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                borderRadius: AppRadius.lgBorder,
-                border: Border.all(color: theme.colorScheme.outlineVariant),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.gold.withValues(alpha: 0.15),
+          // ── Bookmarked lessons ───────────────────────────────────────────
+          if (bookmarkCount > 0) ...[
+            _staggered(
+              6,
+              TapScale(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: AppRadius.lgBorder,
+                    onTap: () => context.go('/home'),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainer,
+                        borderRadius: AppRadius.lgBorder,
+                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.gold.withValues(alpha: 0.15),
+                            ),
+                            child: const Icon(Icons.bookmark_rounded,
+                                color: AppColors.gold),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                                'বুকমার্ক করা পাঠ · ${bnDigits(bookmarkCount)}টি',
+                                style: theme.textTheme.bodyLarge),
+                          ),
+                          Icon(Icons.arrow_forward_ios,
+                              size: 14, color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
                     ),
-                    child: const Icon(Icons.emoji_events_rounded,
-                        color: AppColors.gold),
                   ),
-                  const SizedBox(width: 12),
-                  Text('সর্বোচ্চ ধারা', style: theme.textTheme.bodyLarge),
-                  const Spacer(),
-                  _CountUpStat(
-                    value: streak?.longestStreak ?? 0,
-                    suffix: ' দিন',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold, color: AppColors.gold),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
           const SizedBox(height: 28),
 
           // ── Anonymous upgrade prompt ───────────────────────────────────
@@ -690,43 +834,182 @@ class _ProfileHeader extends StatelessWidget {
   }
 }
 
-/// One tile of the 2x3 profile metric grid: icon in a tinted circle,
-/// a value that counts up from 0 on first build, and a muted label.
-class _MetricTile extends StatelessWidget {
-  final IconData icon;
-  final int value;
+/// A derived achievement badge: an emoji and a short Bengali label.
+class _BadgeData {
+  final String emoji;
   final String label;
-  const _MetricTile(
-      {required this.icon, required this.value, required this.label});
+  const _BadgeData(this.emoji, this.label);
+}
+
+/// One of the three header action buttons (share / ranking / settings).
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ActionButton(
+      {required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.15),
+    final theme = Theme.of(context);
+    return TapScale(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: AppRadius.lgBorder,
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainer,
+              borderRadius: AppRadius.lgBorder,
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: theme.colorScheme.primary),
+                const SizedBox(height: 4),
+                Text(label, style: theme.textTheme.labelSmall),
+              ],
+            ),
           ),
-          child: Icon(icon, size: 18, color: Colors.white),
         ),
-        const SizedBox(height: 6),
-        _CountUpStat(
-          value: value,
-          style: const TextStyle(
-              fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-              fontSize: 11, color: Colors.white.withValues(alpha: 0.85)),
-        ),
-      ],
+      ),
+    );
+  }
+}
+
+/// One tile of the 2x2 profile stat grid: icon in a tinted circle,
+/// a value that counts up from 0 on first build, and a muted label.
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final int value;
+  final String suffix;
+  final String label;
+  const _StatTile({
+    required this.icon,
+    required this.color,
+    required this.value,
+    this.suffix = '',
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: AppRadius.lgBorder,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withValues(alpha: 0.15),
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const Spacer(),
+          _CountUpStat(
+            value: value,
+            suffix: suffix,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          Text(label,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 7-day row showing which of the last 7 days were part of the user's
+/// active streak (derived from currentStreak + lastActivityDate).
+class _WeeklyStreakCard extends StatelessWidget {
+  final int currentStreak;
+  final DateTime? lastActivityDate;
+  const _WeeklyStreakCard({required this.currentStreak, this.lastActivityDate});
+
+  static const _dayLabels = {
+    1: 'সোম', 2: 'মঙ্গল', 3: 'বুধ', 4: 'বৃহ', 5: 'শুক্র', 6: 'শনি', 7: 'রবি',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final last = lastActivityDate == null
+        ? null
+        : DateTime(
+            lastActivityDate!.year, lastActivityDate!.month, lastActivityDate!.day);
+    final streakStart = (last != null && currentStreak > 0)
+        ? last.subtract(Duration(days: currentStreak - 1))
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: AppRadius.lgBorder,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('সাপ্তাহিক ধারা',
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (i) {
+              final day = today.subtract(Duration(days: 6 - i));
+              final active = last != null &&
+                  streakStart != null &&
+                  !day.isBefore(streakStart) &&
+                  !day.isAfter(last);
+              final isToday = day == today;
+              return Column(
+                children: [
+                  Text(_dayLabels[day.weekday] ?? '',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: active
+                          ? AppColors.brightGreen
+                          : theme.colorScheme.surfaceContainerHighest,
+                      border: isToday
+                          ? Border.all(color: AppColors.gold, width: 2)
+                          : null,
+                    ),
+                    child: active
+                        ? const Icon(Icons.local_fire_department_rounded,
+                            size: 16, color: Colors.white)
+                        : null,
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
     );
   }
 }

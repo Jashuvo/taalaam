@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
+import '../../../shared/utils/bn_digits.dart';
+import '../../auth/presentation/auth_provider.dart';
+import 'home_provider.dart';
 
 const _kSoundChime   = 'sound_chime';
 const _kSoundTakbeer = 'sound_takbeer';
@@ -92,6 +95,9 @@ class SettingsPage extends ConsumerWidget {
     final notifier = ref.read(soundSettingsProvider.notifier);
     final themeMode = ref.watch(themeModeProvider);
     final themeModeNotifier = ref.read(themeModeProvider.notifier);
+    final streak = ref.watch(streakProvider).valueOrNull;
+    final userId = ref.watch(currentUserProvider)?.id;
+    final freezeCount = streak?.freezeCount ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -162,6 +168,49 @@ class SettingsPage extends ConsumerWidget {
                       .copyWith(topLeft: Radius.zero, topRight: Radius.zero)),
             ),
           ]),
+          const _SectionHeader('রিমাইন্ডার'),
+          _SettingsCard(children: [
+            SwitchListTile(
+              secondary: const Icon(Icons.notifications_active_outlined),
+              title: const Text('সালাহ-সচেতন নোটিফিকেশন'),
+              subtitle: const Text(
+                  'মাগরিবের ৩০ মিনিট পর মনে করিয়ে দেবে · শীঘ্রই আসছে'),
+              value: false,
+              onChanged: null,
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
+            ),
+          ]),
+          if (userId != null) ...[
+            const _SectionHeader('ধারা সুরক্ষা'),
+            _SettingsCard(children: [
+              ListTile(
+                leading: const Icon(Icons.ac_unit_rounded,
+                    color: AppColors.teal),
+                title: Text('স্ট্রিক ফ্রিজ · ${bnDigits(freezeCount)}টি আছে'),
+                subtitle: const Text(
+                    'একদিন মিস হলেও ধারা অটুট থাকবে'),
+                trailing: FilledButton(
+                  onPressed: freezeCount > 0
+                      ? () async {
+                          final used = await ref
+                              .read(streakFreezeProvider(userId).notifier)
+                              .useFreeze();
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(used
+                                  ? 'ফ্রিজ ব্যবহার করা হয়েছে — আপনার ধারা সুরক্ষিত!'
+                                  : 'আপনার ধারা এখনই সুরক্ষিত — ফ্রিজের প্রয়োজন নেই।'),
+                            ),
+                          );
+                        }
+                      : null,
+                  child: const Text('ব্যবহার করুন'),
+                ),
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
+              ),
+            ]),
+          ],
           const _SectionHeader('অ্যাপ সম্পর্কে'),
           _SettingsCard(children: [
             ListTile(

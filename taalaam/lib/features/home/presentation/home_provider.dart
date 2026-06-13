@@ -196,6 +196,47 @@ class StreakFreezeNotifier extends StateNotifier<AsyncValue<void>> {
       state = AsyncValue.error(e, st);
     }
   }
+
+  /// Spends one freeze to protect a streak that's about to lapse: if the
+  /// last activity was 2+ days ago (the streak would reset on next lesson),
+  /// backdates `last_activity_date` to yesterday so the streak continues.
+  /// Returns true if a freeze was spent, false if not needed or unavailable.
+  Future<bool> useFreeze() async {
+    final row = await (_db.select(_db.streaks)
+          ..where((t) => t.userId.equals(_userId)))
+        .getSingleOrNull();
+    if (row == null || row.freezeCount <= 0) return false;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastDate = row.lastActivityDate;
+    final diff = lastDate == null
+        ? 999
+        : today.difference(DateTime(lastDate.year, lastDate.month, lastDate.day)).inDays;
+    if (diff < 2) return false;
+
+    state = const AsyncValue.loading();
+    try {
+      final yesterday = today.subtract(const Duration(days: 1));
+      await (_db.update(_db.streaks)..where((t) => t.userId.equals(_userId)))
+          .write(StreaksCompanion(
+        freezeCount: drift.Value(row.freezeCount - 1),
+        lastActivityDate: drift.Value(yesterday),
+        lastFreezedAt: drift.Value(now),
+      ));
+      Supabase.instance.client.from('streaks').upsert({
+        'user_id': _userId,
+        'freeze_count': row.freezeCount - 1,
+        'last_activity_date':
+            yesterday.toIso8601String().substring(0, 10),
+      }).then((_) {}).catchError((_) {});
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
 }
 
 final streakFreezeProvider = StateNotifierProvider.autoDispose
