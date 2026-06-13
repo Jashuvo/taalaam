@@ -63,6 +63,16 @@ final _nextLessonProvider =
   return firstOfNext.isEmpty ? null : firstOfNext.first;
 });
 
+// Title of the unit this lesson belongs to, shown under the heading.
+final _unitTitleProvider =
+    FutureProvider.family<String?, String>((ref, unitId) async {
+  final db = ref.watch(appDatabaseProvider);
+  final unit = await (db.select(db.units)
+        ..where((t) => t.id.equals(unitId)))
+      .getSingleOrNull();
+  return unit?.titleBn;
+});
+
 class _NextLessonArgs {
   final String lessonId;
   final String unitId;
@@ -189,6 +199,7 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
         .valueOrNull;
     final needsStreakGoal =
         ref.watch(_needsStreakGoalProvider).valueOrNull ?? false;
+    final unitTitle = ref.watch(_unitTitleProvider(widget.unitId)).valueOrNull;
     final pct =
         widget.totalCount > 0
             ? (widget.correctCount / widget.totalCount * 100).round()
@@ -238,6 +249,17 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                         ),
                         textAlign: TextAlign.center,
                       ),
+                      if (unitTitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          unitTitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontFamily: 'HindSiliguri',
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                       const SizedBox(height: 28),
                       // Accuracy ring
                       _staggered(
