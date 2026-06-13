@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/vocabulary_model.dart';
 import '../../domain/exercise_model.dart';
 import 'arabic_word_tooltip.dart';
@@ -67,7 +68,6 @@ class _ExerciseTrueFalseState extends State<ExerciseTrueFalse> {
             Expanded(
               child: _TFButton(
                 label: '✓ সঠিক',
-                color: Colors.green,
                 selected: _selected == true,
                 onTap: _selected != null
                     ? null
@@ -78,7 +78,6 @@ class _ExerciseTrueFalseState extends State<ExerciseTrueFalse> {
             Expanded(
               child: _TFButton(
                 label: '✗ ভুল',
-                color: Colors.red,
                 selected: _selected == false,
                 onTap: _selected != null
                     ? null
@@ -101,38 +100,50 @@ class _ExerciseTrueFalseState extends State<ExerciseTrueFalse> {
 
 class _TFButton extends StatelessWidget {
   final String label;
-  final Color color;
   final bool selected;
   final VoidCallback? onTap;
   const _TFButton(
-      {required this.label,
-      required this.color,
-      required this.selected,
-      required this.onTap});
+      {required this.label, required this.selected, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: selected ? color.withValues(alpha: 0.2) : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: selected ? color : Colors.grey.shade300, width: 2),
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Material(
+      color: selected
+          ? (isDark
+              ? AppColors.darkPrimaryContainer
+              : const Color(0xFFEAF4F2))
+          : Colors.transparent,
+      borderRadius: AppRadius.mdBorder,
+      child: InkWell(
+        borderRadius: AppRadius.mdBorder,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.mdBorder,
+            border: Border.all(
+              color: selected
+                  ? AppColors.tealLight
+                  : (isDark ? AppColors.darkOutlineVariant : AppColors.line),
+              width: selected ? 2 : 1.5,
             ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: selected ? color : Colors.grey.shade600),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: selected
+                  ? (isDark ? AppColors.darkPrimary : AppColors.teal)
+                  : theme.colorScheme.onSurface,
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 }

@@ -209,7 +209,7 @@ class _AyahWithBlank extends StatelessWidget {
       fontFamily: 'NotoNaskhArabic',
       fontSize: 22,
       height: 2.0,
-      color: Color(0xFF1B3A2D),
+      color: AppColors.forestGreen,
     );
 
     for (int i = 0; i < parts.length; i++) {
