@@ -189,23 +189,31 @@ class SettingsPage extends ConsumerWidget {
                 title: Text('স্ট্রিক ফ্রিজ · ${bnDigits(freezeCount)}টি আছে'),
                 subtitle: const Text(
                     'একদিন মিস হলেও ধারা অটুট থাকবে'),
-                trailing: FilledButton(
-                  onPressed: freezeCount > 0
-                      ? () async {
-                          final used = await ref
-                              .read(streakFreezeProvider(userId).notifier)
-                              .useFreeze();
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(used
-                                  ? 'ফ্রিজ ব্যবহার করা হয়েছে — আপনার ধারা সুরক্ষিত!'
-                                  : 'আপনার ধারা এখনই সুরক্ষিত — ফ্রিজের প্রয়োজন নেই।'),
-                            ),
-                          );
-                        }
-                      : null,
-                  child: const Text('ব্যবহার করুন'),
+                trailing: SizedBox(
+                  width: 112,
+                  child: FilledButton(
+                    onPressed: freezeCount > 0
+                        ? () async {
+                            final used = await ref
+                                .read(streakFreezeProvider(userId).notifier)
+                                .useFreeze();
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(used
+                                    ? 'ফ্রিজ ব্যবহার করা হয়েছে — আপনার ধারা সুরক্ষিত!'
+                                    : 'আপনার ধারা এখনই সুরক্ষিত — ফ্রিজের প্রয়োজন নেই।'),
+                              ),
+                            );
+                          }
+                        : null,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: const Text('ব্যবহার করুন',
+                        style: TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis),
+                  ),
                 ),
                 shape: RoundedRectangleBorder(borderRadius: AppRadius.lgBorder),
               ),
@@ -308,9 +316,12 @@ class _SettingsCard extends StatelessWidget {
         boxShadow: AppShadows.card,
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: children,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        ),
       ),
     );
   }
