@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/widgets/misbaha/duaa_card.dart';
+import '../../../shared/widgets/misbaha/ornament_stamp.dart';
 import '../../auth/presentation/auth_provider.dart';
 
 // Returns true if the user has NOT yet set a streak goal (show goal screen once)
@@ -224,21 +226,14 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Logo
-                      Center(
-                        child: Image.asset(
-                          isDark
-                              ? 'assets/logo_dark-removebg-preview.png'
-                              : 'assets/logo_light-removebg-preview.png',
-                          height: 130,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      const Center(child: OrnamentStamp(size: 58)),
+                      const SizedBox(height: 12),
                       Text(
                         'পাঠ সম্পন্ন!',
                         style: theme.textTheme.headlineMedium?.copyWith(
+                          fontFamily: 'HindSiliguri',
                           fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
+                          color: isDark ? AppColors.darkOnSurface : AppColors.ink,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -262,102 +257,63 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // XP / stats card
+                      // XP / stats pills
                       _staggered(
                         1,
                         _PerfectShimmer(
                           active: pct == 100,
-                          child: Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainer,
-                              borderRadius: AppRadius.lgBorder,
-                              border: Border.all(
-                                  color: theme.colorScheme.outlineVariant),
-                            ),
-                            child: Column(
-                              children: [
-                                _StatRow(
-                                  icon: Icons.stars_rounded,
-                                  label: 'XP অর্জিত',
-                                  color: AppColors.gold,
-                                  value: _CountUpNumber(
-                                    value: widget.xpEarned,
-                                    suffix: ' XP',
-                                    prefix: '+',
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            color: AppColors.gold),
-                                  ),
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 9,
+                            runSpacing: 9,
+                            children: [
+                              _StatPill(
+                                value: _CountUpNumber(
+                                  value: widget.xpEarned,
+                                  prefix: '+',
+                                  suffix: ' XP',
                                 ),
-                                if (widget.perfectBonus > 0) ...[
-                                  const Divider(height: 20),
-                                  _StatRow(
-                                    icon: Icons.workspace_premium_rounded,
-                                    label: 'পারফেক্ট বোনাস',
-                                    color: AppColors.gold,
-                                    value: Text('+${widget.perfectBonus} XP',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.gold)),
-                                  ),
-                                ],
-                                if (widget.firstDayBonus > 0) ...[
-                                  const Divider(height: 20),
-                                  _StatRow(
-                                    icon: Icons.wb_sunny_rounded,
-                                    label: 'প্রথম পাঠ বোনাস',
-                                    color: AppColors.brightGreen,
-                                    value: Text('+${widget.firstDayBonus} XP',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.brightGreen)),
-                                  ),
-                                ],
-                                if (widget.gemReward > 0) ...[
-                                  const Divider(height: 20),
-                                  _StatRow(
-                                    icon: Icons.diamond_outlined,
-                                    label: 'রত্ন অর্জিত',
-                                    color: AppColors.teal,
-                                    value: Text('+${widget.gemReward} 💎',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                                color: AppColors.teal)),
-                                  ),
-                                ],
-                                const Divider(height: 20),
-                                _StatRow(
-                                  icon: Icons.quiz_outlined,
-                                  label: 'সঠিক উত্তর',
-                                  color: theme.colorScheme.primary,
-                                  value: Text(
-                                      '${widget.correctCount} / ${widget.totalCount}',
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: theme.colorScheme.primary)),
+                                label: 'XP অর্জিত',
+                              ),
+                              _StatPill(
+                                value: Text('$pct%'),
+                                label: 'সঠিকতা',
+                              ),
+                              _StatPill(
+                                value: Text(
+                                    '${widget.correctCount}/${widget.totalCount}'),
+                                label: 'সঠিক উত্তর',
+                              ),
+                              if (pct == 100)
+                                const _StatPill(
+                                  value: Text('✨'),
+                                  label: 'পারফেক্ট রান',
+                                  gold: true,
                                 ),
-                                if (widget.totalXpAfter > 0) ...[
-                                  const Divider(height: 20),
-                                  _StatRow(
-                                    icon: Icons.trending_up_rounded,
-                                    label: 'মোট XP',
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    value: Text('${widget.totalXpAfter} XP',
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                                color: theme.colorScheme
-                                                    .onSurfaceVariant)),
-                                  ),
-                                ],
-                              ],
-                            ),
+                              if (widget.perfectBonus > 0)
+                                _StatPill(
+                                  value: Text('+${widget.perfectBonus} XP'),
+                                  label: 'পারফেক্ট বোনাস',
+                                  gold: true,
+                                ),
+                              if (widget.firstDayBonus > 0)
+                                _StatPill(
+                                  value: Text('+${widget.firstDayBonus} XP'),
+                                  label: 'প্রথম পাঠ বোনাস',
+                                  gold: true,
+                                ),
+                              if (widget.gemReward > 0)
+                                _StatPill(
+                                  value: Text('+${widget.gemReward} XP'),
+                                  label: 'বোনাস XP',
+                                  gold: true,
+                                ),
+                              if (widget.totalXpAfter > 0)
+                                _StatPill(
+                                  value: Text('${widget.totalXpAfter} XP'),
+                                  label: 'মোট XP',
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -365,47 +321,10 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                       // Du'aa — gold-tinted manuscript card
                       _staggered(
                         2,
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.gold.withValues(alpha: 0.12),
-                                AppColors.gold.withValues(alpha: 0.05),
-                              ],
-                            ),
-                            borderRadius: AppRadius.lgBorder,
-                            border: Border.all(
-                                color: AppColors.gold.withValues(alpha: 0.35)),
-                          ),
-                          child: Column(
-                            children: [
-                              if (parts.isNotEmpty)
-                                Directionality(
-                                  textDirection: TextDirection.rtl,
-                                  child: Text(
-                                    parts[0],
-                                    style: const TextStyle(
-                                      fontFamily: 'NotoNaskhArabic',
-                                      fontSize: 22,
-                                      height: 1.8,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              if (parts.length > 1) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  parts[1],
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ],
+                        Center(
+                          child: DuaaCard(
+                            arabic: parts.isNotEmpty ? parts[0] : '',
+                            bangla: parts.length > 1 ? parts[1] : '',
                           ),
                         ),
                       ),
@@ -491,32 +410,57 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
   }
 }
 
-class _StatRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
+/// A small completion-stat pill (`.cp` / `.cp.gold` in the demo): a big
+/// number/value on top with a small uppercase label below.
+class _StatPill extends StatelessWidget {
   final Widget value;
-  final Color color;
-  const _StatRow(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color});
+  final String label;
+  final bool gold;
+  const _StatPill({required this.value, required this.label, this.gold = false});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(label,
-              style: theme.textTheme.bodyLarge,
-              overflow: TextOverflow.ellipsis),
-        ),
-        const SizedBox(width: 8),
-        value,
-      ],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final numberColor = gold
+        ? AppColors.goldDeep
+        : (isDark ? AppColors.darkPrimary : AppColors.forestGreen);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+      decoration: BoxDecoration(
+        color: gold
+            ? const Color(0xFFFBF3DE)
+            : (isDark ? AppColors.darkCard : Colors.white),
+        border: Border.all(
+            color: gold
+                ? const Color(0xFFEAD9A8)
+                : (isDark ? AppColors.darkOutlineVariant : AppColors.line)),
+        borderRadius: AppRadius.mdBorder,
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DefaultTextStyle.merge(
+            style: TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: numberColor,
+            ),
+            child: value,
+          ),
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontSize: 10,
+              color: AppColors.ink2,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -526,12 +470,10 @@ class _CountUpNumber extends StatelessWidget {
   final int value;
   final String prefix;
   final String suffix;
-  final TextStyle? style;
   const _CountUpNumber({
     required this.value,
     this.prefix = '',
     this.suffix = '',
-    this.style,
   });
 
   @override
@@ -541,7 +483,7 @@ class _CountUpNumber extends StatelessWidget {
       tween: IntTween(begin: reduceMotion ? value : 0, end: value),
       duration: reduceMotion ? Duration.zero : AppMotion.countUp,
       curve: Curves.easeOutCubic,
-      builder: (context, v, _) => Text('$prefix$v$suffix', style: style),
+      builder: (context, v, _) => Text('$prefix$v$suffix'),
     );
   }
 }

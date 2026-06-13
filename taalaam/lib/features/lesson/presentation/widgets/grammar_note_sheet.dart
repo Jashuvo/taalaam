@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../data/models/vocabulary_model.dart';
+import '../../../../shared/utils/bn_digits.dart';
+import '../../../../shared/widgets/misbaha/ornament_stamp.dart';
 import '../../domain/exercise_model.dart';
 
 // TPI gesture-icon lookup: pronoun (or tense marker) string → SVG asset.
@@ -52,10 +55,10 @@ class GrammarNoteSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = correct ? AppColors.correctBg : AppColors.wrongBg;
-    final bgColor = correct
-        ? AppColors.correctBg.withValues(alpha: 0.12)
-        : AppColors.wrongBg.withValues(alpha: 0.12);
+    final color = correct ? AppColors.okGreen : AppColors.wrongRed;
+    final bgColor = correct ? AppColors.okBg : AppColors.wrongBgSoft;
+    final borderColor =
+        correct ? const Color(0xFFCBE3CD) : const Color(0xFFEFC7C2);
 
     final vocabMap = {for (final v in vocab) v.arabic: v};
 
@@ -65,7 +68,11 @@ class GrammarNoteSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: bgColor,
-        border: Border(top: BorderSide(color: color, width: 3)),
+        border: Border(top: BorderSide(color: borderColor, width: 1.5)),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(22),
+          topRight: Radius.circular(22),
+        ),
       ),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
@@ -74,25 +81,55 @@ class GrammarNoteSheet extends StatelessWidget {
         children: [
           Row(
             children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: 1.0),
-                duration: AppMotion.playful,
-                curve: Curves.elasticOut,
-                builder: (context, value, child) => Transform.scale(
-                  scale: MediaQuery.of(context).disableAnimations
-                      ? 1.0
-                      : value,
-                  child: child,
+              if (correct)
+                const OrnamentStamp(size: 30)
+              else
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: AppMotion.playful,
+                  curve: Curves.elasticOut,
+                  builder: (context, value, child) => Transform.scale(
+                    scale: MediaQuery.of(context).disableAnimations
+                        ? 1.0
+                        : value,
+                    child: child,
+                  ),
+                  child: Icon(Icons.cancel, color: color),
                 ),
-                child: Icon(correct ? Icons.check_circle : Icons.cancel,
-                    color: color),
-              ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 11),
               Text(
-                correct ? 'সঠিক! চমৎকার!' : 'ভুল হয়েছে',
+                correct ? 'মাশাআল্লাহ! সঠিক' : 'সঠিক হয়নি',
                 style: theme.textTheme.titleMedium
                     ?.copyWith(color: color, fontWeight: FontWeight.bold),
               ),
+              if (correct) ...[
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold,
+                    borderRadius: BorderRadius.circular(99),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.goldDeep.withValues(alpha: 0.5),
+                        offset: const Offset(0, 4),
+                        blurRadius: 10,
+                        spreadRadius: -2,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    '+${bnDigits(AppConstants.xpPerExercise)} XP',
+                    style: const TextStyle(
+                      fontFamily: 'HindSiliguri',
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           if (correctWords.isNotEmpty) ...[
@@ -189,31 +226,63 @@ class GrammarNoteSheet extends StatelessWidget {
                   ),
                 );
               },
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Text(
-                        grammarNote!.replaceAll('«', '').replaceAll('»', ''),
-                        style: theme.textTheme.bodyMedium?.copyWith(color: color),
+              child: Container(
+                padding: const EdgeInsets.only(top: 9),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0xFFBCD9BE))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'ব্যাকরণ: ',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: AppColors.okGreen,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              TextSpan(
+                                text: grammarNote!
+                                    .replaceAll('«', '')
+                                    .replaceAll('»', ''),
+                              ),
+                            ],
+                          ),
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: color),
+                        ),
                       ),
                     ),
-                  ),
-                  if (_tpiIconAsset() case final asset?) ...[
-                    const SizedBox(width: 8),
-                    SvgPicture.asset(asset, width: 32, height: 32,
-                        colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                    if (_tpiIconAsset() case final asset?) ...[
+                      const SizedBox(width: 8),
+                      SvgPicture.asset(asset, width: 32, height: 32,
+                          colorFilter: ColorFilter.mode(color, BlendMode.srcIn)),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ],
           const SizedBox(height: 16),
           FilledButton(
             onPressed: onNext,
-            style: FilledButton.styleFrom(backgroundColor: color),
+            style: FilledButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
+              textStyle: const TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             child: const Text('পরবর্তী'),
           ),
         ],

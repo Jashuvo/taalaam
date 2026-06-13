@@ -77,21 +77,26 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
         ...List.generate(_options.length, (i) {
           final isSelected = _selected == i;
           final isCorrect = i == _correctIdx;
-          Color? tileColor;
-          Color? textColor;
+          final isDark = theme.brightness == Brightness.dark;
+          Color tileColor = isDark ? AppColors.darkCard : Colors.white;
+          Color borderColor = isDark ? AppColors.darkOutlineVariant : AppColors.line;
+          Color textColor = isDark ? AppColors.darkOnSurface : AppColors.ink;
           if (_checked) {
             // Only reveal correct/wrong AFTER check is pressed
             if (isCorrect) {
-              tileColor = AppColors.correctTile.withValues(alpha: 0.15);
-              textColor = AppColors.correctBg;
+              tileColor = AppColors.okBg;
+              borderColor = AppColors.okGreen;
+              textColor = AppColors.okGreen;
             } else if (isSelected) {
-              tileColor = AppColors.wrongTile.withValues(alpha: 0.15);
-              textColor = AppColors.wrongBg;
+              tileColor = AppColors.wrongBgSoft;
+              borderColor = AppColors.wrongRed;
+              textColor = AppColors.wrongRed;
             }
           } else if (isSelected) {
             // Selection highlight only — no spoiler
-            tileColor = theme.colorScheme.primaryContainer.withValues(alpha: 0.5);
-            textColor = theme.colorScheme.primary;
+            tileColor = const Color(0xFFEAF4F2);
+            borderColor = AppColors.tealLight;
+            textColor = AppColors.teal;
           }
           // After check: fade out tiles that are neither correct nor the
           // (wrong) selected answer, so the learner's focus narrows to the
@@ -120,15 +125,20 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
                     duration: AppMotion.fast,
                     curve: Curves.easeOut,
                     decoration: BoxDecoration(
-                      color: tileColor ??
-                          theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
+                      color: tileColor,
+                      borderRadius: AppRadius.mdBorder,
+                      border: Border(
+                        top: BorderSide(color: borderColor, width: 1.5),
+                        left: BorderSide(color: borderColor, width: 1.5),
+                        right: BorderSide(color: borderColor, width: 1.5),
+                        bottom: BorderSide(color: borderColor, width: 3.5),
+                      ),
                     ),
                     child: Material(
                       color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppRadius.mdBorder,
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: AppRadius.mdBorder,
                         // Allow changing selection until Check is pressed
                         onTap: _checked
                             ? null
@@ -138,7 +148,7 @@ class _ExerciseMultipleChoiceState extends State<ExerciseMultipleChoice> {
                               vertical: 16, horizontal: 20),
                           child: _OptionText(
                             _options[i],
-                            color: textColor ?? theme.colorScheme.onSurface,
+                            color: textColor,
                           ),
                         ),
                       ),

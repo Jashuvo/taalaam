@@ -8,12 +8,12 @@ import '../../../core/theme/app_theme.dart';
 class DuaaCard extends StatelessWidget {
   final String arabic;
   final String bangla;
-  final String source;
+  final String? source;
 
   const DuaaCard({
     required this.arabic,
     required this.bangla,
-    required this.source,
+    this.source,
     super.key,
   });
 
@@ -54,18 +54,20 @@ class DuaaCard extends StatelessWidget {
               color: isDark ? AppColors.darkOnSurfaceVariant : AppColors.ink2,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            source,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: 'HindSiliguri',
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: AppColors.goldDeep,
-              letterSpacing: 0.8,
+          if (source != null && source!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              source!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.goldDeep,
+                letterSpacing: 0.8,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

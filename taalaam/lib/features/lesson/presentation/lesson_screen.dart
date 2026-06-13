@@ -334,16 +334,28 @@ class _LessonBodyState extends ConsumerState<_LessonBody> {
         ),
         title: ClipRRect(
           borderRadius: AppRadius.xxlBorder,
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: progress),
-            duration: AppMotion.progress,
-            curve: Curves.easeOutCubic,
-            builder: (_, val, __) => LinearProgressIndicator(
-              value: val,
-              minHeight: 10,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-              valueColor:
-                  AlwaysStoppedAnimation(theme.colorScheme.primary),
+          child: Container(
+            height: 11,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: AppRadius.xxlBorder,
+            ),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: AppMotion.progress,
+              curve: Curves.easeOutCubic,
+              builder: (_, val, __) => FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: val.clamp(0.0, 1.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: AppRadius.xxlBorder,
+                    gradient: const LinearGradient(
+                      colors: [AppColors.midGreen, AppColors.brightGreen],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
