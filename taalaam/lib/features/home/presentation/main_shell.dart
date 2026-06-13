@@ -271,11 +271,14 @@ class _PracticeTabState extends ConsumerState<_PracticeTab>
         (_staggerCount - 1) * _stagger.inMilliseconds;
     _controller =
         AnimationController(vsync: this, duration: Duration(milliseconds: totalMs));
-    if (MediaQuery.of(context).disableAnimations) {
-      _controller.value = 1;
-    } else {
-      _controller.forward();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (MediaQuery.of(context).disableAnimations) {
+        _controller.value = 1;
+      } else {
+        _controller.forward();
+      }
+    });
   }
 
   @override
