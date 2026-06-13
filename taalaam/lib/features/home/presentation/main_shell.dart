@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/utils/bn_digits.dart';
 import '../../../shared/utils/xp_level.dart';
+import '../../../shared/widgets/misbaha/ornament_stamp.dart';
 import '../../../shared/widgets/progress_share_card.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../track_quran/presentation/quran_reader_provider.dart';
@@ -725,34 +727,48 @@ class _ProfileTab extends ConsumerWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [AppColors.forestGreen, Color(0xFF2E7D52)],
+                colors: AppColors.gradientStreak,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: AppRadius.lgBorder,
+              boxShadow: AppShadows.pop,
             ),
-            child: Column(
+            child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _StatPill('🔥', '$currentStreak', 'দিনের ধারা'),
-                    _StatPill('⭐', '$totalXp', 'মোট XP'),
-                    _StatPill('❤️', '$hearts/5', 'হার্টস'),
-                  ],
+                const Positioned(
+                  right: -10,
+                  top: -24,
+                  child: Opacity(
+                    opacity: 0.13,
+                    child: OrnamentStamp(size: 84, color: AppColors.gold),
+                  ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  height: 1,
-                  color: Colors.white24,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                Column(
                   children: [
-                    _StatPill('🏆', level.nameAr, 'স্তর'),
-                    _StatPill('📚', '$mastered', 'মুখস্থ শব্দ'),
-                    _StatPill('❄️', '$freezeCount', 'ফ্রিজ বাকি'),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _StatPill('🔥', '$currentStreak', 'দিনের ধারা'),
+                        _StatPill('⭐', '$totalXp', 'মোট XP'),
+                        _StatPill('❤️', '$hearts/${AppConstants.heartsPerLesson}', 'হার্টস'),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      height: 1,
+                      color: Colors.white24,
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _StatPill('🏆', level.nameAr, 'স্তর'),
+                        _StatPill('📚', '$mastered', 'মুখস্থ শব্দ'),
+                        _StatPill('❄️', '$freezeCount', 'ফ্রিজ বাকি'),
+                      ],
+                    ),
                   ],
                 ),
               ],
@@ -766,6 +782,8 @@ class _ProfileTab extends ConsumerWidget {
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainer,
               borderRadius: AppRadius.lgBorder,
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+              boxShadow: AppShadows.card,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -813,6 +831,8 @@ class _ProfileTab extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainer,
                 borderRadius: AppRadius.lgBorder,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+                boxShadow: AppShadows.card,
               ),
               child: Row(
                 children: [

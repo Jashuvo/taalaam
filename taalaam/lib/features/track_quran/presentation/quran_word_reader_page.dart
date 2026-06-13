@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:just_audio/just_audio.dart' show PlayerState;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
@@ -10,6 +11,8 @@ import '../../../features/auth/presentation/auth_provider.dart';
 import '../../../features/srs/data/srs_local_source.dart';
 import '../../../shared/services/audio_service.dart';
 import '../../../shared/services/progression_service.dart';
+import '../../../shared/utils/bn_digits.dart';
+import '../../../shared/widgets/misbaha/ornament_stamp.dart';
 import '../data/quran_coverage_service.dart';
 import 'quran_reader_provider.dart';
 
@@ -246,17 +249,22 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
               alignment: Alignment.topCenter,
               child: FadeTransition(
                 opacity: _headerAnim,
-                child: _ReaderHeader(
-                  surah: currentSurah,
-                  ayah: nav.ayah,
-                  ayahCount: ayahCount,
-                  showBackButton: widget.showBackButton,
-                  highlightEnabled: _highlightEnabled,
-                  tafsirOpen: _tafsirOpen,
-                  onToggleHighlight: _toggleHighlight,
-                  onToggleTafsir: _toggleTafsirSheet,
-                  onShowSurahList: () =>
-                      _showSurahPicker(context, surahsAsync.valueOrNull ?? []),
+                child: Column(
+                  children: [
+                    _ReaderHeader(
+                      surah: currentSurah,
+                      ayah: nav.ayah,
+                      ayahCount: ayahCount,
+                      showBackButton: widget.showBackButton,
+                      highlightEnabled: _highlightEnabled,
+                      tafsirOpen: _tafsirOpen,
+                      onToggleHighlight: _toggleHighlight,
+                      onToggleTafsir: _toggleTafsirSheet,
+                      onShowSurahList: () => _showSurahPicker(
+                          context, surahsAsync.valueOrNull ?? []),
+                    ),
+                    _AudioPlayerBar(surah: nav.surah, ayah: nav.ayah),
+                  ],
                 ),
               ),
             ),
@@ -539,6 +547,111 @@ class _ReaderHeader extends StatelessWidget {
   }
 }
 
+// ── Persistent audio player bar ────────────────────────────────────────────────
+
+class _AudioPlayerBar extends ConsumerWidget {
+  final int surah;
+  final int ayah;
+  const _AudioPlayerBar({required this.surah, required this.ayah});
+
+  static String _fmt(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return bnDigits('$m:$s');
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final audio = ref.watch(audioServiceProvider);
+    final url = _ayahAudioUrl(surah, ayah);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: AppRadius.lgBorder,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: StreamBuilder<PlayerState>(
+        stream: audio.playerStateStream,
+        builder: (context, stateSnap) {
+          final isThisAyah = audio.currentUrl == url;
+          final playing = isThisAyah && (stateSnap.data?.playing ?? false);
+
+          return StreamBuilder<Duration>(
+            stream: audio.positionStream,
+            builder: (context, posSnap) {
+              final position =
+                  isThisAyah ? (posSnap.data ?? Duration.zero) : Duration.zero;
+              final duration =
+                  isThisAyah ? (audio.duration ?? Duration.zero) : Duration.zero;
+              final progress = duration.inMilliseconds > 0
+                  ? (position.inMilliseconds / duration.inMilliseconds)
+                      .clamp(0.0, 1.0)
+                  : 0.0;
+
+              return Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      playing
+                          ? Icons.pause_circle_filled_rounded
+                          : Icons.play_circle_filled_rounded,
+                      color: AppColors.teal,
+                      size: 32,
+                    ),
+                    onPressed: () {
+                      if (!isThisAyah) {
+                        audio.playUrl(url);
+                      } else if (playing) {
+                        audio.pause();
+                      } else {
+                        audio.resume();
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('মিশারী আল-আফাসী',
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 4,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
+                            valueColor:
+                                const AlwaysStoppedAnimation(AppColors.teal),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_fmt(position)} / ${_fmt(duration)}',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
 // ── Surah picker bottom sheet ─────────────────────────────────────────────────
 
 class _SurahPickerSheet extends StatefulWidget {
@@ -810,6 +923,10 @@ class _WordView extends ConsumerWidget {
         .where((s) => s.isNotEmpty && !_isAyahMarker(s))
         .join(' ');
 
+    // Al-Fatihah ayah 1 *is* the bismillah — show it as its own ornamental
+    // opening block instead of the regular ayah header.
+    final isBismillah = nav.surah == 1 && nav.ayah == 1;
+
     final wordCount       = displayWords.length;
     final arabicFontSize  = wordCount > 30 ? 14.0
         : wordCount > 20 ? 16.0
@@ -823,7 +940,66 @@ class _WordView extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // ── Bismillah opening (Al-Fatihah 1:1 only) ────────────────────
+        if (isBismillah)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: AppColors.gradientQuranic,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: AppRadius.lgBorder,
+                border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Positioned(
+                    right: -8,
+                    top: -20,
+                    child: Opacity(
+                      opacity: 0.13,
+                      child: OrnamentStamp(size: 64, color: AppColors.gold),
+                    ),
+                  ),
+                  Column(
+                    children: [
+                      Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Text(
+                          fullAyah,
+                          style: const TextStyle(
+                            fontFamily: 'NotoNaskhArabic',
+                            fontSize: 30,
+                            color: AppColors.gold,
+                            height: 2.0,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'পরম করুণাময় ও অসীম দয়াবান আল্লাহর নামে শুরু করছি',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.75),
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
         // ── Full ayah header ─────────────────────────────────────────
+        if (!isBismillah)
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
           child: Container(
