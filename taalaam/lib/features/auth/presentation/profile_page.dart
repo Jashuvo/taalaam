@@ -13,14 +13,17 @@ import '../../home/presentation/home_provider.dart';
 import '../../home/presentation/widgets/streak_goal_progress_widget.dart';
 import 'auth_provider.dart';
 
-class ProfilePage extends ConsumerStatefulWidget {
-  const ProfilePage({super.key});
+/// The "আমি" (Me) tab — single source of truth for the profile UI,
+/// matching the demo's `.pf` profile section (no back header; this *is*
+/// a top-level tab).
+class ProfileTab extends ConsumerStatefulWidget {
+  const ProfileTab({super.key});
 
   @override
-  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+  ConsumerState<ProfileTab> createState() => _ProfileTabState();
 }
 
-class _ProfilePageState extends ConsumerState<ProfilePage>
+class _ProfileTabState extends ConsumerState<ProfileTab>
     with SingleTickerProviderStateMixin {
   String? _displayName;
   bool _loadingName = true;
@@ -305,13 +308,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
         : (email.isNotEmpty ? email[0].toUpperCase() : '?');
 
     return Scaffold(
-      body: Column(
-        children: [
-          _ProfileHeader(onBack: () => context.go('/home')),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              children: [
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, navClearance(context)),
+          children: [
           // ── Avatar + name ──────────────────────────────────────────────
           Center(
             child: Column(
@@ -758,77 +759,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             ]),
           ],
           const SizedBox(height: 32),
-              ],
-            ),
-          ),
         ],
-      ),
-    );
-  }
-}
-
-/// Gradient header with ornament watermark, matching the leaderboard header.
-class _ProfileHeader extends StatelessWidget {
-  final VoidCallback onBack;
-  const _ProfileHeader({required this.onBack});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 6, 12, 15),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.forestGreen, AppColors.midGreen],
         ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(26),
-          bottomRight: Radius.circular(26),
-        ),
-        boxShadow: AppShadows.pop,
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Positioned(
-            right: -8,
-            top: -28,
-            child: Opacity(
-              opacity: 0.13,
-              child: OrnamentStamp(size: 88, color: AppColors.gold),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                      onPressed: onBack,
-                      icon: const Icon(Icons.arrow_back, color: Colors.white)),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.only(left: 16),
-                child: Text('প্রোফাইল',
-                    style: TextStyle(
-                        fontFamily: 'HindSiliguri',
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(left: 16, top: 2),
-                child: Text('আপনার অগ্রগতি ও সেটিংস',
-                    style: TextStyle(
-                        fontFamily: 'HindSiliguri',
-                        fontSize: 11,
-                        color: Color(0xBFF5F0E8))),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

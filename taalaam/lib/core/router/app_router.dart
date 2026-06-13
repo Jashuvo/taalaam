@@ -12,7 +12,6 @@ import '../../features/auth/presentation/admin_login_page.dart';
 import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/presentation/login_page.dart';
 import '../../features/auth/presentation/onboarding_page.dart';
-import '../../features/auth/presentation/profile_page.dart';
 import '../../features/auth/presentation/streak_goal_page.dart';
 import '../../features/lesson/presentation/exam_screen.dart';
 import '../../features/home/presentation/main_shell.dart';
@@ -116,11 +115,6 @@ final appRouterProvider =
           path: '/settings',
           pageBuilder: (_, state) => sharedAxisPage(
               key: state.pageKey, child: const SettingsPage()),
-        ),
-        GoRoute(
-          path: '/profile',
-          pageBuilder: (_, state) =>
-              fadeThroughPage(key: state.pageKey, child: const ProfilePage()),
         ),
         GoRoute(
           path: '/exam/:examLessonId',
