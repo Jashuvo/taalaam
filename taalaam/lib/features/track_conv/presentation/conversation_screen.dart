@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../core/theme/app_theme.dart';
 
 const _scenarios = [
   _Scenario('classroom', 'শ্রেণিকক্ষ', 'মিসরীয় শিক্ষকের সাথে', Icons.school_outlined),
@@ -120,8 +123,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (!_started) {
       return _ScenarioPicker(
         selected: _scenario,
@@ -132,36 +133,24 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
     final scenarioLabel =
         _scenarios.firstWhere((s) => s.id == _scenario).titleBn;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: () => context.go('/home')),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('আরবি কথোপকথন', style: TextStyle(fontSize: 15)),
-            Text(scenarioLabel,
-                style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => setState(() {
+      backgroundColor: isDark ? null : AppColors.cream,
+      body: Column(
+        children: [
+          _ChatHeader(
+            scenarioLabel: scenarioLabel,
+            onBack: () => context.go('/home'),
+            onReset: () => setState(() {
               _messages.clear();
               _started = false;
             }),
-            child: const Text('নতুন'),
           ),
-        ],
-      ),
-      body: Column(
-        children: [
           Expanded(
             child: ListView.builder(
               controller: _scroll,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
               itemCount: _messages.length + (_loading ? 1 : 0),
               itemBuilder: (_, i) {
                 if (i == _messages.length) {
@@ -182,6 +171,128 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 }
 
+/// `.chh` — teal gradient chat header with avatar (`.chav`), title and
+/// subtitle, matching the demo's Muhadathah header.
+class _ChatHeader extends StatelessWidget {
+  final String scenarioLabel;
+  final VoidCallback onBack;
+  final VoidCallback onReset;
+  const _ChatHeader({
+    required this.scenarioLabel,
+    required this.onBack,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 6, 12, 13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: AppColors.gradientConversational,
+        ),
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(22),
+          bottomRight: Radius.circular(22),
+        ),
+        boxShadow: AppShadows.pop,
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+          ),
+          const _ChatAvatar(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'উস্তায ইউসুফ',
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  'AI কথোপকথন সঙ্গী · $scenarioLabel',
+                  style: const TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 10.5,
+                    color: Color(0xBFFFFFFF),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onReset,
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
+            child: const Text('নতুন', style: TextStyle(fontFamily: 'HindSiliguri', fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// `.chav` — 38px circular avatar with the Arabic letter ي and an online
+/// indicator dot (`.chav i`).
+class _ChatAvatar extends StatelessWidget {
+  const _ChatAvatar();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 38,
+      height: 38,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(
+              color: Color(0x2EFFFFFF),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              'ي',
+              style: GoogleFonts.amiri(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.gold,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -1,
+            right: -1,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: const Color(0xFF5EDB8A),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.teal, width: 2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ScenarioPicker extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelect;
@@ -194,29 +305,32 @@ class _ScenarioPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.go('/home')),
-        title: const Text('কথোপকথন অনুশীলন'),
+        title: const Text('কথোপকথন অনুশীলন', style: TextStyle(fontFamily: 'HindSiliguri')),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
+            const Text(
               'পরিস্থিতি বেছে নিন',
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: TextStyle(fontFamily: 'HindSiliguri', fontSize: 19, fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               'AI একজন আরবিভাষী হিসেবে কথা বলবে। আপনি যা জানেন তা দিয়ে চেষ্টা করুন।',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 12.5,
+                height: 1.4,
+                color: isDark ? AppColors.darkOnSurfaceVariant : AppColors.ink2,
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 22),
             Expanded(
               child: GridView.count(
                 crossAxisCount: 2,
@@ -228,40 +342,47 @@ class _ScenarioPicker extends StatelessWidget {
                   return GestureDetector(
                     onTap: () => onSelect(s.id),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
+                      duration: AppMotion.fast,
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? theme.colorScheme.primaryContainer
-                            : theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(16),
+                        color: isDark ? AppColors.darkCard : Colors.white,
+                        borderRadius: AppRadius.lgBorder,
                         border: Border.all(
                           color: isSelected
-                              ? theme.colorScheme.primary
-                              : Colors.transparent,
-                          width: 2,
+                              ? AppColors.gold
+                              : (isDark ? AppColors.darkOutlineVariant : AppColors.line),
+                          width: isSelected ? 2 : 1,
                         ),
+                        boxShadow: AppShadows.card,
                       ),
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(s.icon,
-                              size: 32,
-                              color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.onSurfaceVariant),
+                          Icon(
+                            s.icon,
+                            size: 30,
+                            color: isSelected
+                                ? AppColors.goldDeep
+                                : (isDark ? AppColors.darkOnSurfaceVariant : AppColors.teal),
+                          ),
                           const SizedBox(height: 8),
-                          Text(s.titleBn,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected
-                                      ? theme.colorScheme.primary
-                                      : null)),
-                          Text(s.subtitleBn,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant),
-                              textAlign: TextAlign.center),
+                          Text(
+                            s.titleBn,
+                            style: TextStyle(
+                              fontFamily: 'HindSiliguri',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected
+                                  ? AppColors.goldDeep
+                                  : (isDark ? AppColors.darkOnSurface : AppColors.ink),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            s.subtitleBn,
+                            style: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 10.5, color: AppColors.ink2),
+                            textAlign: TextAlign.center,
+                          ),
                         ],
                       ),
                     ),
@@ -269,10 +390,27 @@ class _ScenarioPicker extends StatelessWidget {
                 }).toList(),
               ),
             ),
-            FilledButton.icon(
-              icon: const Icon(Icons.chat_outlined),
-              label: const Text('শুরু করুন'),
-              onPressed: onStart,
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [AppColors.gold, AppColors.goldDeep]),
+                  borderRadius: AppRadius.mdBorder,
+                  boxShadow: AppShadows.card,
+                ),
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.mdBorder),
+                  ),
+                  icon: const Icon(Icons.chat_outlined, color: Colors.white),
+                  label: const Text('শুরু করুন', style: TextStyle(fontFamily: 'HindSiliguri', fontWeight: FontWeight.w700, color: Colors.white)),
+                  onPressed: onStart,
+                ),
+              ),
             ),
           ],
         ),
@@ -281,92 +419,106 @@ class _ScenarioPicker extends StatelessWidget {
   }
 }
 
+/// `.bub` — chat bubble. `.bub.bot`/`.bub.me` for the two sides, plus a
+/// `.bub.sys`-style gold pill for the AI's correction note.
 class _MessageBubble extends StatelessWidget {
   final _Message msg;
   const _MessageBubble({required this.msg});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isUser = msg.isUser;
 
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.78),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isUser
-              ? theme.colorScheme.primary
-              : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(16).copyWith(
-            bottomRight: isUser ? const Radius.circular(4) : null,
-            bottomLeft: !isUser ? const Radius.circular(4) : null,
+    return Column(
+      crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.8),
+            margin: const EdgeInsets.only(bottom: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+            decoration: BoxDecoration(
+              color: isUser
+                  ? AppColors.forestGreen
+                  : (isDark ? AppColors.darkCard : Colors.white),
+              border: isUser
+                  ? null
+                  : Border.all(color: isDark ? AppColors.darkOutlineVariant : AppColors.line),
+              borderRadius: BorderRadius.circular(16).copyWith(
+                bottomRight: isUser ? const Radius.circular(5) : null,
+                bottomLeft: !isUser ? const Radius.circular(5) : null,
+              ),
+              boxShadow: AppShadows.card,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Text(
+                    msg.arabic,
+                    style: TextStyle(
+                      fontFamily: 'NotoNaskhArabic',
+                      fontSize: 20,
+                      height: 1.6,
+                      color: isUser ? AppColors.cream : (isDark ? AppColors.darkOnSurface : AppColors.ink),
+                    ),
+                  ),
+                ),
+                if (!isUser && msg.transliteration.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    msg.transliteration,
+                    style: const TextStyle(
+                      fontFamily: 'HindSiliguri',
+                      fontSize: 10.5,
+                      color: AppColors.ink2,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+                if (msg.translation.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    msg.translation,
+                    style: TextStyle(
+                      fontFamily: 'HindSiliguri',
+                      fontSize: 10.5,
+                      color: isUser ? const Color(0xB3F5F0E8) : AppColors.ink2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Directionality(
-              textDirection: TextDirection.rtl,
-              child: Text(
-                msg.arabic,
-                style: TextStyle(
-                  fontFamily: 'NotoNaskhArabic',
-                  fontSize: 20,
-                  height: 1.7,
-                  color: isUser ? Colors.white : theme.colorScheme.onSurface,
-                ),
-              ),
+        if (msg.correction != null)
+          Container(
+            margin: const EdgeInsets.only(bottom: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFBF3DE),
+              border: Border.all(color: const Color(0xFFEAD9A8)),
+              borderRadius: BorderRadius.circular(99),
             ),
-            if (!isUser && msg.transliteration.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                msg.transliteration,
-                style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontStyle: FontStyle.italic),
-              ),
-            ],
-            if (!isUser && msg.translation.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                msg.translation,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
-            if (msg.correction != null) ...[
-              const SizedBox(height: 6),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade100,
-                  borderRadius: BorderRadius.circular(6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.tips_and_updates_outlined, size: 14, color: AppColors.goldDeep),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    'সংশোধন: ${msg.correction}',
+                    style: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.goldDeep),
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.tips_and_updates_outlined,
-                        size: 14, color: Colors.amber),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        'সংশোধন: ${msg.correction}',
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.brown),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -376,26 +528,30 @@ class _TypingBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
+          color: isDark ? AppColors.darkCard : Colors.white,
+          border: Border.all(color: isDark ? AppColors.darkOutlineVariant : AppColors.line),
           borderRadius: BorderRadius.circular(16).copyWith(
-            bottomLeft: const Radius.circular(4),
+            bottomLeft: const Radius.circular(5),
           ),
+          boxShadow: AppShadows.card,
         ),
         child: Text('…',
             style: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant, fontSize: 20)),
+                color: isDark ? AppColors.darkOnSurfaceVariant : AppColors.ink2, fontSize: 20)),
       ),
     );
   }
 }
 
+/// `.chbar` — bottom input bar with a pill-shaped text field (`.fld`) and a
+/// gold gradient send button (`.mic`).
 class _InputBar extends StatelessWidget {
   final TextEditingController ctrl;
   final bool loading;
@@ -405,16 +561,13 @@ class _InputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? AppColors.darkOutlineVariant : AppColors.line;
     return SafeArea(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          border: Border(
-              top: BorderSide(color: theme.colorScheme.outlineVariant)),
-        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: TextField(
@@ -423,13 +576,20 @@ class _InputBar extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: 'আরবিতে লিখুন…',
                   hintTextDirection: TextDirection.ltr,
+                  hintStyle: const TextStyle(fontFamily: 'HindSiliguri', fontSize: 12, color: Color(0xFFB9AF97)),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none),
+                      borderRadius: BorderRadius.circular(99),
+                      borderSide: BorderSide(color: borderColor)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(99),
+                      borderSide: BorderSide(color: borderColor)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(99),
+                      borderSide: BorderSide(color: borderColor)),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest,
+                  fillColor: isDark ? AppColors.darkCard : Colors.white,
                   contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                      horizontal: 16, vertical: 11),
                 ),
                 style: const TextStyle(
                     fontFamily: 'NotoNaskhArabic', fontSize: 18, height: 1.5),
@@ -437,17 +597,25 @@ class _InputBar extends StatelessWidget {
                 enabled: !loading,
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              icon: loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                    )
-                  : const Icon(Icons.send),
-              onPressed: loading ? null : onSend,
+            const SizedBox(width: 10),
+            DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [AppColors.gold, AppColors.goldDeep]),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(color: Color(0x8CA87B0A), offset: Offset(0, 6), blurRadius: 16, spreadRadius: -4),
+                ],
+              ),
+              child: IconButton(
+                icon: loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Icon(Icons.send, color: Colors.white),
+                onPressed: loading ? null : onSend,
+              ),
             ),
           ],
         ),
