@@ -5,7 +5,10 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/services/progression_service.dart';
+import '../../../shared/utils/bn_digits.dart';
 import '../../../shared/widgets/arabic_audio_button.dart';
+import '../../../shared/widgets/misbaha/ornament_stamp.dart';
+import '../../../shared/widgets/misbaha/stat_pill.dart';
 import '../../../shared/widgets/shimmer_skeleton.dart';
 import '../../auth/presentation/auth_provider.dart';
 import 'srs_provider.dart';
@@ -50,6 +53,23 @@ class _ReviewBody extends ConsumerWidget {
           icon: const Icon(Icons.close),
           onPressed: () => context.go('/home'),
         ),
+        actions: [
+          if (notifier.currentCard != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  'বাকি ${bnDigits(notifier.remaining)}/${bnDigits(notifier.total)}',
+                  style: const TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink2,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: sessionAsync.when(
         loading: () => const ReviewSkeleton(),
@@ -89,10 +109,10 @@ class _CardViewState extends State<_CardView> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       child: Column(
         children: [
           Expanded(
@@ -103,15 +123,35 @@ class _CardViewState extends State<_CardView> {
                     onTap: _flipped
                         ? null
                         : () => setState(() => _flipped = true),
-                    child: Card(
-                      elevation: 2,
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: _flipped
-                              ? _FlippedFace(vocabId: widget.card.vocabularyId)
-                              : _FrontFace(vocabId: widget.card.vocabularyId),
-                        ),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(18, 38, 18, 22),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkCard : Colors.white,
+                        border: Border.all(
+                            color: isDark
+                                ? AppColors.darkOutlineVariant
+                                : AppColors.line),
+                        borderRadius: AppRadius.xlBorder,
+                        boxShadow: AppShadows.card,
+                      ),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            top: -26,
+                            left: -6,
+                            child: _SrsStatePill(card: widget.card),
+                          ),
+                          Center(
+                            child: SingleChildScrollView(
+                              child: _flipped
+                                  ? _FlippedFace(
+                                      vocabId: widget.card.vocabularyId)
+                                  : _FrontFace(
+                                      vocabId: widget.card.vocabularyId),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -123,46 +163,87 @@ class _CardViewState extends State<_CardView> {
             ),
           ),
           if (!_flipped)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
+            const Padding(
+              padding: EdgeInsets.only(top: 14),
               child: Text(
-                'ট্যাপ করুন উত্তর দেখতে',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                'অর্থ দেখতে কার্ডে চাপ দিন',
+                style: TextStyle(
+                  fontFamily: 'HindSiliguri',
+                  fontSize: 11.5,
+                  color: Color(0xFFB9AF97),
                 ),
               ),
             ),
           if (_flipped) ...[
-            const SizedBox(height: 8),
-            Text('কতটা মনে ছিল?', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 12),
+            const SizedBox(height: 13),
             Row(
               children: [
                 _RatingBtn(
-                    label: 'ভুলে\nগেছি',
+                    label: 'আবার',
+                    sub: '< ১ মিনিট',
                     rating: 1,
-                    color: Colors.red.shade700,
+                    color: const Color(0xFFC0392B),
                     notifier: widget.notifier),
                 _RatingBtn(
                     label: 'কঠিন',
+                    sub: '১০ মিনিট',
                     rating: 2,
-                    color: Colors.orange.shade700,
+                    color: const Color(0xFFE67E22),
                     notifier: widget.notifier),
                 _RatingBtn(
                     label: 'ভালো',
+                    sub: '১ দিন',
                     rating: 3,
-                    color: Colors.green.shade600,
+                    color: AppColors.okGreen,
                     notifier: widget.notifier),
                 _RatingBtn(
                     label: 'সহজ',
+                    sub: '৪ দিন',
                     rating: 4,
-                    color: Colors.blue.shade600,
+                    color: const Color(0xFF2471A3),
                     notifier: widget.notifier),
               ],
             ),
-            const SizedBox(height: 24),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ── SRS state pill (`.spill` in the demo) ───────────────────────────────────
+
+class _SrsStatePill extends StatelessWidget {
+  final SrsCard card;
+  const _SrsStatePill({required this.card});
+
+  @override
+  Widget build(BuildContext context) {
+    final isNew = card.reps == 0;
+    final isLearning = card.stability < 2.0;
+    final (label, fg, bg, border) = isNew
+        ? ('নতুন', const Color(0xFF1565C0), const Color(0xFFEAF2FB),
+            const Color(0xFF9FC4E8))
+        : isLearning
+            ? ('শেখা হচ্ছে', const Color(0xFFB45309), const Color(0xFFFBF1DF),
+                const Color(0xFFEAC089))
+            : ('স্মরণে আছে', AppColors.okGreen, AppColors.okBg,
+                const Color(0xFFA8D4AB));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'HindSiliguri',
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: fg,
+        ),
       ),
     );
   }
@@ -176,6 +257,7 @@ class _FrontFace extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final entryAsync = ref.watch(_vocabEntryProvider(vocabId));
     return entryAsync.when(
       loading: () => const CircularProgressIndicator(),
@@ -186,8 +268,12 @@ class _FrontFace extends ConsumerWidget {
               textDirection: TextDirection.rtl,
               child: Text(
                 entry.arabic,
-                style: const TextStyle(
-                    fontFamily: 'NotoNaskhArabic', fontSize: 48, height: 1.6),
+                style: TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  fontSize: 52,
+                  height: 1.4,
+                  color: isDark ? AppColors.darkOnSurface : AppColors.ink,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -204,6 +290,7 @@ class _FlippedFace extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final entry = ref.watch(_vocabEntryProvider(vocabId)).valueOrNull;
     if (entry == null) return const SizedBox.shrink();
     return Column(
@@ -213,21 +300,31 @@ class _FlippedFace extends ConsumerWidget {
           textDirection: TextDirection.rtl,
           child: Text(
             entry.arabic,
-            style: const TextStyle(
-                fontFamily: 'NotoNaskhArabic', fontSize: 36, height: 1.6),
+            style: TextStyle(
+              fontFamily: 'NotoNaskhArabic',
+              fontSize: 52,
+              height: 1.4,
+              color: isDark ? AppColors.darkOnSurface : AppColors.ink,
+            ),
             textAlign: TextAlign.center,
           ),
         ),
         ArabicAudioButton(audioUrl: entry.audioUrl),
-        const SizedBox(height: 8),
-        if (entry.transliteration != null)
+        if (entry.transliteration != null) ...[
+          const SizedBox(height: 4),
           Text(entry.transliteration!,
               style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 12),
+        ],
+        const SizedBox(height: 10),
         Text(
           entry.meaningBn,
-          style: theme.textTheme.headlineSmall,
+          style: TextStyle(
+            fontFamily: 'HindSiliguri',
+            fontSize: 21,
+            fontWeight: FontWeight.w700,
+            color: isDark ? AppColors.darkPrimary : AppColors.forestGreen,
+          ),
           textAlign: TextAlign.center,
         ),
         if (entry.meaningEn != null) ...[
@@ -236,40 +333,30 @@ class _FlippedFace extends ConsumerWidget {
               style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant)),
         ],
-        if (entry.rootLetters != null) ...[
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+        if (entry.rootLetters != null || entry.frequencyRank != null) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            alignment: WrapAlignment.center,
             children: [
-              Icon(Icons.account_tree_outlined,
-                  size: 14,
-                  color: theme.colorScheme.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text('মূল: ',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant)),
-              Directionality(
-                textDirection: TextDirection.rtl,
-                child: Text(
-                  entry.rootLetters!,
-                  style: TextStyle(
-                    fontFamily: 'NotoNaskhArabic',
-                    fontSize: 16,
-                    height: 1.6,
-                    color: theme.colorScheme.primary,
+              if (entry.rootLetters != null)
+                _RvChip(
+                  child: Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Text(
+                      'ধাতু ${entry.rootLetters!}',
+                      style: const TextStyle(
+                          fontFamily: 'NotoNaskhArabic', fontSize: 12.5),
+                    ),
                   ),
                 ),
-              ),
+              if (entry.frequencyRank != null)
+                _RvChip(
+                  gold: true,
+                  child: Text('কুরআনে #${entry.frequencyRank}'),
+                ),
             ],
-          ),
-        ],
-        if (entry.frequencyRank != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            'কুরআনে ${entry.frequencyRank}তম সর্বাধিক ব্যবহৃত',
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: theme.colorScheme.tertiary),
-            textAlign: TextAlign.center,
           ),
         ],
         if (entry.grammarNoteBn != null) ...[
@@ -307,6 +394,34 @@ class _FlippedFace extends ConsumerWidget {
   }
 }
 
+// ── Small rounded chip (`.rvchip` / `.rvchip.g` in the demo) ────────────────
+
+class _RvChip extends StatelessWidget {
+  final Widget child;
+  final bool gold;
+  const _RvChip({required this.child, this.gold = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: gold ? const Color(0xFFFBF3DE) : const Color(0xFFF2EDE1),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(
+          fontFamily: 'HindSiliguri',
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+          color: gold ? AppColors.goldDeep : AppColors.ink2,
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
 // ── Context snippet loader (Feature 3) ───────────────────────────────────────
 
 class _ContextSnippetLoader extends ConsumerWidget {
@@ -339,43 +454,45 @@ class _ContextSnippetBlock extends StatelessWidget {
       curve: Curves.easeOutCubic,
       child: Container(
         width: double.infinity,
+        margin: const EdgeInsets.only(top: 10),
         decoration: BoxDecoration(
-          color: AppColors.gold.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: AppColors.gold.withValues(alpha: 0.3), width: 1),
+          color: const Color(0xFFFFFDF6),
+          borderRadius: AppRadius.mdBorder,
+          border: Border.all(color: const Color(0xFFEAD9A8)),
         ),
         padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              const Icon(Icons.auto_stories_rounded,
-                  size: 14, color: AppColors.gold),
-              const SizedBox(width: 6),
-              Text('প্রসঙ্গ',
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: AppColors.gold)),
-            ]),
+            const Text(
+              'প্রসঙ্গ',
+              style: TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+                color: AppColors.goldDeep,
+              ),
+            ),
             if (entry.contextSnippetAr != null) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 5),
               Directionality(
                 textDirection: TextDirection.rtl,
                 child: Text(
                   entry.contextSnippetAr!,
                   style: const TextStyle(
                     fontFamily: 'NotoNaskhArabic',
-                    fontSize: 18,
-                    height: 2.0,
-                    color: AppColors.gold,
+                    fontSize: 19,
+                    height: 1.9,
+                    color: AppColors.goldDeep,
                   ),
                   textAlign: TextAlign.right,
                 ),
               ),
             ],
             if (entry.contextSnippetBn != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 3),
               Text(
                 entry.contextSnippetBn!,
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -394,11 +511,13 @@ class _ContextSnippetBlock extends StatelessWidget {
 
 class _RatingBtn extends StatelessWidget {
   final String label;
+  final String sub;
   final int rating;
   final Color color;
   final ReviewSessionNotifier notifier;
   const _RatingBtn(
       {required this.label,
+      required this.sub,
       required this.rating,
       required this.color,
       required this.notifier});
@@ -406,17 +525,41 @@ class _RatingBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 3.5),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: color,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13)),
+              elevation: 0,
             ),
             onPressed: () => notifier.rate(rating),
-            child: Text(label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  sub,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 9.5,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -459,7 +602,7 @@ class _ReviewDoneViewState extends State<_ReviewDoneView>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final reward = widget.reward;
 
     return Center(
@@ -473,22 +616,54 @@ class _ReviewDoneViewState extends State<_ReviewDoneView>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('✅', style: TextStyle(fontSize: 64),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                Text('আজকের রিভিউ শেষ!',
-                    style: theme.textTheme.headlineSmall
-                        ?.copyWith(color: theme.colorScheme.primary),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 8),
-                Text('আবার আগামীকাল দেখুন।',
-                    style: theme.textTheme.bodyMedium,
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 24),
+                const Center(child: OrnamentStamp(size: 58)),
+                const SizedBox(height: 12),
+                Text(
+                  'আজকের রিভিউ শেষ!',
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkOnSurface : AppColors.ink,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'FSRS অনুযায়ী পরবর্তী রিভিউ নির্ধারিত হয়েছে',
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 12.5,
+                    color: AppColors.ink2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
                 if (reward != null) ...[
-                  _ReviewRewardCard(reward: reward),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 9,
+                    runSpacing: 9,
+                    children: [
+                      StatPill(
+                        value: Text('+${reward.xp} XP'),
+                        label: 'সেশন XP',
+                        gold: true,
+                      ),
+                      StatPill(
+                        value: Text('${reward.streakDays}'),
+                        label: 'ধারাবাহিকতা',
+                      ),
+                      if (reward.heartGained)
+                        StatPill(
+                          value: Text(
+                              '${reward.newHearts}/${AppConstants.heartsPerLesson}'),
+                          label: 'হার্ট পুনরুদ্ধার',
+                        ),
+                    ],
+                  ),
                 ],
+                const SizedBox(height: 24),
                 FilledButton.icon(
                   icon: const Icon(Icons.home_rounded),
                   label: const Text('হোমে ফিরুন'),
@@ -502,82 +677,6 @@ class _ReviewDoneViewState extends State<_ReviewDoneView>
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ReviewRewardCard extends StatelessWidget {
-  final SrsReward reward;
-  const _ReviewRewardCard({required this.reward});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          _Row(
-            icon: '⭐',
-            label: 'অর্জিত XP',
-            value: '+${reward.xp} XP',
-            color: AppColors.gold,
-          ),
-          const Divider(height: 20),
-          _Row(
-            icon: '🔥',
-            label: 'ধারাবাহিকতা',
-            value: '${reward.streakDays} দিন',
-            color: Colors.orangeAccent,
-          ),
-          if (reward.heartGained) ...[
-            const Divider(height: 20),
-            _Row(
-              icon: '❤️',
-              label: 'হার্ট পুনরুদ্ধার',
-              value:
-                  '+১ (${reward.newHearts}/${AppConstants.heartsPerLesson})',
-              color: Colors.redAccent,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  final String icon;
-  final String label;
-  final String value;
-  final Color color;
-  const _Row(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 20)),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Text(label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant))),
-        Text(value,
-            style: theme.textTheme.titleSmall
-                ?.copyWith(color: color, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 }

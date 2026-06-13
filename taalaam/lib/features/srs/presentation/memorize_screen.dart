@@ -5,6 +5,8 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/services/progression_service.dart';
+import '../../../shared/widgets/misbaha/ornament_stamp.dart';
+import '../../../shared/widgets/misbaha/stat_pill.dart';
 import '../../auth/presentation/auth_provider.dart';
 import 'srs_provider.dart';
 
@@ -171,6 +173,7 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final entry = _entry;
     final inWordBank = _inWordBankMode;
 
@@ -199,35 +202,45 @@ class _MemorizeCardState extends ConsumerState<_MemorizeCard> {
           const SizedBox(height: 16),
 
           // ── Prompt card (Bangla meaning → write Arabic)
-          Card(
-            elevation: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                children: [
-                  Text(
-                    'আরবিতে লিখুন:',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : Colors.white,
+              border: Border.all(
+                  color:
+                      isDark ? AppColors.darkOutlineVariant : AppColors.line),
+              borderRadius: AppRadius.xlBorder,
+              boxShadow: AppShadows.card,
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'আরবিতে লিখুন:',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  entry.meaningBn,
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 21,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkOnSurface : AppColors.ink,
                   ),
-                  const SizedBox(height: 14),
+                  textAlign: TextAlign.center,
+                ),
+                if (entry.transliteration != null) ...[
+                  const SizedBox(height: 6),
                   Text(
-                    entry.meaningBn,
-                    style: theme.textTheme.headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
+                    entry.transliteration!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic),
                   ),
-                  if (entry.transliteration != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      entry.transliteration!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontStyle: FontStyle.italic),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
           const SizedBox(height: 20),
@@ -337,6 +350,7 @@ class _WordBankInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     if (choices.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -347,18 +361,24 @@ class _WordBankInput extends StatelessWidget {
       children: choices.map((word) {
         Color bg;
         Color fg;
+        Color border;
         if (!checked) {
-          bg = theme.colorScheme.surfaceContainerHighest;
-          fg = theme.colorScheme.onSurface;
+          bg = isDark ? AppColors.darkCard : Colors.white;
+          fg = isDark ? AppColors.darkOnSurface : AppColors.ink;
+          border = isDark ? AppColors.darkOutlineVariant : AppColors.line;
         } else if (word == correctAnswer) {
-          bg = AppColors.brightGreen.withValues(alpha: 0.15);
-          fg = AppColors.brightGreen;
+          bg = AppColors.okBg;
+          fg = AppColors.okGreen;
+          border = AppColors.okGreen;
         } else if (word == selectedWord) {
-          bg = theme.colorScheme.errorContainer;
-          fg = theme.colorScheme.onErrorContainer;
+          bg = AppColors.wrongBgSoft;
+          fg = AppColors.wrongRed;
+          border = AppColors.wrongRed;
         } else {
-          bg = theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4);
-          fg = theme.colorScheme.onSurface.withValues(alpha: 0.4);
+          bg = isDark ? AppColors.darkCard : Colors.white;
+          fg = (isDark ? AppColors.darkOnSurface : AppColors.ink)
+              .withValues(alpha: 0.4);
+          border = isDark ? AppColors.darkOutlineVariant : AppColors.line;
         }
 
         return GestureDetector(
@@ -371,10 +391,8 @@ class _WordBankInput extends StatelessWidget {
               color: bg,
               borderRadius: BorderRadius.circular(32),
               border: Border.all(
-                color: checked && word == correctAnswer
-                    ? AppColors.brightGreen
-                    : theme.colorScheme.outline.withValues(alpha: 0.3),
-                width: checked && word == correctAnswer ? 2 : 1,
+                color: border,
+                width: checked && word == correctAnswer ? 2 : 1.5,
               ),
             ),
             child: Directionality(
@@ -426,12 +444,10 @@ class _KeyboardInput extends StatelessWidget {
           decoration: InputDecoration(
             hintText: 'আরবি অক্ষরে লিখুন…',
             hintTextDirection: TextDirection.ltr,
-            border: const OutlineInputBorder(),
+            border: OutlineInputBorder(borderRadius: AppRadius.mdBorder),
             filled: checked,
             fillColor: checked
-                ? (correct
-                    ? AppColors.brightGreen.withValues(alpha: 0.1)
-                    : Colors.red.withValues(alpha: 0.1))
+                ? (correct ? AppColors.okBg : AppColors.wrongBgSoft)
                 : null,
           ),
           style: const TextStyle(
@@ -452,19 +468,18 @@ class _FeedbackBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final color = correct ? AppColors.okGreen : AppColors.wrongRed;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: correct
-            ? AppColors.brightGreen.withValues(alpha: 0.1)
-            : theme.colorScheme.errorContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
+        color: correct ? AppColors.okBg : AppColors.wrongBgSoft,
+        borderRadius: AppRadius.mdBorder,
       ),
       child: Row(
         children: [
           Icon(
             correct ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-            color: correct ? AppColors.brightGreen : theme.colorScheme.error,
+            color: color,
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -712,7 +727,7 @@ class _MemorizeDoneViewState extends State<_MemorizeDoneView>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final reward = widget.reward;
 
     return Center(
@@ -726,18 +741,44 @@ class _MemorizeDoneViewState extends State<_MemorizeDoneView>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text('🌙', style: TextStyle(fontSize: 64),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                Text('মুখস্থ সেশন শেষ!',
-                    style: theme.textTheme.headlineSmall
-                        ?.copyWith(color: theme.colorScheme.primary),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 24),
+                const Center(child: OrnamentStamp(size: 58)),
+                const SizedBox(height: 12),
+                Text(
+                  'নতুন শব্দ শেখা শেষ!',
+                  style: TextStyle(
+                    fontFamily: 'HindSiliguri',
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? AppColors.darkOnSurface : AppColors.ink,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
                 if (reward != null) ...[
-                  _RewardCard(reward: reward),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 9,
+                    runSpacing: 9,
+                    children: [
+                      StatPill(
+                        value: Text('+${reward.xp} XP'),
+                        label: 'সেশন XP',
+                        gold: true,
+                      ),
+                      StatPill(
+                        value: Text('${reward.streakDays}'),
+                        label: 'ধারাবাহিকতা',
+                      ),
+                      if (reward.heartGained)
+                        StatPill(
+                          value: Text(
+                              '${reward.newHearts}/${AppConstants.heartsPerLesson}'),
+                          label: 'হার্ট পুনরুদ্ধার',
+                        ),
+                    ],
+                  ),
                 ],
+                const SizedBox(height: 24),
                 FilledButton.icon(
                   icon: const Icon(Icons.home_rounded),
                   label: const Text('হোমে ফিরুন'),
@@ -751,83 +792,6 @@ class _MemorizeDoneViewState extends State<_MemorizeDoneView>
           ),
         ),
       ),
-    );
-  }
-}
-
-// ── Shared reward card ────────────────────────────────────────────────────────
-
-class _RewardCard extends StatelessWidget {
-  final SrsReward reward;
-  const _RewardCard({required this.reward});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          _RewardRow(
-            icon: '⭐',
-            label: 'অর্জিত XP',
-            value: '+${reward.xp} XP',
-            color: AppColors.gold,
-          ),
-          const Divider(height: 20),
-          _RewardRow(
-            icon: '🔥',
-            label: 'ধারাবাহিকতা',
-            value: '${reward.streakDays} দিন',
-            color: Colors.orangeAccent,
-          ),
-          if (reward.heartGained) ...[
-            const Divider(height: 20),
-            _RewardRow(
-              icon: '❤️',
-              label: 'হার্ট পুনরুদ্ধার',
-              value: '+১ (${reward.newHearts}/${AppConstants.heartsPerLesson})',
-              color: Colors.redAccent,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _RewardRow extends StatelessWidget {
-  final String icon;
-  final String label;
-  final String value;
-  final Color color;
-  const _RewardRow(
-      {required this.icon,
-      required this.label,
-      required this.value,
-      required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 20)),
-        const SizedBox(width: 10),
-        Expanded(
-            child: Text(label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant))),
-        Text(value,
-            style: theme.textTheme.titleSmall
-                ?.copyWith(color: color, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 }

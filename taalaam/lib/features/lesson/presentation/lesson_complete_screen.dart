@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/local/database.dart';
 import '../../../shared/widgets/misbaha/duaa_card.dart';
 import '../../../shared/widgets/misbaha/ornament_stamp.dart';
+import '../../../shared/widgets/misbaha/stat_pill.dart';
 import '../../auth/presentation/auth_provider.dart';
 
 // Returns true if the user has NOT yet set a streak goal (show goal screen once)
@@ -267,7 +268,7 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                             spacing: 9,
                             runSpacing: 9,
                             children: [
-                              _StatPill(
+                              StatPill(
                                 value: _CountUpNumber(
                                   value: widget.xpEarned,
                                   prefix: '+',
@@ -275,41 +276,41 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                                 ),
                                 label: 'XP অর্জিত',
                               ),
-                              _StatPill(
+                              StatPill(
                                 value: Text('$pct%'),
                                 label: 'সঠিকতা',
                               ),
-                              _StatPill(
+                              StatPill(
                                 value: Text(
                                     '${widget.correctCount}/${widget.totalCount}'),
                                 label: 'সঠিক উত্তর',
                               ),
                               if (pct == 100)
-                                const _StatPill(
+                                const StatPill(
                                   value: Text('✨'),
                                   label: 'পারফেক্ট রান',
                                   gold: true,
                                 ),
                               if (widget.perfectBonus > 0)
-                                _StatPill(
+                                StatPill(
                                   value: Text('+${widget.perfectBonus} XP'),
                                   label: 'পারফেক্ট বোনাস',
                                   gold: true,
                                 ),
                               if (widget.firstDayBonus > 0)
-                                _StatPill(
+                                StatPill(
                                   value: Text('+${widget.firstDayBonus} XP'),
                                   label: 'প্রথম পাঠ বোনাস',
                                   gold: true,
                                 ),
                               if (widget.gemReward > 0)
-                                _StatPill(
+                                StatPill(
                                   value: Text('+${widget.gemReward} XP'),
                                   label: 'বোনাস XP',
                                   gold: true,
                                 ),
                               if (widget.totalXpAfter > 0)
-                                _StatPill(
+                                StatPill(
                                   value: Text('${widget.totalXpAfter} XP'),
                                   label: 'মোট XP',
                                 ),
@@ -402,61 +403,6 @@ class _LessonCompleteScreenState extends ConsumerState<LessonCompleteScreen>
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A small completion-stat pill (`.cp` / `.cp.gold` in the demo): a big
-/// number/value on top with a small uppercase label below.
-class _StatPill extends StatelessWidget {
-  final Widget value;
-  final String label;
-  final bool gold;
-  const _StatPill({required this.value, required this.label, this.gold = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final numberColor = gold
-        ? AppColors.goldDeep
-        : (isDark ? AppColors.darkPrimary : AppColors.forestGreen);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-      decoration: BoxDecoration(
-        color: gold
-            ? const Color(0xFFFBF3DE)
-            : (isDark ? AppColors.darkCard : Colors.white),
-        border: Border.all(
-            color: gold
-                ? const Color(0xFFEAD9A8)
-                : (isDark ? AppColors.darkOutlineVariant : AppColors.line)),
-        borderRadius: AppRadius.mdBorder,
-        boxShadow: AppShadows.card,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DefaultTextStyle.merge(
-            style: TextStyle(
-              fontFamily: 'HindSiliguri',
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: numberColor,
-            ),
-            child: value,
-          ),
-          const SizedBox(height: 1),
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'HindSiliguri',
-              fontSize: 10,
-              color: AppColors.ink2,
-              letterSpacing: 0.4,
             ),
           ),
         ],
