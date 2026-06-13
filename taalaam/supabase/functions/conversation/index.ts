@@ -4,6 +4,12 @@
 
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 const SCENARIOS: Record<string, string> = {
   classroom: `You are Ahmad (أحمد), a friendly Arabic teacher in a classroom in Egypt.
 The learner is a Bangladeshi Muslim student practicing basic Arabic conversation.
@@ -28,6 +34,8 @@ Always reply with: { "arabic": "...", "transliteration": "...", "translation": "
 };
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
   try {
     const { messages, scenario = 'classroom' } = await req.json() as {
       messages: Array<{ role: 'user' | 'model'; content: string }>;
@@ -37,7 +45,7 @@ Deno.serve(async (req: Request) => {
     if (!messages || messages.length === 0) {
       return new Response(
         JSON.stringify({ error: 'messages array is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -83,13 +91,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ success: true, reply: parsed }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
     console.error('conversation error:', err);
     return new Response(
       JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
