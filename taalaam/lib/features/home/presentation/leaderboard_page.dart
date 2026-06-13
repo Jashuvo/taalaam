@@ -110,50 +110,16 @@ class LeaderboardPage extends ConsumerWidget {
           );
         }
 
-        // Separate top 3 from the rest
-        final top3 = entries.take(3).toList();
-        final rest = entries.skip(3).toList();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-          children: [
-            // ── Podium ────────────────────────────────────────────────
-            if (top3.length >= 2)
-              _Podium(
-                entries: top3,
-                currentUserId: currentUser?.id,
-              ),
-            const SizedBox(height: 16),
-
-            // ── Your rank highlight (if outside top 3) ───────────────
-            () {
-              final selfIdx =
-                  entries.indexWhere((e) => e['user_id'] == currentUser?.id);
-              if (selfIdx >= 3) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _RankRow(
-                      entry: entries[selfIdx],
-                      rank: selfIdx + 1,
-                      isSelf: true,
-                      theme: theme,
-                    ),
-                    Divider(color: theme.colorScheme.outlineVariant),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
-            }(),
-
-            // ── Rest of the list ──────────────────────────────────────
-            ...rest.asMap().entries.map((e) => _RankRow(
-                  entry: e.value,
-                  rank: e.key + 4,
-                  isSelf: e.value['user_id'] == currentUser?.id,
-                  theme: theme,
-                )),
-          ],
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+          itemCount: entries.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, i) => _RankRow(
+            entry: entries[i],
+            rank: i + 1,
+            isSelf: entries[i]['user_id'] == currentUser?.id,
+            theme: theme,
+          ),
         );
       },
     );
@@ -202,19 +168,31 @@ class _LeaderboardHeader extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  IconButton(
+                  _CircleIconButton(
                     onPressed: onBack,
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    icon: Icons.arrow_back,
                   ),
-                  const Spacer(),
-                  IconButton(
+                  const Expanded(
+                    child: Text(
+                      'সাপ্তাহিক প্রতিযোগিতা',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'HindSiliguri',
+                        fontSize: 10,
+                        letterSpacing: 2,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.goldLight,
+                      ),
+                    ),
+                  ),
+                  _CircleIconButton(
                     onPressed: onRefresh,
-                    icon: const Icon(Icons.refresh, color: Colors.white),
+                    icon: Icons.refresh,
                   ),
                 ],
               ),
               const Padding(
-                padding: EdgeInsets.only(left: 16),
+                padding: EdgeInsets.only(left: 8, top: 6),
                 child: Text(
                   'লিডারবোর্ড',
                   style: TextStyle(
@@ -226,9 +204,9 @@ class _LeaderboardHeader extends StatelessWidget {
                 ),
               ),
               const Padding(
-                padding: EdgeInsets.only(left: 16, top: 2),
+                padding: EdgeInsets.only(left: 8, top: 2),
                 child: Text(
-                  'সর্বমোট XP অনুযায়ী র‍্যাংকিং',
+                  'বেনামী নাম · প্রতি জুমু\'আয় রিসেট হয়',
                   style: TextStyle(
                     fontFamily: 'HindSiliguri',
                     fontSize: 11,
@@ -244,176 +222,34 @@ class _LeaderboardHeader extends StatelessWidget {
   }
 }
 
-// ── Podium widget (top 3) ────────────────────────────────────────────────────
+// ── Header back/refresh button (.back) ──────────────────────────────────────
 
-class _Podium extends StatefulWidget {
-  final List<Map<String, dynamic>> entries;
-  final String? currentUserId;
-  const _Podium({required this.entries, this.currentUserId});
-
-  @override
-  State<_Podium> createState() => _PodiumState();
-}
-
-class _PodiumState extends State<_Podium> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: AppMotion.gentle);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (MediaQuery.of(context).disableAnimations) {
-        _controller.value = 1;
-      } else {
-        _controller.forward();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  /// Staggered rise-up entrance for the podium slot at [displayIdx]
-  /// (0 = left, 1 = centre, 2 = right).
-  Animation<double> _entranceFor(int displayIdx) {
-    final stagger =
-        AppMotion.stagger.inMilliseconds / AppMotion.gentle.inMilliseconds;
-    final start = (displayIdx * stagger).clamp(0.0, 1.0);
-    final end = (start + (1 - 2 * stagger)).clamp(start, 1.0);
-    return CurvedAnimation(
-      parent: _controller,
-      curve: Interval(start, end, curve: Curves.easeOut),
-    );
-  }
+class _CircleIconButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final IconData icon;
+  const _CircleIconButton({required this.onPressed, required this.icon});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final entries = widget.entries;
-    final currentUserId = widget.currentUserId;
-
-    Widget slot(int rank) {
-      if (rank > entries.length) return const SizedBox.shrink();
-      final e = entries[rank - 1];
-      final isSelf = e['user_id'] == currentUserId;
-      final name = _displayName(e, isSelf);
-      final xp = e['total_xp'] as int? ?? 0;
-      final medalColors = [
-        AppColors.gold,
-        const Color(0xFF9E9E9E),
-        const Color(0xFFA9745B),
-      ];
-      final heights = [100.0, 72.0, 56.0];
-      // Show rank 2 left, rank 1 centre, rank 3 right
-      final displayOrder = [2, 1, 3];
-      final displayIdx = displayOrder.indexOf(rank);
-      if (displayIdx == -1) return const SizedBox.shrink();
-      final height = heights[displayIdx];
-
-      final entrance = _entranceFor(displayIdx);
-
-      return Expanded(
-        child: AnimatedBuilder(
-          animation: entrance,
-          builder: (context, child) => Opacity(
-            opacity: entrance.value,
-            child: Transform.translate(
-              offset: Offset(0, (1 - entrance.value) * 28),
-              child: child,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // Avatar circle
-              CircleAvatar(
-                radius: rank == 1 ? 28 : 22,
-                backgroundColor: isSelf
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.surfaceContainerHighest,
-                child: Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    fontSize: rank == 1 ? 20 : 16,
-                    fontWeight: FontWeight.bold,
-                    color: isSelf
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                name,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  fontWeight: isSelf ? FontWeight.bold : FontWeight.normal,
-                  color: isSelf
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurface,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                '$xp XP',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 4),
-              // Podium block
-              Container(
-                height: height,
-                decoration: BoxDecoration(
-                  color: rank == 1
-                      ? AppColors.gold.withValues(alpha: 0.25)
-                      : rank == 2
-                          ? const Color(0xFFC0C0C0).withValues(alpha: 0.2)
-                          : const Color(0xFFCD7F32).withValues(alpha: 0.2),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                  border: Border.all(
-                    color: rank == 1
-                        ? AppColors.gold.withValues(alpha: 0.5)
-                        : theme.colorScheme.outlineVariant,
-                  ),
-                ),
-                child: Center(
-                  child: Icon(Icons.emoji_events,
-                      size: 24, color: medalColors[rank - 1]),
-                ),
-              ),
-            ],
-          ),
+    return Material(
+      color: Colors.white.withValues(alpha: 0.16),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 31,
+          height: 31,
+          child: Icon(icon, color: Colors.white, size: 16),
         ),
-      );
-    }
-
-    return SizedBox(
-      height: 220,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          slot(2),
-          const SizedBox(width: 8),
-          slot(1),
-          const SizedBox(width: 8),
-          slot(3)
-        ],
       ),
     );
   }
 }
 
-// ── Individual rank row ──────────────────────────────────────────────────────
+// ── Individual rank row (.lbr) ───────────────────────────────────────────────
+
+const _medals = ['🥇', '🥈', '🥉'];
 
 class _RankRow extends StatelessWidget {
   final Map<String, dynamic> entry;
@@ -429,17 +265,15 @@ class _RankRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final xp = entry['total_xp'] as int? ?? 0;
-    final streak = entry['current_streak'] as int? ?? 0;
     final name = _displayName(entry, isSelf);
-
     final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
       decoration: BoxDecoration(
         color: isSelf
             ? (isDark ? AppColors.darkCard : const Color(0xFFFFFDF4))
-            : (isDark ? AppColors.darkCard : Colors.white),
+            : (isDark ? AppColors.darkCard : AppColors.lightCard),
         borderRadius: AppRadius.mdBorder,
         border: Border.all(
           color: isSelf
@@ -451,60 +285,40 @@ class _RankRow extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 36,
+            width: 26,
             child: Text(
-              '#$rank',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              rank <= 3 ? _medals[rank - 1] : '$rank',
               textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(width: 8),
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: isSelf
-                ? theme.colorScheme.primaryContainer
-                : theme.colorScheme.surfaceContainerHighest,
-            child: Text(
-              name.isNotEmpty ? name[0].toUpperCase() : '?',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isSelf
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
+                fontSize: rank <= 3 ? 16 : 14,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 11),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: isSelf ? FontWeight.bold : FontWeight.normal,
-                    color: isSelf ? theme.colorScheme.primary : null,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Row(children: [
-                  const Icon(Icons.local_fire_department,
-                      size: 12, color: AppColors.gold),
-                  const SizedBox(width: 2),
-                  Text('$streak দিন',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant)),
-                ]),
-              ],
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'HindSiliguri',
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: isSelf
+                    ? AppColors.goldDeep
+                    : theme.colorScheme.onSurface,
+              ),
             ),
           ),
           Text(
             '$xp XP',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.gold,
+            style: TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.primary,
             ),
           ),
         ],
