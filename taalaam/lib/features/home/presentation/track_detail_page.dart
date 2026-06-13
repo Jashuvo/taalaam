@@ -1,10 +1,15 @@
-import 'dart:math' show sin, pi;
+import 'dart:math' show cos, pi;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/tap_scale.dart';
 import '../../../data/local/database.dart';
+import '../../../shared/utils/bn_digits.dart';
+import '../../../shared/widgets/misbaha/misbaha_beads.dart';
+import '../../../shared/widgets/misbaha/misbaha_cord_painter.dart';
 import '../../../shared/widgets/shimmer_skeleton.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../track_quran/presentation/widgets/quran_coverage_ring.dart';
@@ -100,8 +105,17 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
     final allUnits = unitsAsync.valueOrNull;
     if (allUnits == null) {
       return Scaffold(
+        backgroundColor: theme.brightness == Brightness.dark ? null : AppColors.paper,
         body: CustomScrollView(slivers: [
-          _buildAppBar(trackGradient),
+          SliverToBoxAdapter(
+            child: _TrackHeaderBanner(
+              track: widget.track,
+              isQuranic: isQuranic,
+              gradient: trackGradient,
+              allUnits: const [],
+              completedIds: const {},
+            ),
+          ),
           SliverFillRemaining(
             child: Center(
               child: unitsAsync.hasError
@@ -125,10 +139,19 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
     final sortedTiers = tierGroups.keys.toList()..sort();
 
     return Scaffold(
+      backgroundColor: theme.brightness == Brightness.dark ? null : AppColors.paper,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildAppBar(trackGradient),
+          SliverToBoxAdapter(
+            child: _TrackHeaderBanner(
+              track: widget.track,
+              isQuranic: isQuranic,
+              gradient: trackGradient,
+              allUnits: allUnits,
+              completedIds: completedIds,
+            ),
+          ),
           if (allUnits.isEmpty)
             const SliverToBoxAdapter(child: _EmptyTierPlaceholder())
           else if (isQuranic)
@@ -216,63 +239,208 @@ class _TrackBodyState extends ConsumerState<_TrackBody> {
     return slivers;
   }
 
-  SliverAppBar _buildAppBar(List<Color> gradient) {
-    return SliverAppBar(
-      expandedHeight: 88.0,
-      collapsedHeight: 56.0,
-      pinned: true,
-      stretch: true,
-      backgroundColor: gradient[0],
-      foregroundColor: Colors.white,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-        onPressed: () => Navigator.of(context).canPop()
-            ? Navigator.of(context).pop()
-            : context.go('/home'),
-      ),
-      flexibleSpace: FlexibleSpaceBar(
-        stretchModes: const [StretchMode.zoomBackground],
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradient,
-            ),
+}
+
+// ── Track header banner — gradient card with progress + unit chips ────────────
+
+class _TrackHeaderBanner extends ConsumerWidget {
+  final Track track;
+  final bool isQuranic;
+  final List<Color> gradient;
+  final List<Unit> allUnits;
+  final Set<String> completedIds;
+
+  const _TrackHeaderBanner({
+    required this.track,
+    required this.isQuranic,
+    required this.gradient,
+    required this.allUnits,
+    required this.completedIds,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progress = ref.watch(trackProgressProvider(track.id)).valueOrNull;
+    final total = progress?.total ?? 0;
+    final completed = progress?.completed ?? 0;
+    final fraction = total == 0 ? 0.0 : completed / total;
+    final eyebrow = isQuranic ? 'কুরআনিক ট্র্যাক' : 'কথোপকথন ট্র্যাক';
+    final bigGlyph = track.nameAr.isNotEmpty ? track.nameAr.substring(0, 1) : '';
+
+    String? activeUnitId;
+    final sortedUnits = [...allUnits]
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    if (isQuranic) {
+      for (final u in sortedUnits) {
+        final lessons = ref.watch(lessonsForUnitProvider(u.id)).valueOrNull ?? [];
+        if (lessons.isEmpty) continue;
+        final done = lessons.where((l) => completedIds.contains(l.id)).length;
+        if (done < lessons.length) {
+          activeUnitId = u.id;
+          break;
+        }
+      }
+      activeUnitId ??= sortedUnits.isNotEmpty ? sortedUnits.last.id : null;
+    }
+
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 11, 18, 15),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradient,
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(56, 6, 20, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    widget.track.nameBn,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Directionality(
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(26),
+            bottomRight: Radius.circular(26),
+          ),
+        ),
+        child: ClipRect(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (bigGlyph.isNotEmpty)
+                Positioned(
+                  right: -10,
+                  bottom: -26,
+                  child: Directionality(
                     textDirection: TextDirection.rtl,
                     child: Text(
-                      widget.track.nameAr,
-                      style: const TextStyle(
+                      bigGlyph,
+                      style: TextStyle(
                         fontFamily: 'NotoNaskhArabic',
-                        fontSize: 14,
-                        height: 1.6,
-                        color: Colors.white60,
+                        fontSize: 92,
+                        height: 1,
+                        color: Colors.white.withValues(alpha: 0.10),
                       ),
                     ),
                   ),
+                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).canPop()
+                            ? Navigator.of(context).pop()
+                            : context.go('/home'),
+                        child: Container(
+                          width: 31,
+                          height: 31,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.15),
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded,
+                              color: Colors.white, size: 16),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        eyebrow,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          letterSpacing: 2,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.goldLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    track.nameBn,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.cream,
+                    ),
+                  ),
+                  Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Text(
+                      track.nameAr,
+                      style: TextStyle(
+                        fontFamily: 'NotoNaskhArabic',
+                        fontSize: 14.5,
+                        height: 1.6,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(99),
+                          child: LinearProgressIndicator(
+                            value: fraction,
+                            minHeight: 7,
+                            backgroundColor: Colors.white.withValues(alpha: 0.22),
+                            valueColor:
+                                const AlwaysStoppedAnimation(AppColors.gold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${bnDigits(completed)}/${bnDigits(total)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.goldLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (isQuranic && sortedUnits.isNotEmpty) ...[
+                    const SizedBox(height: 11),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final u in sortedUnits)
+                          _UnitChip(label: u.titleBn, active: u.id == activeUnitId),
+                      ],
+                    ),
+                  ],
                 ],
               ),
-            ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UnitChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  const _UnitChip({required this.label, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: active ? AppColors.gold : Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontFamily: 'HindSiliguri',
+          fontSize: 10.5,
+          fontWeight: FontWeight.w600,
+          color: active ? Colors.white : Colors.white.withValues(alpha: 0.65),
         ),
       ),
     );
@@ -396,343 +564,6 @@ class _EmptyTierPlaceholder extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Sticky section bar ────────────────────────────────────────────────────────
-
-class _SectionBarDelegate extends SliverPersistentHeaderDelegate {
-  final int selectedTier;
-  final List<int> availableTiers;
-  final List<Unit> allUnits;
-  final ValueChanged<int> onSelectTier;
-
-  static const double _h = 60.0;
-
-  const _SectionBarDelegate({
-    required this.selectedTier,
-    required this.availableTiers,
-    required this.allUnits,
-    required this.onSelectTier,
-  });
-
-  @override double get minExtent => _h;
-  @override double get maxExtent => _h;
-
-  @override
-  bool shouldRebuild(_SectionBarDelegate old) =>
-      selectedTier != old.selectedTier ||
-      availableTiers.length != old.availableTiers.length;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final colors   = _tierColors(selectedTier);
-    final name     = _tierNames[selectedTier]   ?? 'বিভাগ $selectedTier';
-    final nameAr   = _tierNamesAr[selectedTier] ?? '';
-    final unitCount = allUnits.where((u) => u.tierLevel == selectedTier).length;
-    final idx      = availableTiers.indexOf(selectedTier);
-    final hasPrev  = idx > 0;
-    final hasNext  = idx < availableTiers.length - 1;
-
-    return Material(
-      elevation: overlapsContent ? 6 : 0,
-      shadowColor: colors[0].withValues(alpha: 0.4),
-      child: Container(
-        height: _h,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [
-              colors[0],
-              Color.lerp(colors[0], colors[1], 0.7)!,
-              colors[1],
-            ],
-          ),
-        ),
-        child: Row(
-          children: [
-            // ← prev
-            _NavArrow(
-              icon: Icons.chevron_left_rounded,
-              enabled: hasPrev,
-              onTap: hasPrev ? () => onSelectTier(availableTiers[idx - 1]) : null,
-            ),
-
-            // Centre: name + tap to pick
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _showPicker(context),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'বিভাগ ${idx + 1}  ·  $name',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        const Icon(Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white54, size: 16),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '$unitCount ইউনিট',
-                          style: const TextStyle(
-                              color: Colors.white54, fontSize: 10.5),
-                        ),
-                        const SizedBox(width: 8),
-                        Directionality(
-                          textDirection: TextDirection.rtl,
-                          child: Text(
-                            nameAr,
-                            style: const TextStyle(
-                              fontFamily: 'NotoNaskhArabic',
-                              fontSize: 11,
-                              height: 1.6,
-                              color: Colors.white38,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // → next
-            _NavArrow(
-              icon: Icons.chevron_right_rounded,
-              enabled: hasNext,
-              onTap: hasNext ? () => onSelectTier(availableTiers[idx + 1]) : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showPicker(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _SectionPickerSheet(
-        availableTiers: availableTiers,
-        selectedTier: selectedTier,
-        allUnits: allUnits,
-        onSelect: (tier) {
-          onSelectTier(tier);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-}
-
-class _NavArrow extends StatelessWidget {
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback? onTap;
-  const _NavArrow({required this.icon, required this.enabled, this.onTap});
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: SizedBox(
-          width: 44,
-          height: double.infinity,
-          child: Icon(
-            icon,
-            color: enabled ? Colors.white : Colors.white24,
-            size: 26,
-          ),
-        ),
-      );
-}
-
-// ── Section picker bottom sheet ───────────────────────────────────────────────
-
-class _SectionPickerSheet extends StatelessWidget {
-  final List<int> availableTiers;
-  final int selectedTier;
-  final List<Unit> allUnits;
-  final ValueChanged<int> onSelect;
-
-  const _SectionPickerSheet({
-    required this.availableTiers,
-    required this.selectedTier,
-    required this.allUnits,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: AppRadius.xxlBorder,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 24,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-            child: Row(
-              children: [
-                Icon(Icons.layers_rounded,
-                    size: 18, color: theme.colorScheme.primary),
-                const SizedBox(width: 10),
-                Text('বিভাগ নির্বাচন',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700)),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          ...availableTiers.map((tier) {
-            final colors    = _tierColors(tier);
-            final name      = _tierNames[tier]   ?? 'বিভাগ $tier';
-            final nameAr    = _tierNamesAr[tier]  ?? '';
-            final desc      = _tierDescriptions[tier] ?? '';
-            final count     = allUnits.where((u) => u.tierLevel == tier).length;
-            final isSelected = tier == selectedTier;
-            final tierIdx   = availableTiers.indexOf(tier);
-
-            return InkWell(
-              onTap: () => onSelect(tier),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: isSelected
-                    ? BoxDecoration(
-                        color: colors[0].withValues(alpha: 0.07),
-                        border: Border(
-                          left: BorderSide(color: colors[0], width: 3),
-                        ),
-                      )
-                    : null,
-                child: Row(
-                  children: [
-                    // Tier badge
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: colors,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: AppRadius.lgBorder,
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: colors[0].withValues(alpha: 0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                )
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${tierIdx + 1}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(name,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w600,
-                                      color: isSelected ? colors[0] : null,
-                                    )),
-                              ),
-                              const SizedBox(width: 8),
-                              Directionality(
-                                textDirection: TextDirection.rtl,
-                                child: Text(nameAr,
-                                    style: const TextStyle(
-                                      fontFamily: 'NotoNaskhArabic',
-                                      fontSize: 12,
-                                      height: 1.6,
-                                      color: Colors.grey,
-                                    )),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '$desc  •  $count ইউনিট',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isSelected)
-                      Icon(Icons.check_circle_rounded,
-                          color: colors[0], size: 20)
-                    else
-                      const SizedBox(width: 20),
-                  ],
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 16),
-        ],
       ),
     );
   }
@@ -984,25 +815,48 @@ class _UnitSection extends ConsumerWidget {
                   _LessonPath(
                     lessons: firstHalf,
                     completedIds: completedIds,
-                    tierColors: tierColors,
-                    isQuranic: isQuranic,
+                    tierColor: tierColors[0],
                   ),
                   if (showChest) ...[
-                    _ChestNode(isOpen: chestOpen, tierColors: tierColors),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Center(
+                        child: ChestNode(
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(chestOpen
+                                    ? 'পরবর্তী অর্ধেক শেষ করলে বোনাস XP অর্জন করুন!'
+                                    : 'অর্ধেক পাঠ সম্পন্ন — চমৎকার!'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                     _LessonPath(
                       lessons: secondHalf,
                       completedIds: completedIds,
-                      tierColors: tierColors,
-                      isQuranic: isQuranic,
+                      tierColor: tierColors[0],
                     ),
                   ],
                   if (examLesson != null)
-                    _ExamNode(
-                      examLesson: examLesson,
-                      isUnlocked: allDone,
-                      isDone: examDone,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: ExamNode(
+                          completed: examDone,
+                          onTap: allDone
+                              ? () => context.push('/exam/${examLesson.id}')
+                              : null,
+                        ),
+                      ),
                     ),
-                  _TrophyNode(isComplete: allDone),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(0, 12, 0, 24),
+                    child: Center(child: TasselOrnament()),
+                  ),
                 ],
               );
             },
@@ -1018,14 +872,12 @@ class _UnitSection extends ConsumerWidget {
 class _LessonPath extends StatefulWidget {
   final List<Lesson> lessons;
   final Set<String> completedIds;
-  final List<Color> tierColors;
-  final bool isQuranic;
+  final Color tierColor;
 
   const _LessonPath({
     required this.lessons,
     required this.completedIds,
-    required this.tierColors,
-    required this.isQuranic,
+    required this.tierColor,
   });
 
   @override
@@ -1074,14 +926,15 @@ class _LessonPathState extends State<_LessonPath>
   Widget build(BuildContext context) {
     final lessons = widget.lessons;
     final completedIds = widget.completedIds;
-    final tierColors = widget.tierColors;
-    final isQuranic = widget.isQuranic;
+    final tierColor = widget.tierColor;
     final firstUndone =
         lessons.indexWhere((l) => !completedIds.contains(l.id));
 
     return LayoutBuilder(builder: (context, constraints) {
       final width       = constraints.maxWidth;
       final totalHeight = lessons.length * _rowHeight + 32;
+      const nodeWidth   = _nodeSize + 24;
+      const nodeHeight  = _rowHeight - 8;
 
       final positions = List.generate(lessons.length, (i) {
         final xFrac = _xFractions[i % _xFractions.length];
@@ -1098,10 +951,9 @@ class _LessonPathState extends State<_LessonPath>
             RepaintBoundary(
               child: CustomPaint(
                 size: Size(width, totalHeight),
-                painter: _PathPainter(
-                  positions: positions,
-                  isDoneList: lessons.map((l) => completedIds.contains(l.id)).toList(),
-                  tierColor: tierColors[0],
+                painter: MisbahaCordPainter(
+                  nodes: positions,
+                  color: AppColors.misbahaCord,
                 ),
               ),
             ),
@@ -1109,8 +961,8 @@ class _LessonPathState extends State<_LessonPath>
               final pos = positions[i];
               final entrance = _entranceFor(i);
               return Positioned(
-                left: pos.dx - _nodeSize / 2,
-                top:  pos.dy - _nodeSize / 2,
+                left: pos.dx - nodeWidth / 2,
+                top:  pos.dy - nodeHeight / 2,
                 child: AnimatedBuilder(
                   animation: entrance,
                   builder: (context, child) => Opacity(
@@ -1120,12 +972,17 @@ class _LessonPathState extends State<_LessonPath>
                       child: child,
                     ),
                   ),
-                  child: _LessonNode(
-                    lesson: lessons[i],
-                    isDone: completedIds.contains(lessons[i].id),
-                    isCurrent: i == firstUndone,
-                    tierColors: tierColors,
-                    isQuranic: isQuranic,
+                  child: SizedBox(
+                    width: nodeWidth,
+                    height: nodeHeight,
+                    child: Center(
+                      child: _LessonNode(
+                        lesson: lessons[i],
+                        isDone: completedIds.contains(lessons[i].id),
+                        isCurrent: i == firstUndone,
+                        tierColor: tierColor,
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -1137,344 +994,44 @@ class _LessonPathState extends State<_LessonPath>
   }
 }
 
-// ── Path line painter ─────────────────────────────────────────────────────────
-
-class _PathPainter extends CustomPainter {
-  final List<Offset> positions;
-  final List<bool> isDoneList;
-  final Color tierColor;
-
-  const _PathPainter({
-    required this.positions,
-    required this.isDoneList,
-    required this.tierColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (int i = 0; i < positions.length - 1; i++) {
-      final done = isDoneList[i];
-      final paint = Paint()
-        ..color = done ? tierColor.withValues(alpha: 0.7) : Colors.grey.shade300
-        ..strokeWidth = 4
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-
-      final from = positions[i];
-      final to   = positions[i + 1];
-      final delta = to - from;
-      final dist  = delta.distance;
-      final unitV = Offset(delta.dx / dist, delta.dy / dist);
-      const gap   = _nodeSize / 2 + 4;
-      final start = from + unitV * gap;
-      final end   = to   - unitV * gap;
-      final mid   = (end.dy - start.dy) * 0.4;
-      final path  = Path()
-        ..moveTo(start.dx, start.dy)
-        ..cubicTo(
-          start.dx, start.dy + mid,
-          end.dx,   end.dy   - mid,
-          end.dx,   end.dy,
-        );
-
-      if (done) {
-        canvas.drawPath(path, paint);
-      } else {
-        _drawDashed(canvas, path, paint);
-      }
-    }
-  }
-
-  void _drawDashed(Canvas canvas, Path path, Paint paint) {
-    const dash = 7.0;
-    const gap  = 5.0;
-    for (final metric in path.computeMetrics()) {
-      double dist = 0;
-      bool draw   = true;
-      while (dist < metric.length) {
-        final seg  = draw ? dash : gap;
-        final next = (dist + seg).clamp(0.0, metric.length);
-        if (draw) canvas.drawPath(metric.extractPath(dist, next), paint);
-        dist += seg;
-        draw = !draw;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PathPainter old) {
-    if (tierColor != old.tierColor) return true;
-    if (positions.length != old.positions.length ||
-        isDoneList.length != old.isDoneList.length) {
-      return true;
-    }
-    for (int i = 0; i < positions.length; i++) {
-      if (positions[i] != old.positions[i]) return true;
-    }
-    for (int i = 0; i < isDoneList.length; i++) {
-      if (isDoneList[i] != old.isDoneList[i]) return true;
-    }
-    return false;
-  }
-}
-
 // ── Individual lesson node ────────────────────────────────────────────────────
 
-class _LessonNode extends ConsumerStatefulWidget {
+class _LessonNode extends ConsumerWidget {
   final Lesson lesson;
   final bool isDone;
   final bool isCurrent;
-  final List<Color> tierColors;
-  final bool isQuranic;
+  final Color tierColor;
 
   const _LessonNode({
     required this.lesson,
     required this.isDone,
     required this.isCurrent,
-    required this.tierColors,
-    required this.isQuranic,
+    required this.tierColor,
   });
 
   @override
-  ConsumerState<_LessonNode> createState() => _LessonNodeState();
-}
-
-class _LessonNodeState extends ConsumerState<_LessonNode>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _bounceCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _bounceCtrl =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
-    _syncBounce();
-  }
-
-  @override
-  void didUpdateWidget(_LessonNode old) {
-    super.didUpdateWidget(old);
-    _syncBounce();
-  }
-
-  void _syncBounce() {
-    if (widget.isCurrent && !MediaQuery.of(context).disableAnimations) {
-      if (!_bounceCtrl.isAnimating) _bounceCtrl.repeat(reverse: true);
-    } else {
-      _bounceCtrl.stop();
-      _bounceCtrl.value = 0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _bounceCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final lesson = widget.lesson;
-    final isDone = widget.isDone;
-    final isCurrent = widget.isCurrent;
-    final tierColors = widget.tierColors;
-    final isQuranic = widget.isQuranic;
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final accuracyMap =
         ref.watch(lessonAccuracyMapProvider).valueOrNull ?? {};
     final accuracy = isDone ? accuracyMap[lesson.id] : null;
-    final isDark = theme.brightness == Brightness.dark;
 
-    final Color bg;
-    final Color borderColor;
-    final Widget nodeIcon;
-    final List<BoxShadow> shadows;
-
-    if (isDone) {
-      bg          = AppColors.brightGreen;
-      borderColor = AppColors.correctBg;
-      nodeIcon    = const Icon(Icons.check_rounded, color: Colors.white, size: 28);
-      shadows     = [
-        BoxShadow(
-          color: AppColors.brightGreen.withValues(alpha: 0.3),
-          blurRadius: 10,
-          spreadRadius: 1,
-        ),
-      ];
-    } else if (isCurrent) {
-      bg          = tierColors[0];
-      borderColor = Colors.white.withValues(alpha: 0.9);
-      nodeIcon    = const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 32);
-      shadows     = [
-        BoxShadow(
-          color: tierColors[0].withValues(alpha: 0.5),
-          blurRadius: 18,
-          spreadRadius: 4,
-        ),
-      ];
-    } else if (isQuranic) {
-      // Quranic: all undone lessons are open — no lock, show open book
-      bg          = tierColors[0].withValues(alpha: 0.10);
-      borderColor = tierColors[0].withValues(alpha: 0.45);
-      nodeIcon    = Icon(Icons.menu_book_rounded,
-          color: tierColors[0].withValues(alpha: 0.75), size: 22);
-      shadows     = [];
-    } else {
-      bg          = isDark
-          ? AppColors.darkSurfaceHigh
-          : AppColors.lightSurfaceHighest;
-      borderColor = theme.colorScheme.outlineVariant;
-      nodeIcon    = Icon(Icons.lock_outline_rounded,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-          size: 22);
-      shadows     = [];
-    }
-
-    final iconKey = isDone
-        ? 'done'
+    final Widget bead = isDone
+        ? DoneBead(
+            label: lesson.titleBn,
+            fill: tierColor,
+            accuracyStars:
+                accuracy == null ? null : _accuracyToStars(accuracy),
+          )
         : isCurrent
-            ? 'current'
-            : isQuranic
-                ? 'open'
-                : 'locked';
+            ? _CurrentLessonBead(lesson: lesson)
+            : LockedBead(label: lesson.titleBn);
 
     return TapScale(
       child: GestureDetector(
-      onTap:      () => context.push('/lesson/${lesson.id}'),
-      onLongPress: () => _showTooltip(context, theme),
-      child: SizedBox(
-        width: _nodeSize,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedBuilder(
-              animation: _bounceCtrl,
-              builder: (context, child) => Transform.translate(
-                offset: Offset(
-                    0, -4 * Curves.easeInOut.transform(_bounceCtrl.value)),
-                child: child,
-              ),
-              child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                if (isCurrent) _PulsingGlow(glowColor: tierColors[0]),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOutCubic,
-                  width:  _nodeSize,
-                  height: _nodeSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: bg,
-                    border: Border.all(
-                      color: borderColor,
-                      width: isCurrent ? 3.0 : 1.8,
-                    ),
-                    boxShadow: shadows,
-                  ),
-                  child: Center(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (child, anim) => ScaleTransition(
-                        scale: anim,
-                        child: FadeTransition(opacity: anim, child: child),
-                      ),
-                      child: KeyedSubtree(key: ValueKey(iconKey), child: nodeIcon),
-                    ),
-                  ),
-                ),
-                if (accuracy != null && accuracy >= 50)
-                  Positioned(
-                    bottom: -4,
-                    right: -4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: accuracy >= 80
-                            ? AppColors.gold
-                            : theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: Colors.white, width: 1.2),
-                      ),
-                      child: Text(
-                        '$accuracy%',
-                        style: TextStyle(
-                          color: accuracy >= 80
-                              ? Colors.white
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-              ),
-            ),
-            const SizedBox(height: 5),
-            SizedBox(
-              width: _nodeSize + 18,
-              child: AnimatedDefaultTextStyle(
-                duration: AppMotion.normal,
-                style: TextStyle(
-                  fontSize: 11,
-                  height: 1.3,
-                  fontWeight:
-                      isCurrent ? FontWeight.w700 : FontWeight.w500,
-                  color: isCurrent
-                      ? tierColors[0]
-                      : theme.colorScheme.onSurfaceVariant
-                          .withValues(alpha: isDone ? 0.5 : 0.8),
-                ),
-                child: Text(
-                  lesson.titleBn,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-            AnimatedSize(
-              duration: AppMotion.normal,
-              curve: Curves.easeOut,
-              alignment: Alignment.topCenter,
-              child: isDone
-                  ? const SizedBox.shrink()
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 3),
-                        AnimatedContainer(
-                          duration: AppMotion.normal,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isCurrent
-                                ? tierColors[0].withValues(alpha: 0.12)
-                                : theme.colorScheme.surfaceContainerHighest
-                                    .withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${lesson.xpReward} XP',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: isCurrent
-                                  ? tierColors[0]
-                                  : theme.colorScheme.onSurfaceVariant
-                                      .withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ],
-        ),
-      ),
+        onTap: () => context.push('/lesson/${lesson.id}'),
+        onLongPress: () => _showTooltip(context, theme),
+        child: bead,
       ),
     );
   }
@@ -1497,18 +1054,15 @@ class _LessonNodeState extends ConsumerState<_LessonNode>
             Row(
               children: [
                 _StatusChip(
-                    isDone: widget.isDone,
-                    isCurrent: widget.isCurrent,
-                    tierColor: widget.tierColors[0],
-                    isQuranic: widget.isQuranic),
+                    isDone: isDone, isCurrent: isCurrent, tierColor: tierColor),
                 const Spacer(),
-                Text('${widget.lesson.xpReward} XP',
+                Text('${lesson.xpReward} XP',
                     style: theme.textTheme.labelMedium?.copyWith(
                         color: AppColors.gold, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 12),
-            Text(widget.lesson.titleBn,
+            Text(lesson.titleBn,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
@@ -1517,11 +1071,9 @@ class _LessonNodeState extends ConsumerState<_LessonNode>
               child: FilledButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  context.push('/lesson/${widget.lesson.id}');
+                  context.push('/lesson/${lesson.id}');
                 },
-                style: FilledButton.styleFrom(
-                  backgroundColor: widget.tierColors[0],
-                ),
+                style: FilledButton.styleFrom(backgroundColor: tierColor),
                 child: const Text('শুরু করুন'),
               ),
             ),
@@ -1532,16 +1084,174 @@ class _LessonNodeState extends ConsumerState<_LessonNode>
   }
 }
 
+/// Maps an accuracy percentage to a 0-3 misbaha star rating.
+int _accuracyToStars(int accuracy) {
+  if (accuracy >= 90) return 3;
+  if (accuracy >= 70) return 2;
+  if (accuracy >= 50) return 1;
+  return 0;
+}
+
+// ── Current lesson bead (pulsing gold ring, label below) ───────────────────────
+
+class _CurrentLessonBead extends StatefulWidget {
+  final Lesson lesson;
+  const _CurrentLessonBead({required this.lesson});
+
+  @override
+  State<_CurrentLessonBead> createState() => _CurrentLessonBeadState();
+}
+
+class _CurrentLessonBeadState extends State<_CurrentLessonBead>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: AppMotion.beadPulse);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _pulse.stop();
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final titleAr = widget.lesson.titleAr;
+    final letter =
+        (titleAr != null && titleAr.isNotEmpty) ? titleAr.substring(0, 1) : '✦';
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 60,
+          height: 60,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              AnimatedBuilder(
+                animation: _pulse,
+                builder: (context, _) {
+                  final opacity = reduceMotion
+                      ? 0.3
+                      : 0.08 +
+                          (0.55 - 0.08) *
+                              (0.5 + 0.5 * cos(_pulse.value * 2 * pi));
+                  return Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.gold.withValues(alpha: opacity),
+                        width: 2,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    center: Alignment(-0.3, -0.4),
+                    radius: 0.9,
+                    colors: [AppColors.goldLight, Color(0xFFC9920E)],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: .3),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Text(
+                        letter,
+                        style: GoogleFonts.amiri(
+                            fontSize: 18,
+                            color: AppColors.deepGreen,
+                            height: 1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: _nodeSize + 18,
+          child: Text(
+            widget.lesson.titleBn,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'HindSiliguri',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '${widget.lesson.xpReward} XP',
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.goldDeep,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Status chip (lesson tooltip) ────────────────────────────────────────────────
+
 class _StatusChip extends StatelessWidget {
   final bool isDone;
   final bool isCurrent;
   final Color tierColor;
-  final bool isQuranic;
-  const _StatusChip(
-      {required this.isDone,
-      required this.isCurrent,
-      required this.tierColor,
-      required this.isQuranic});
+  const _StatusChip({
+    required this.isDone,
+    required this.isCurrent,
+    required this.tierColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1550,16 +1260,12 @@ class _StatusChip extends StatelessWidget {
         ? '✓ সম্পন্ন'
         : isCurrent
             ? '▶ পরবর্তী'
-            : isQuranic
-                ? '📖 পড়ুন'
-                : '🔒 লক';
+            : '🔒 লক';
     final color = isDone
         ? AppColors.brightGreen
         : isCurrent
             ? tierColor
-            : isQuranic
-                ? tierColor
-                : theme.colorScheme.onSurfaceVariant;
+            : theme.colorScheme.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -1619,174 +1325,6 @@ class _QuranicCurriculumHeader extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Exam node ─────────────────────────────────────────────────────────────────
-
-class _ExamNode extends StatefulWidget {
-  final Lesson examLesson;
-  final bool isUnlocked;
-  final bool isDone;
-
-  const _ExamNode({
-    required this.examLesson,
-    required this.isUnlocked,
-    required this.isDone,
-  });
-
-  @override
-  State<_ExamNode> createState() => _ExamNodeState();
-}
-
-class _ExamNodeState extends State<_ExamNode>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1800));
-    if (widget.isUnlocked && !widget.isDone) _pulse.repeat();
-  }
-
-  @override
-  void didUpdateWidget(_ExamNode old) {
-    super.didUpdateWidget(old);
-    if (widget.isUnlocked && !widget.isDone) {
-      if (!_pulse.isAnimating) _pulse.repeat();
-    } else {
-      _pulse.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    const examSize = 80.0;
-    const gold     = AppColors.gold;
-    const goldDark = Color(0xFFB8860B);
-
-    final Color bg;
-    final Color borderColor;
-    final Widget icon;
-
-    if (widget.isDone) {
-      bg          = gold;
-      borderColor = goldDark;
-      icon = const Icon(Icons.emoji_events_rounded, color: Colors.white, size: 36);
-    } else if (widget.isUnlocked) {
-      bg          = gold;
-      borderColor = Colors.white.withValues(alpha: 0.8);
-      icon = const Icon(Icons.shield_rounded, color: Colors.white, size: 36);
-    } else {
-      bg          = theme.colorScheme.surfaceContainerHighest;
-      borderColor = theme.colorScheme.outlineVariant;
-      icon = Icon(Icons.lock_outline_rounded,
-          color: theme.colorScheme.onSurfaceVariant, size: 28);
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Center(
-        child: GestureDetector(
-          onTap: widget.isUnlocked
-              ? () => context.push('/exam/${widget.examLesson.id}')
-              : null,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedBuilder(
-                animation: _pulse,
-                builder: (_, child) {
-                  final glow = widget.isUnlocked && !widget.isDone
-                      ? 0.3 + 0.25 * sin(_pulse.value * 2 * pi)
-                      : 0.0;
-                  return Container(
-                    width: examSize + 24,
-                    height: examSize + 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        if (glow > 0)
-                          BoxShadow(
-                            color: gold.withValues(alpha: glow),
-                            blurRadius: 28,
-                            spreadRadius: 8,
-                          ),
-                      ],
-                    ),
-                    child: child,
-                  );
-                },
-                child: Center(
-                  child: Container(
-                    width: examSize,
-                    height: examSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: bg,
-                      border: Border.all(color: borderColor, width: 3),
-                      boxShadow: widget.isUnlocked
-                          ? [
-                              BoxShadow(
-                                color: gold.withValues(alpha: 0.4),
-                                blurRadius: 16,
-                                spreadRadius: 2,
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: icon,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'মডিউল পরীক্ষা',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: widget.isUnlocked
-                      ? gold
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: widget.isUnlocked
-                      ? gold.withValues(alpha: 0.12)
-                      : theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                  border: widget.isUnlocked
-                      ? Border.all(color: gold.withValues(alpha: 0.35))
-                      : null,
-                ),
-                child: Text(
-                  widget.isUnlocked
-                      ? '${widget.examLesson.xpReward} XP  ·  ${widget.examLesson.gemReward} 💎'
-                      : 'সব পাঠ শেষ করুন',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: widget.isUnlocked
-                        ? gold
-                        : theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -1892,167 +1430,3 @@ class _TierSectionBanner extends StatelessWidget {
   }
 }
 
-// ── Chest node (mid-unit reward marker) ──────────────────────────────────────
-
-class _ChestNode extends StatelessWidget {
-  final bool isOpen;
-  final List<Color> tierColors;
-  const _ChestNode({required this.isOpen, required this.tierColors});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Center(
-        child: GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(isOpen
-                    ? 'পরবর্তী অর্ধেক শেষ করলে রত্ন অর্জন করুন!'
-                    : 'অর্ধেক পাঠ সম্পন্ন — চমৎকার!'),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 400),
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: isOpen
-                  ? AppColors.gold.withValues(alpha: 0.18)
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isOpen
-                    ? AppColors.gold
-                    : theme.colorScheme.outlineVariant,
-                width: 2,
-              ),
-              boxShadow: isOpen
-                  ? [
-                      BoxShadow(
-                        color: AppColors.gold.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        spreadRadius: 2,
-                      )
-                    ]
-                  : null,
-            ),
-            child: Icon(
-              isOpen ? Icons.redeem_rounded : Icons.lock_outline_rounded,
-              size: 26,
-              color: isOpen
-                  ? AppColors.gold
-                  : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Trophy node (unit-end completion marker) ──────────────────────────────────
-
-class _TrophyNode extends StatelessWidget {
-  final bool isComplete;
-  const _TrophyNode({required this.isComplete});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 12, 0, 24),
-      child: Center(
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 400),
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isComplete
-                ? AppColors.brightGreen.withValues(alpha: 0.15)
-                : theme.colorScheme.surfaceContainerHighest,
-            border: Border.all(
-              color: isComplete
-                  ? AppColors.brightGreen
-                  : theme.colorScheme.outlineVariant,
-              width: 2,
-            ),
-            boxShadow: isComplete
-                ? [
-                    BoxShadow(
-                      color: AppColors.brightGreen.withValues(alpha: 0.25),
-                      blurRadius: 12,
-                    )
-                  ]
-                : null,
-          ),
-          child: Icon(
-            Icons.emoji_events_rounded,
-            size: 28,
-            color: isComplete
-                ? AppColors.brightGreen
-                : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Pulsing glow ring for the current lesson node ─────────────────────────────
-
-class _PulsingGlow extends StatefulWidget {
-  final Color glowColor;
-  const _PulsingGlow({required this.glowColor});
-
-  @override
-  State<_PulsingGlow> createState() => _PulsingGlowState();
-}
-
-class _PulsingGlowState extends State<_PulsingGlow>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, __) => Container(
-          width: _nodeSize,
-          height: _nodeSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: widget.glowColor.withValues(alpha: 0.5),
-                blurRadius: 14.0 + _ctrl.value * 14.0,
-                spreadRadius: 2.0 + _ctrl.value * 4.0,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
