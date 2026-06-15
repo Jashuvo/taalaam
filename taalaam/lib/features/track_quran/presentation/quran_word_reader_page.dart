@@ -12,7 +12,6 @@ import '../../../features/srs/data/srs_local_source.dart';
 import '../../../shared/services/audio_service.dart';
 import '../../../shared/services/progression_service.dart';
 import '../../../shared/utils/bn_digits.dart';
-import '../../../shared/widgets/misbaha/ornament_stamp.dart';
 import '../data/quran_coverage_service.dart';
 import 'quran_reader_provider.dart';
 
@@ -52,10 +51,13 @@ String _ayahAudioUrl(int surah, int ayah) {
   return 'https://cdn.islamic.network/quran/audio/128/ar.alafasy/$s$a.mp3';
 }
 
-// Tafsir sheet geometry
-const _tafsirHeaderHeight = 56.0; // px height of the pinned header (handle + label row)
-const _tafsirMaxFraction  = 0.92;
-const _tafsirRadius       = 24.0;
+const _arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+String _arabicNum(int n) =>
+    n.toString().split('').map((d) => _arabicDigits[int.parse(d)]).join();
+
+// Demo design tokens: `--rl` (ayah card radius) and `--rm` (audio bar radius).
+const _rl = 22.0;
+const _rm = 16.0;
 
 class QuranWordReaderPage extends ConsumerStatefulWidget {
   final bool showBackButton;
@@ -67,22 +69,15 @@ class QuranWordReaderPage extends ConsumerStatefulWidget {
 }
 
 class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late final AnimationController _shimmerCtrl;
-  late final AnimationController _immersiveCtrl;
-  late final Animation<double> _headerAnim;
-  final _sheetCtrl = DraggableScrollableController();
+  final _scrollController = ScrollController();
 
   bool _highlightEnabled = true;
-  bool _immersive = false;
-  bool _tafsirOpen = false;
-  bool _tafsirScrim = false;
-  // Recomputed each build from the available height so the header
-  // (handle + label row) is never clipped on short viewports.
-  double _tafsirPeekFraction = 0.09;
-  int _navDir = 1; // +1 forward (next ayah), -1 backward — drives slide direction
   String? _userId;
-  late final StateController<bool> _navBarVisible;
+  ({int ayah, int position})? _litWord;
+  int? _tafsirOpenAyah;
+  int _activeAyah = 1;
 
   @override
   void initState() {
@@ -91,38 +86,36 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat();
-    _immersiveCtrl =
-        AnimationController(vsync: this, duration: AppMotion.normal);
-    _headerAnim = ReverseAnimation(
-        CurvedAnimation(parent: _immersiveCtrl, curve: Curves.easeOutCubic));
-    _sheetCtrl.addListener(_onSheetChanged);
 
     _userId = ref.read(currentUserProvider)?.id;
-    // Captured here because ref can't be used inside dispose().
-    _navBarVisible = ref.read(quranNavBarVisibleProvider.notifier);
+    final nav = ref.read(quranNavProvider);
+    _activeAyah = nav.ayah;
 
-    // Restore last reading position and highlight preference.
-    SharedPreferences.getInstance().then((prefs) {
-      final surah = prefs.getInt('quran_last_surah') ?? 1;
-      final ayah  = prefs.getInt('quran_last_ayah')  ?? 1;
-      if (mounted && (surah != 1 || ayah != 1)) {
-        ref.read(quranNavProvider.notifier).restore(surah, ayah);
-      }
-      final uid = _userId;
-      if (uid != null && mounted) {
+    if (nav.ayah > 1) {
+      // Approximate scroll position — exact card heights vary with ayah
+      // length, so this lands the reader close to the requested ayah.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final target = (nav.ayah - 1) * 190.0;
+        _scrollController.jumpTo(
+            target.clamp(0.0, _scrollController.position.maxScrollExtent));
+      });
+    }
+
+    final uid = _userId;
+    if (uid != null) {
+      SharedPreferences.getInstance().then((prefs) {
+        if (!mounted) return;
         final on = prefs.getBool('reader_highlight_$uid') ?? true;
         setState(() => _highlightEnabled = on);
-      }
-    });
+      });
+    }
   }
 
   @override
   void dispose() {
     _shimmerCtrl.dispose();
-    _immersiveCtrl.dispose();
-    _sheetCtrl.dispose();
-    // ref is unusable in dispose(); _navBarVisible was captured in initState.
-    _navBarVisible.state = true;
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -136,240 +129,91 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
     }
   }
 
-  void _onSheetChanged() {
-    if (!_sheetCtrl.isAttached) return;
-    final extent = _sheetCtrl.size;
-    final open  = extent > _tafsirPeekFraction + 0.05;
-    final scrim = extent > 0.5;
-    if (open != _tafsirOpen || scrim != _tafsirScrim) {
-      setState(() {
-        _tafsirOpen  = open;
-        _tafsirScrim = scrim;
-      });
-    }
-    final visibleNotifier = ref.read(quranNavBarVisibleProvider.notifier);
-    if (visibleNotifier.state == open) {
-      visibleNotifier.state = !open;
-    }
-  }
-
-  void _toggleImmersive() {
-    setState(() => _immersive = !_immersive);
-    if (MediaQuery.of(context).disableAnimations) {
-      _immersiveCtrl.value = _immersive ? 1.0 : 0.0;
-    } else if (_immersive) {
-      _immersiveCtrl.forward();
-    } else {
-      _immersiveCtrl.reverse();
-    }
-  }
-
-  void _toggleTafsirSheet() {
-    if (!_sheetCtrl.isAttached) return;
-    if (_immersive) _toggleImmersive();
-    final target = _tafsirOpen ? _tafsirPeekFraction : _tafsirMaxFraction;
-    if (MediaQuery.of(context).disableAnimations) {
-      _sheetCtrl.jumpTo(target);
-    } else {
-      _sheetCtrl.animateTo(target,
-          duration: AppMotion.normal, curve: Curves.easeOutCubic);
-    }
-  }
-
-  Future<void> _onSwipe(DragEndDetails details, int ayahCount) async {
-    final v = details.primaryVelocity ?? 0;
-    if (v.abs() < 200) return;
-    final nav      = ref.read(quranNavProvider);
-    final notifier = ref.read(quranNavProvider.notifier);
-    final goNext = v < 0;
-    if (goNext ? !(ayahCount > 0 && nav.ayah < ayahCount) : !(nav.ayah > 1)) {
-      return;
-    }
-
-    // Collapse the sheet to peek before switching ayah so the new
-    // tafsir opens at peek and resets its scroll position.
-    if (_tafsirOpen && _sheetCtrl.isAttached) {
-      if (MediaQuery.of(context).disableAnimations) {
-        _sheetCtrl.jumpTo(_tafsirPeekFraction);
-      } else {
-        await _sheetCtrl.animateTo(_tafsirPeekFraction,
-            duration: AppMotion.fast, curve: Curves.easeOutCubic);
-      }
-    }
-    if (!mounted) return;
-
-    if (goNext) {
-      _navDir = 1;
-      notifier.nextAyah(ayahCount);
-    } else {
-      _navDir = -1;
-      notifier.previousAyah();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final nav         = ref.watch(quranNavProvider);
+    final nav = ref.watch(quranNavProvider);
     final surahsAsync = ref.watch(quranSurahsProvider);
-    final theme       = Theme.of(context);
-    final disableAnim = MediaQuery.of(context).disableAnimations;
+    final theme = Theme.of(context);
+    final bookmarks = ref.watch(quranBookmarksProvider);
 
     final currentSurah = surahsAsync.valueOrNull
         ?.where((s) => s.number == nav.surah)
         .firstOrNull;
     final ayahCount = currentSurah?.ayahCount ?? 0;
-
-    // Mastered words appearing in this ayah (tafsir-sheet strip, max 4).
-    final words = ref
-            .watch(quranAyahWordsProvider((surah: nav.surah, ayah: nav.ayah)))
-            .valueOrNull ??
-        const <QuranWord>[];
-    var masteredInAyah = const <QuranWord>[];
-    final uid = _userId;
-    if (uid != null && _highlightEnabled) {
-      final mastered =
-          ref.watch(knownWordFormsProvider(uid)).valueOrNull?.mastered ?? {};
-      masteredInAyah = words
-          .where((w) =>
-              _isRealWord(w.arabic) &&
-              mastered.contains(normalizeArabic(w.arabic)))
-          .take(4)
-          .toList();
-    }
+    final showBism = nav.surah == 1;
+    final itemCount = ayahCount + (showBism ? 1 : 0);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // ── Header — slides/fades away in immersive mode ────────────
-            SizeTransition(
-              sizeFactor: _headerAnim,
-              alignment: Alignment.topCenter,
-              child: FadeTransition(
-                opacity: _headerAnim,
-                child: Column(
-                  children: [
-                    _ReaderHeader(
-                      surah: currentSurah,
-                      ayah: nav.ayah,
-                      ayahCount: ayahCount,
-                      showBackButton: widget.showBackButton,
-                      highlightEnabled: _highlightEnabled,
-                      tafsirOpen: _tafsirOpen,
-                      onToggleHighlight: _toggleHighlight,
-                      onToggleTafsir: _toggleTafsirSheet,
-                      onShowSurahList: () => _showSurahPicker(
-                          context, surahsAsync.valueOrNull ?? []),
-                    ),
-                    _AudioPlayerBar(surah: nav.surah, ayah: nav.ayah),
-                  ],
+      body: Column(
+        children: [
+          _ReaderHeader(
+            surah: currentSurah,
+            ayahCount: ayahCount,
+            showBackButton: widget.showBackButton,
+            highlightEnabled: _highlightEnabled,
+            onToggleHighlight: _toggleHighlight,
+            onShowSurahList: () =>
+                _showSurahPicker(context, surahsAsync.valueOrNull ?? []),
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                if (ayahCount == 0)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  ListView.builder(
+                    controller: _scrollController,
+                    padding: EdgeInsets.fromLTRB(
+                        12, 14, 12, navClearance(context) + 96),
+                    itemCount: itemCount,
+                    itemBuilder: (context, index) {
+                      if (showBism && index == 0) {
+                        return const _BismillahHeading();
+                      }
+                      final ayahNum = index - (showBism ? 1 : 0) + 1;
+                      return _AyahCard(
+                        key: ValueKey('${nav.surah}_$ayahNum'),
+                        shimmerCtrl: _shimmerCtrl,
+                        surah: nav.surah,
+                        ayah: ayahNum,
+                        userId: _userId,
+                        highlightEnabled: _highlightEnabled,
+                        bookmarked:
+                            bookmarks.contains('${nav.surah}_$ayahNum'),
+                        onToggleBookmark: () => ref
+                            .read(quranBookmarksProvider.notifier)
+                            .toggle(nav.surah, ayahNum),
+                        litPosition: _litWord?.ayah == ayahNum
+                            ? _litWord?.position
+                            : null,
+                        onToggleLit: (pos) => setState(() {
+                          _litWord =
+                              (_litWord?.ayah == ayahNum &&
+                                      _litWord?.position == pos)
+                                  ? null
+                                  : (ayah: ayahNum, position: pos);
+                        }),
+                        tafsirOpen: _tafsirOpenAyah == ayahNum,
+                        onToggleTafsir: () => setState(() {
+                          _tafsirOpenAyah =
+                              _tafsirOpenAyah == ayahNum ? null : ayahNum;
+                        }),
+                        onTapBody: () =>
+                            setState(() => _activeAyah = ayahNum),
+                      );
+                    },
+                  ),
+                Positioned(
+                  left: 14,
+                  right: 14,
+                  bottom: navClearance(context) + 12,
+                  child: _AudioBar(surah: nav.surah, ayah: _activeAyah),
                 ),
-              ),
+              ],
             ),
-
-            // ── Ayah area + persistent tafsir sheet ─────────────────────
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  _tafsirPeekFraction = ((_tafsirHeaderHeight +
-                              navClearance(context)) /
-                          constraints.maxHeight)
-                      .clamp(0.05, 0.4);
-                  final peekHeightPx =
-                      _tafsirPeekFraction * constraints.maxHeight;
-                  final contentBlocked = _tafsirScrim && !_immersive;
-                  return Stack(
-                children: [
-                  Positioned.fill(
-                    child: AnimatedPadding(
-                      duration: disableAnim ? Duration.zero : AppMotion.normal,
-                      curve: Curves.easeOutCubic,
-                      padding: EdgeInsets.only(
-                          bottom: _immersive ? 0 : peekHeightPx),
-                      child: IgnorePointer(
-                        ignoring: contentBlocked,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onTap: _toggleImmersive,
-                          onHorizontalDragEnd: (d) => _onSwipe(d, ayahCount),
-                          child: AnimatedSwitcher(
-                            duration:
-                                disableAnim ? Duration.zero : AppMotion.gentle,
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeOutCubic,
-                            transitionBuilder: (child, animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: Offset(0.15 * _navDir, 0),
-                                    end: Offset.zero,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: KeyedSubtree(
-                              key: ValueKey('${nav.surah}_${nav.ayah}'),
-                              child: _AyahBody(
-                                shimmerCtrl: _shimmerCtrl,
-                                nav: nav,
-                                userId: _userId,
-                                highlightEnabled: _highlightEnabled,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  // ── Reading-mode scrim ──────────────────────────────────
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      ignoring: !contentBlocked,
-                      child: AnimatedOpacity(
-                        opacity: contentBlocked ? 1 : 0,
-                        duration: disableAnim
-                            ? Duration.zero
-                            : const Duration(milliseconds: 200),
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: _toggleTafsirSheet,
-                          child: ColoredBox(
-                            color: Colors.black.withValues(alpha: 0.3),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: AnimatedSlide(
-                      offset: _immersive ? const Offset(0, 1) : Offset.zero,
-                      duration: disableAnim ? Duration.zero : AppMotion.normal,
-                      curve: Curves.easeOutCubic,
-                      child: IgnorePointer(
-                        ignoring: _immersive,
-                        child: _TafsirSheet(
-                          surah: nav.surah,
-                          ayah: nav.ayah,
-                          masteredInAyah: masteredInAyah,
-                          controller: _sheetCtrl,
-                          peekFraction: _tafsirPeekFraction,
-                          expanded: _tafsirOpen,
-                          onToggle: _toggleTafsirSheet,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -386,8 +230,13 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
         surahs: surahs,
         currentSurah: ref.read(quranNavProvider).surah,
         onSelect: (n) {
-          _navDir = 1;
           ref.read(quranNavProvider.notifier).goToSurah(n);
+          setState(() {
+            _litWord = null;
+            _tafsirOpenAyah = null;
+            _activeAyah = 1;
+          });
+          if (_scrollController.hasClients) _scrollController.jumpTo(0);
           Navigator.pop(context);
         },
       ),
@@ -395,151 +244,159 @@ class _QuranWordReaderPageState extends ConsumerState<QuranWordReaderPage>
   }
 }
 
-// ── Header (replaces AppBar so it can slide away in immersive mode) ──────────
+// ── Header (.qh) ──────────────────────────────────────────────────────────
 
 class _ReaderHeader extends StatelessWidget {
   final QuranSurah? surah;
-  final int ayah;
   final int ayahCount;
   final bool showBackButton;
   final bool highlightEnabled;
-  final bool tafsirOpen;
   final VoidCallback onToggleHighlight;
-  final VoidCallback onToggleTafsir;
   final VoidCallback onShowSurahList;
 
   const _ReaderHeader({
     required this.surah,
-    required this.ayah,
     required this.ayahCount,
     required this.showBackButton,
     required this.highlightEnabled,
-    required this.tafsirOpen,
     required this.onToggleHighlight,
-    required this.onToggleTafsir,
     required this.onShowSurahList,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final s = surah;
+    final topInset = MediaQuery.paddingOf(context).top;
+    const metaStyle = TextStyle(
+      fontSize: 10,
+      color: Colors.white60,
+      letterSpacing: 0.6,
+    );
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-      child: Row(
+    return Container(
+      padding: EdgeInsets.fromLTRB(8, topInset + 2, 8, 14),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.teal, AppColors.tealLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(26)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x590D2218),
+            offset: Offset(0, 8),
+            blurRadius: 24,
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          if (showBackButton)
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.go('/home'),
-            )
-          else
-            const SizedBox(width: 12),
-          Expanded(
-            child: s == null
-                ? Text('শব্দে শব্দে কুরআন',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600))
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: Text(
-                          s.nameAr,
-                          style: const TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 17,
-                            color: AppColors.gold,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              s.nameBn,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: s.revelation == 'meccan'
-                                  ? AppColors.gold.withValues(alpha: 0.15)
-                                  : Colors.blue.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              s.revelation == 'meccan' ? 'মাক্কী' : 'মাদানী',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: s.revelation == 'meccan'
-                                    ? AppColors.gold
-                                    : Colors.blue.shade700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          // Ayah counter pill
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: AppColors.forestGreen
-                                  .withValues(alpha: 0.10),
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.xl),
-                            ),
-                            child: Text(
-                              ayahCount > 0
-                                  ? 'আয়াত $ayah / $ayahCount'
-                                  : 'আয়াত $ayah',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: theme.brightness == Brightness.dark
-                                    ? AppColors.brightGreen
-                                    : AppColors.forestGreen,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+          const Positioned(
+            left: -14,
+            bottom: -30,
+            child: Opacity(
+              opacity: 0.12,
+              child: Text(
+                '﴿',
+                style: TextStyle(
+                  fontFamily: 'NotoNaskhArabic',
+                  fontSize: 112,
+                  color: AppColors.gold,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+          Column(
+            children: [
+              Row(
+                children: [
+                  if (showBackButton)
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => context.go('/home'),
+                    )
+                  else
+                    const SizedBox(width: 48, height: 48),
+                  const Spacer(),
+                  IconButton(
+                    icon: Icon(
+                      highlightEnabled
+                          ? Icons.remove_red_eye_rounded
+                          : Icons.visibility_off_rounded,
+                      color: highlightEnabled
+                          ? AppColors.goldLight
+                          : Colors.white70,
+                    ),
+                    tooltip: highlightEnabled ? 'রঙ বন্ধ করুন' : 'রঙ চালু করুন',
+                    onPressed: onToggleHighlight,
                   ),
-          ),
-          IconButton(
-            icon: Icon(
-              highlightEnabled
-                  ? Icons.remove_red_eye_rounded
-                  : Icons.visibility_off_rounded,
-              color: highlightEnabled ? AppColors.brightGreen : null,
-            ),
-            tooltip: highlightEnabled ? 'রঙ বন্ধ করুন' : 'রঙ চালু করুন',
-            onPressed: onToggleHighlight,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.menu_book_rounded,
-              color: tafsirOpen ? AppColors.gold : null,
-            ),
-            tooltip: tafsirOpen ? 'তাফসীর বন্ধ করুন' : 'তাফসীর দেখুন',
-            onPressed: onToggleTafsir,
-          ),
-          IconButton(
-            icon: const Icon(Icons.format_list_bulleted_rounded),
-            tooltip: 'সূরা তালিকা',
-            onPressed: onShowSurahList,
+                  IconButton(
+                    icon: const Icon(Icons.format_list_bulleted_rounded,
+                        color: Colors.white70),
+                    tooltip: 'সূরা তালিকা',
+                    onPressed: onShowSurahList,
+                  ),
+                ],
+              ),
+              if (s == null)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                )
+              else ...[
+                Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Text(
+                    '﴿ ${s.nameAr} ﴾',
+                    style: const TextStyle(
+                      fontFamily: 'NotoNaskhArabic',
+                      fontSize: 25,
+                      color: AppColors.goldLight,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  'সূরা ${s.nameBn} · শব্দে শব্দে',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(s.revelation == 'meccan' ? 'মাক্কী' : 'মাদানী',
+                        style: metaStyle),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6),
+                      child: Text('✦', style: metaStyle),
+                    ),
+                    Text('${bnDigits(ayahCount)} আয়াত', style: metaStyle),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6),
+                      child: Text('✦', style: metaStyle),
+                    ),
+                    const Text('QPC হাফস · GTAF', style: metaStyle),
+                  ],
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -547,112 +404,33 @@ class _ReaderHeader extends StatelessWidget {
   }
 }
 
-// ── Persistent audio player bar ────────────────────────────────────────────────
+// ── Plain Bismillah heading (.bism) ──────────────────────────────────────
 
-class _AudioPlayerBar extends ConsumerWidget {
-  final int surah;
-  final int ayah;
-  const _AudioPlayerBar({required this.surah, required this.ayah});
-
-  static String _fmt(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return bnDigits('$m:$s');
-  }
+class _BismillahHeading extends StatelessWidget {
+  const _BismillahHeading();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final audio = ref.watch(audioServiceProvider);
-    final url = _ayahAudioUrl(surah, ayah);
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: AppRadius.lgBorder,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: StreamBuilder<PlayerState>(
-        stream: audio.playerStateStream,
-        builder: (context, stateSnap) {
-          final isThisAyah = audio.currentUrl == url;
-          final playing = isThisAyah && (stateSnap.data?.playing ?? false);
-
-          return StreamBuilder<Duration>(
-            stream: audio.positionStream,
-            builder: (context, posSnap) {
-              final position =
-                  isThisAyah ? (posSnap.data ?? Duration.zero) : Duration.zero;
-              final duration =
-                  isThisAyah ? (audio.duration ?? Duration.zero) : Duration.zero;
-              final progress = duration.inMilliseconds > 0
-                  ? (position.inMilliseconds / duration.inMilliseconds)
-                      .clamp(0.0, 1.0)
-                  : 0.0;
-
-              return Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      playing
-                          ? Icons.pause_circle_filled_rounded
-                          : Icons.play_circle_filled_rounded,
-                      color: AppColors.teal,
-                      size: 32,
-                    ),
-                    onPressed: () {
-                      if (!isThisAyah) {
-                        audio.playUrl(url);
-                      } else if (playing) {
-                        audio.pause();
-                      } else {
-                        audio.resume();
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('মিশারী আল-আফাসী',
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 4,
-                            backgroundColor:
-                                theme.colorScheme.surfaceContainerHighest,
-                            valueColor:
-                                const AlwaysStoppedAnimation(AppColors.teal),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${_fmt(position)} / ${_fmt(duration)}',
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              );
-            },
-          );
-        },
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 12, top: 2),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Text(
+          'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+          style: TextStyle(
+            fontFamily: 'NotoNaskhArabic',
+            fontSize: 22,
+            color: AppColors.midGreen,
+            height: 1.8,
+          ),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
 }
 
-// ── Surah picker bottom sheet ─────────────────────────────────────────────────
+// ── Surah picker bottom sheet ────────────────────────────────────────────
 
 class _SurahPickerSheet extends StatefulWidget {
   final List<QuranSurah> surahs;
@@ -837,76 +615,56 @@ class _SurahPickerSheetState extends State<_SurahPickerSheet> {
   }
 }
 
-// ── Ayah body ─────────────────────────────────────────────────────────────────
+// ── Ayah card (.ay) ───────────────────────────────────────────────────────
 
-class _AyahBody extends ConsumerWidget {
+class _AyahCard extends ConsumerWidget {
   final AnimationController shimmerCtrl;
-  final QuranNavState nav;
+  final int surah;
+  final int ayah;
   final String? userId;
   final bool highlightEnabled;
-  const _AyahBody({
+  final bool bookmarked;
+  final VoidCallback onToggleBookmark;
+  final int? litPosition;
+  final void Function(int position) onToggleLit;
+  final bool tafsirOpen;
+  final VoidCallback onToggleTafsir;
+  final VoidCallback onTapBody;
+
+  const _AyahCard({
+    super.key,
     required this.shimmerCtrl,
-    required this.nav,
+    required this.surah,
+    required this.ayah,
     required this.userId,
     required this.highlightEnabled,
+    required this.bookmarked,
+    required this.onToggleBookmark,
+    required this.litPosition,
+    required this.onToggleLit,
+    required this.tafsirOpen,
+    required this.onToggleTafsir,
+    required this.onTapBody,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final wordsAsync = ref.watch(
-        quranAyahWordsProvider((surah: nav.surah, ayah: nav.ayah)));
+    final wordsAsync =
+        ref.watch(quranAyahWordsProvider((surah: surah, ayah: ayah)));
 
     return wordsAsync.when(
       data: (words) => words.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : _WordView(
-              words: words,
-              nav: nav,
-              userId: userId,
-              highlightEnabled: highlightEnabled,
-            ),
-      loading: () => _ShimmerWordView(ctrl: shimmerCtrl),
-      error: (e, _) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.wifi_off_rounded,
-                size: 40,
-                color: Theme.of(context).colorScheme.onSurfaceVariant),
-            const SizedBox(height: 12),
-            const Text('শব্দ লোড হয়নি'),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => ref.invalidate(quranAyahWordsProvider(
-                  (surah: nav.surah, ayah: nav.ayah))),
-              child: const Text('আবার চেষ্টা করুন'),
-            ),
-          ],
-        ),
-      ),
+          ? const SizedBox.shrink()
+          : _buildCard(context, ref, words),
+      loading: () => _ShimmerAyahCard(ctrl: shimmerCtrl),
+      error: (_, __) => _ErrorAyahCard(surah: surah, ayah: ayah),
     );
   }
-}
 
-// ── Word view ─────────────────────────────────────────────────────────────────
-
-class _WordView extends ConsumerWidget {
-  final List<QuranWord> words;
-  final QuranNavState nav;
-  final String? userId;
-  final bool highlightEnabled;
-  const _WordView({
-    required this.words,
-    required this.nav,
-    required this.userId,
-    required this.highlightEnabled,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget _buildCard(BuildContext context, WidgetRef ref, List<QuranWord> words) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    // Fetch known forms only when userId is available and highlight is on.
     Set<String> mastered = {};
     Set<String> learning = {};
     final uid = userId;
@@ -917,343 +675,158 @@ class _WordView extends ConsumerWidget {
     }
 
     final displayWords = words.where((w) => _isRealWord(w.arabic)).toList();
-    final fullAyah = displayWords.map((w) => w.arabic).join(' ');
-    final fullMeaning = displayWords
+    final translation = displayWords
         .map((w) => w.meaningBn ?? '')
         .where((s) => s.isNotEmpty && !_isAyahMarker(s))
         .join(' ');
 
-    // Al-Fatihah ayah 1 *is* the bismillah — show it as its own ornamental
-    // opening block instead of the regular ayah header.
-    final isBismillah = nav.surah == 1 && nav.ayah == 1;
+    final cardColor = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final lineColor = isDark ? AppColors.darkOutlineVariant : AppColors.line;
+    final pillBg = isDark ? AppColors.darkCard : AppColors.cream;
 
-    final wordCount       = displayWords.length;
-    final arabicFontSize  = wordCount > 30 ? 14.0
-        : wordCount > 20 ? 16.0
-        : wordCount > 12 ? 18.0
-        : wordCount > 6  ? 20.0
-        : 24.0;
-    // Line-height floor 1.7 — harakat need vertical room at every size.
-    final arabicLineHeight =
-        wordCount > 20 ? 1.7 : wordCount > 10 ? 1.8 : 2.1;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // ── Bismillah opening (Al-Fatihah 1:1 only) ────────────────────
-        if (isBismillah)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: AppColors.gradientQuranic,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: AppRadius.lgBorder,
-                border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
-              ),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Positioned(
-                    right: -8,
-                    top: -20,
-                    child: Opacity(
-                      opacity: 0.13,
-                      child: OrnamentStamp(size: 64, color: AppColors.gold),
-                    ),
-                  ),
-                  Column(
-                    children: [
-                      Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: Text(
-                          fullAyah,
-                          style: const TextStyle(
-                            fontFamily: 'NotoNaskhArabic',
-                            fontSize: 30,
-                            color: AppColors.gold,
-                            height: 2.0,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'পরম করুণাময় ও অসীম দয়াবান আল্লাহর নামে শুরু করছি',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white.withValues(alpha: 0.75),
-                          height: 1.4,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-        // ── Full ayah header ─────────────────────────────────────────
-        if (!isBismillah)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-          child: Container(
-            constraints: const BoxConstraints(maxHeight: 200),
-            clipBehavior: Clip.antiAlias,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: AppColors.gradientQuranic,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: AppRadius.lgBorder,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Scrollable so long ayahs never clip harakat.
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: Text(
-                        fullAyah,
-                        style: TextStyle(
-                          fontFamily: 'NotoNaskhArabic',
-                          fontSize: arabicFontSize,
-                          color: Colors.white,
-                          height: arabicLineHeight,
-                        ),
-                        textAlign: TextAlign.justify,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 24, height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white38, width: 1),
-                        color: Colors.white.withValues(alpha: 0.15),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${nav.ayah}',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    if (fullMeaning.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          fullMeaning,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white60,
-                            height: 1.35,
-                          ),
-                          textDirection: TextDirection.ltr,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTapBody,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12, top: 10),
+        padding: const EdgeInsets.fromLTRB(13, 15, 13, 11),
+        decoration: BoxDecoration(
+          color: cardColor,
+          border: Border.all(color: lineColor),
+          borderRadius: BorderRadius.circular(_rl),
+          boxShadow: AppShadows.card,
         ),
-
-        // ── Scrollable word chips ────────────────────────────────────
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            child: Column(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // .aynum — gold ayah-number pill
+            Positioned(
+              top: -22,
+              right: 2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                decoration: BoxDecoration(
+                  color: pillBg,
+                  border: Border.all(color: AppColors.gold),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  _arabicNum(ayah),
+                  style: const TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.goldDeep,
+                  ),
+                ),
+              ),
+            ),
+            // .bm — bookmark toggle
+            Positioned(
+              top: -22,
+              left: 0,
+              child: GestureDetector(
+                onTap: onToggleBookmark,
+                child: Container(
+                  width: 28,
+                  height: 24,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: pillBg,
+                    border: Border.all(
+                      color: bookmarked ? AppColors.gold : lineColor,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                  child: Icon(
+                    bookmarked
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    size: 14,
+                    color: bookmarked
+                        ? AppColors.goldDeep
+                        : const Color(0xFFB9AF97),
+                  ),
+                ),
+              ),
+            ),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Legend row (only when highlight on AND userId present)
-                if (highlightEnabled && uid != null)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _LegendChip(
-                            color: AppColors.brightGreen, label: 'আয়ত্ত'),
-                        SizedBox(width: 8),
-                        _LegendChip(color: AppColors.gold, label: 'শিখছি'),
-                      ],
-                    ),
-                  ),
-
-                Text(
-                  'শব্দে ট্যাপ করুন · দীর্ঘ চাপে SRS-এ যোগ করুন',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-
-                // Word chips
-                RepaintBoundary(
-                  child: Directionality(
+                const SizedBox(height: 8),
+                // .ws — word chips
+                Directionality(
                   textDirection: TextDirection.rtl,
                   child: Wrap(
-                    spacing: 8,
+                    spacing: 6,
                     runSpacing: 10,
                     alignment: WrapAlignment.center,
-                    children: displayWords.map((word) {
-                      final isSelected = word.position == nav.selectedWord;
-                      final norm       = normalizeArabic(word.arabic);
+                    children: displayWords.map((w) {
+                      final norm = normalizeArabic(w.arabic);
                       final isMastered =
                           highlightEnabled && mastered.contains(norm);
                       final isLearning =
                           highlightEnabled && learning.contains(norm);
-
-                      return GestureDetector(
-                        onTap: () => _showWordDetail(context, ref, word),
+                      return _WordChip(
+                        word: w,
+                        lit: litPosition == w.position,
+                        mastered: isMastered,
+                        learning: isLearning,
+                        onTap: () => onToggleLit(w.position),
                         onLongPress: uid != null
-                            ? () => _showAddToSrs(context, word, uid)
+                            ? () => _showAddToSrs(context, w, uid)
                             : null,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                              isSelected ? AppRadius.full : 12),
-                          child: Stack(
-                            children: [
-                              AnimatedContainer(
-                                duration: AppMotion.fast,
-                                constraints: const BoxConstraints(
-                                    minHeight: 44, minWidth: 44),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.gold.withValues(alpha: 0.15)
-                                      : isMastered
-                                          ? AppColors.brightGreen
-                                              .withValues(alpha: 0.10)
-                                          : theme.colorScheme.surfaceContainer,
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.gold
-                                        : isMastered
-                                            ? AppColors.brightGreen
-                                            : theme.colorScheme.outlineVariant,
-                                    width: isSelected
-                                        ? 1.5
-                                        : isMastered
-                                            ? 1.5
-                                            : 0.8,
-                                  ),
-                                  borderRadius: BorderRadius.circular(
-                                      isSelected ? AppRadius.full : 12),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      word.arabic,
-                                      style: TextStyle(
-                                        fontFamily: 'NotoNaskhArabic',
-                                        fontSize: 24,
-                                        height: 1.7,
-                                        color: isSelected
-                                            ? AppColors.gold
-                                            : isMastered
-                                                ? AppColors.brightGreen
-                                                : theme.colorScheme.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      _isAyahMarker(word.meaningBn)
-                                          ? '—'
-                                          : (word.meaningBn ?? '—'),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        height: 1.3,
-                                        color: isSelected
-                                            ? AppColors.gold
-                                                .withValues(alpha: 0.85)
-                                            : isMastered
-                                                ? AppColors.brightGreen
-                                                    .withValues(alpha: 0.85)
-                                                : theme
-                                                    .colorScheme.onSurfaceVariant,
-                                      ),
-                                      textDirection: TextDirection.ltr,
-                                      textAlign: TextAlign.center,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (isLearning)
-                                const Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  child: SizedBox(
-                                    height: 2,
-                                    child: ColoredBox(color: AppColors.gold),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
                       );
                     }).toList(),
                   ),
+                ),
+                // .aybn — Bengali translation
+                if (translation.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 9),
+                    padding: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: lineColor)),
+                    ),
+                    child: Text(
+                      translation,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.65,
+                        color: isDark ? Colors.white70 : AppColors.ink2,
+                      ),
+                    ),
+                  ),
+                // .tafl — inline tafsir toggle
+                Padding(
+                  padding: const EdgeInsets.only(top: 7),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: onToggleTafsir,
+                      child: Text(
+                        'তাফসীর ${tafsirOpen ? "▴" : "▾"}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.tealLight,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-
-                const SizedBox(height: 20),
+                if (tafsirOpen) _TafsirInline(surah: surah, ayah: ayah),
               ],
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
-  }
-
-  void _showWordDetail(BuildContext context, WidgetRef ref, QuranWord word) {
-    ref.read(quranNavProvider.notifier).selectWord(word.position);
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => _WordDetailSheet(
-        word: word,
-        surah: nav.surah,
-        ayah: nav.ayah,
-      ),
-    ).whenComplete(() {
-      if (context.mounted) {
-        ref.read(quranNavProvider.notifier).clearWord();
-      }
-    });
   }
 
   void _showAddToSrs(BuildContext context, QuranWord word, String userId) {
@@ -1264,137 +837,344 @@ class _WordView extends ConsumerWidget {
       builder: (_) => _AddToSrsSheet(
         word: word,
         userId: userId,
-        surah: nav.surah,
-        ayah: nav.ayah,
+        surah: surah,
+        ayah: ayah,
       ),
     );
   }
 }
 
-// ── Word detail bottom sheet ──────────────────────────────────────────────────
+// ── Word chip (.w) ────────────────────────────────────────────────────────
 
-class _WordDetailSheet extends ConsumerWidget {
+class _WordChip extends StatelessWidget {
   final QuranWord word;
+  final bool lit;
+  final bool mastered;
+  final bool learning;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _WordChip({
+    required this.word,
+    required this.lit,
+    required this.mastered,
+    required this.learning,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final meaning =
+        _isAyahMarker(word.meaningBn) ? '—' : (word.meaningBn ?? '—');
+    final root = word.root;
+
+    final arabicColor = lit
+        ? AppColors.goldDeep
+        : mastered
+            ? AppColors.brightGreen
+            : (isDark ? Colors.white : AppColors.ink);
+    final meaningColor = lit
+        ? AppColors.goldDeep
+        : mastered
+            ? AppColors.brightGreen.withValues(alpha: 0.85)
+            : theme.colorScheme.onSurfaceVariant;
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+        padding: const EdgeInsets.fromLTRB(8, 5, 8, 4),
+        decoration: BoxDecoration(
+          color: lit
+              ? const Color(0xFFFBF3DE)
+              : mastered
+                  ? AppColors.brightGreen.withValues(alpha: 0.10)
+                  : Colors.transparent,
+          border: Border.all(
+            color: lit
+                ? AppColors.gold
+                : mastered
+                    ? AppColors.brightGreen
+                    : Colors.transparent,
+            width: 1.2,
+          ),
+          borderRadius: BorderRadius.circular(11),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              word.arabic,
+              style: TextStyle(
+                fontFamily: 'NotoNaskhArabic',
+                fontSize: 22,
+                height: 1.55,
+                color: arabicColor,
+              ),
+            ),
+            Text(
+              meaning,
+              style: TextStyle(
+                fontSize: 10,
+                height: 1.3,
+                fontWeight: lit ? FontWeight.w600 : FontWeight.normal,
+                color: meaningColor,
+              ),
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (lit && root != null && root.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Text(
+                  root,
+                  style: const TextStyle(
+                    fontFamily: 'NotoNaskhArabic',
+                    fontSize: 10.5,
+                    color: AppColors.goldDeep,
+                  ),
+                  textDirection: TextDirection.rtl,
+                ),
+              ),
+            if (learning && !lit)
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                width: 18,
+                height: 2,
+                color: AppColors.gold,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Inline tafsir panel (.tafb) ──────────────────────────────────────────
+
+class _TafsirInline extends ConsumerWidget {
   final int surah;
   final int ayah;
-  const _WordDetailSheet({
-    required this.word,
-    required this.surah,
-    required this.ayah,
-  });
+  const _TafsirInline({required this.surah, required this.ayah});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final hasMeaning =
-        word.meaningBn != null && !_isAyahMarker(word.meaningBn);
-    final root = word.root;
+    final isDark = theme.brightness == Brightness.dark;
+    final tafsirAsync =
+        ref.watch(quranTafsirProvider((surah: surah, ayah: ayah)));
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Directionality(
-            textDirection: TextDirection.rtl,
-            child: Text(
-              word.arabic,
-              style: const TextStyle(
-                fontFamily: 'NotoNaskhArabic',
-                fontSize: 44,
-                color: AppColors.gold,
-                height: 1.8,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (hasMeaning)
-            Text(
-              word.meaningBn!,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            )
-          else
-            Text(
-              'অর্থ পাওয়া যায়নি',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontStyle: FontStyle.italic,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'শব্দ ${word.position}',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (root != null && root.isNotEmpty) ...[
-                Text(
-                  ' · মূল: ',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+    return Container(
+      margin: const EdgeInsets.only(top: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.teal.withValues(alpha: 0.16)
+            : const Color(0xFFF4F8F6),
+        border: Border.all(
+          color: isDark
+              ? AppColors.tealLight.withValues(alpha: 0.35)
+              : const Color(0xFFD9E6DF),
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: tafsirAsync.when(
+        data: (tafsir) => tafsir == null
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'এই আয়াতের তাফসীর ডাউনলোড হয়নি',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: Text(
-                    root,
-                    style: AppText.arabic(
-                        fontSize: 20, color: AppColors.gold),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () async {
+                      await ref
+                          .read(quranLocalSourceProvider)
+                          .syncTafsirFromSupabase(surah);
+                      ref.invalidate(
+                          quranTafsirProvider((surah: surah, ayah: ayah)));
+                    },
+                    icon: const Icon(Icons.download_rounded, size: 16),
+                    label: const Text('ডাউনলোড করুন',
+                        style: TextStyle(fontSize: 12)),
                   ),
+                ],
+              )
+            : Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: tafsir.tafsirText,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.7,
+                        color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF33564A),
+                        fontFamily: 'HindSiliguri',
+                      ),
+                    ),
+                    TextSpan(
+                      text: ' — তাফসীরে যাকারিয়া',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontStyle: FontStyle.italic,
+                        color: isDark ? AppColors.tealLight.withValues(alpha: 0.9) : const Color(0xFF7A958A),
+                        fontFamily: 'HindSiliguri',
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ],
+              ),
+        loading: () => const Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () => ref
-                .read(audioServiceProvider)
-                .playUrl(_ayahAudioUrl(surah, ayah)),
-            icon: const Icon(Icons.volume_up_rounded, size: 18),
-            label: const Text('আয়াত শুনুন'),
-          ),
-        ],
+        ),
+        error: (_, __) =>
+            Text('তাফসীর লোড হয়নি', style: theme.textTheme.bodySmall),
       ),
     );
   }
 }
 
-// ── Legend chip ───────────────────────────────────────────────────────────────
+// ── Floating audio bar (.qa) ────────────────────────────────────────────
 
-class _LegendChip extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _LegendChip({required this.color, required this.label});
+class _AudioBar extends ConsumerWidget {
+  final int surah;
+  final int ayah;
+  const _AudioBar({required this.surah, required this.ayah});
+
+  static String _fmt(Duration d) {
+    final m = d.inMinutes;
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return bnDigits('$m:$s');
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10, height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 4),
-        Text(label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            )),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final audio = ref.watch(audioServiceProvider);
+    final url = _ayahAudioUrl(surah, ayah);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.forestGreen,
+        borderRadius: BorderRadius.circular(_rm),
+        boxShadow: AppShadows.pop,
+      ),
+      child: StreamBuilder<PlayerState>(
+        stream: audio.playerStateStream,
+        builder: (context, stateSnap) {
+          final isThisAyah = audio.currentUrl == url;
+          final playing = isThisAyah && (stateSnap.data?.playing ?? false);
+
+          return StreamBuilder<Duration>(
+            stream: audio.positionStream,
+            builder: (context, posSnap) {
+              final position =
+                  isThisAyah ? (posSnap.data ?? Duration.zero) : Duration.zero;
+              final duration =
+                  isThisAyah ? (audio.duration ?? Duration.zero) : Duration.zero;
+              final progress = duration.inMilliseconds > 0
+                  ? (position.inMilliseconds / duration.inMilliseconds)
+                      .clamp(0.0, 1.0)
+                  : 0.0;
+
+              return Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (!isThisAyah) {
+                        audio.playUrl(url);
+                      } else if (playing) {
+                        audio.pause();
+                      } else {
+                        audio.resume();
+                      }
+                    },
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.gold,
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        playing
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'মিশারী আল-আফাসী',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.cream,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(99),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 4,
+                            backgroundColor:
+                                Colors.white.withValues(alpha: 0.25),
+                            valueColor: const AlwaysStoppedAnimation(
+                                AppColors.goldLight),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_fmt(position)} / ${_fmt(duration)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.cream.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
 
-// ── Add-to-SRS bottom sheet ───────────────────────────────────────────────────
+// ── Add-to-SRS bottom sheet ───────────────────────────────────────────────
 
 class _AddToSrsSheet extends ConsumerStatefulWidget {
   final QuranWord word;
@@ -1525,7 +1305,15 @@ class _AddToSrsSheetState extends ConsumerState<_AddToSrsSheet> {
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () => ref
+                .read(audioServiceProvider)
+                .playUrl(_ayahAudioUrl(widget.surah, widget.ayah)),
+            icon: const Icon(Icons.volume_up_rounded, size: 18),
+            label: const Text('আয়াত শুনুন'),
+          ),
+          const SizedBox(height: 8),
           if (_loading)
             const CircularProgressIndicator()
           else if (_existingCard != null) ...[
@@ -1593,319 +1381,89 @@ class _AddToSrsSheetState extends ConsumerState<_AddToSrsSheet> {
   }
 }
 
-// ── Persistent tafsir sheet ───────────────────────────────────────────────────
+// ── Shimmer skeleton ──────────────────────────────────────────────────────
 
-class _TafsirSheet extends ConsumerStatefulWidget {
+class _ShimmerAyahCard extends StatelessWidget {
+  final AnimationController ctrl;
+  const _ShimmerAyahCard({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12, top: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(_rl),
+      ),
+      child: AnimatedBuilder(
+        animation: ctrl,
+        builder: (_, __) => Column(
+          children: [
+            _shimmerBox(theme, ctrl.value,
+                width: double.infinity, height: 60, radius: 12),
+            const SizedBox(height: 10),
+            _shimmerBox(theme, ctrl.value,
+                width: double.infinity, height: 30, radius: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _shimmerBox(ThemeData theme, double v,
+    {required double width, required double height, double radius = 8}) {
+  final shimmer = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [
+      theme.colorScheme.surfaceContainer,
+      theme.colorScheme.surfaceContainerHighest,
+      theme.colorScheme.surfaceContainer,
+    ],
+    stops: [
+      (v - 0.3).clamp(0.0, 1.0),
+      v.clamp(0.0, 1.0),
+      (v + 0.3).clamp(0.0, 1.0),
+    ],
+  );
+  return ShaderMask(
+    shaderCallback: (bounds) => shimmer.createShader(bounds),
+    child: Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    ),
+  );
+}
+
+// ── Error card ────────────────────────────────────────────────────────────
+
+class _ErrorAyahCard extends ConsumerWidget {
   final int surah;
   final int ayah;
-  final List<QuranWord> masteredInAyah;
-  final DraggableScrollableController controller;
-  final double peekFraction;
-  final bool expanded;
-  final VoidCallback onToggle;
-
-  const _TafsirSheet({
-    required this.surah,
-    required this.ayah,
-    required this.masteredInAyah,
-    required this.controller,
-    required this.peekFraction,
-    required this.expanded,
-    required this.onToggle,
-  });
+  const _ErrorAyahCard({required this.surah, required this.ayah});
 
   @override
-  ConsumerState<_TafsirSheet> createState() => _TafsirSheetState();
-}
-
-class _TafsirSheetState extends ConsumerState<_TafsirSheet> {
-  ScrollController? _listCtrl;
-
-  @override
-  void didUpdateWidget(covariant _TafsirSheet oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final ayahChanged =
-        oldWidget.surah != widget.surah || oldWidget.ayah != widget.ayah;
-    final ctrl = _listCtrl;
-    if (ayahChanged && ctrl != null && ctrl.hasClients) {
-      ctrl.jumpTo(0);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final disableAnim = MediaQuery.of(context).disableAnimations;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final tafsirAsync = ref
-        .watch(quranTafsirProvider((surah: widget.surah, ayah: widget.ayah)));
-
-    return DraggableScrollableSheet(
-      controller: widget.controller,
-      minChildSize: widget.peekFraction,
-      initialChildSize: widget.peekFraction,
-      maxChildSize: _tafsirMaxFraction,
-      snap: true,
-      snapSizes: [widget.peekFraction, _tafsirMaxFraction],
-      snapAnimationDuration: AppMotion.normal,
-      builder: (context, scrollCtrl) {
-        _listCtrl = scrollCtrl;
-        return AnimatedContainer(
-          duration: disableAnim ? Duration.zero : AppMotion.normal,
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(_tafsirRadius)),
-            border: Border(
-              top: BorderSide(
-                  color: theme.colorScheme.outlineVariant
-                      .withValues(alpha: 0.4)),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              _TafsirHeader(expanded: widget.expanded, onTap: widget.onToggle),
-              Divider(
-                height: 1,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-              ),
-              Expanded(
-                child: ListView(
-                  controller: scrollCtrl,
-                  padding: EdgeInsets.fromLTRB(
-                      16, 12, 16, 24 + (widget.expanded ? bottomInset : 0)),
-                  children: [
-                    if (widget.masteredInAyah.isNotEmpty) ...[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.auto_awesome_rounded,
-                              size: 14, color: AppColors.brightGreen),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'এই আয়াতে আপনার শেখা শব্দ: '
-                              '${widget.masteredInAyah.map((w) => w.arabic).join('، ')}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.brightGreen,
-                                fontFamily: 'NotoNaskhArabic',
-                              ),
-                              textDirection: TextDirection.rtl,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Divider(height: 1),
-                      const SizedBox(height: 10),
-                    ],
-                    tafsirAsync.when(
-                      data: (tafsir) => tafsir == null
-                          ? Center(
-                              child: Column(
-                                children: [
-                                  const SizedBox(height: 8),
-                                  Icon(Icons.menu_book_outlined,
-                                      size: 40,
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    'এই আয়াতের তাফসীর ডাউনলোড হয়নি',
-                                    style:
-                                        theme.textTheme.bodyMedium?.copyWith(
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  FilledButton.icon(
-                                    icon: const Icon(Icons.download_rounded,
-                                        size: 18),
-                                    label: const Text(
-                                        'এই সূরার তাফসীর ডাউনলোড'),
-                                    onPressed: () async {
-                                      await ref
-                                          .read(quranLocalSourceProvider)
-                                          .syncTafsirFromSupabase(
-                                              widget.surah);
-                                      ref.invalidate(quranTafsirProvider((
-                                        surah: widget.surah,
-                                        ayah: widget.ayah
-                                      )));
-                                    },
-                                  ),
-                                ],
-                              ),
-                            )
-                          : Text(
-                              tafsir.tafsirText,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontSize: 15,
-                                height: 2.0,
-                              ),
-                            ),
-                      loading: () => const Center(
-                          child: Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2)),
-                      )),
-                      error: (_, __) => Text('তাফসীর লোড হয়নি',
-                          style: theme.textTheme.bodySmall),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// ── Tafsir sheet header — pinned outside the scrollable content ──────────────
-
-class _TafsirHeader extends StatelessWidget {
-  final bool expanded;
-  final VoidCallback onTap;
-
-  const _TafsirHeader({required this.expanded, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final disableAnim = MediaQuery.of(context).disableAnimations;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 8, bottom: 6),
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.outlineVariant,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Row(
-              children: [
-                const Icon(Icons.menu_book_rounded,
-                    size: 16, color: AppColors.gold),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'তাফসীর — আবু বকর যাকারিয়া',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                AnimatedRotation(
-                  turns: expanded ? 0.5 : 0,
-                  duration: disableAnim ? Duration.zero : AppMotion.fast,
-                  curve: Curves.easeOutCubic,
-                  child: Icon(Icons.keyboard_arrow_up_rounded,
-                      size: 20, color: theme.colorScheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12, top: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(_rl),
       ),
-    );
-  }
-}
-
-// ── Shimmer skeleton ──────────────────────────────────────────────────────────
-
-class _ShimmerWordView extends StatelessWidget {
-  final AnimationController ctrl;
-  const _ShimmerWordView({required this.ctrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          AnimatedBuilder(
-            animation: ctrl,
-            builder: (_, __) => _shimmerBox(
-              theme, ctrl.value,
-              width: double.infinity, height: 100, radius: 12,
-            ),
-          ),
-          const SizedBox(height: 20),
-          AnimatedBuilder(
-            animation: ctrl,
-            builder: (_, __) => Wrap(
-              spacing: 8,
-              runSpacing: 10,
-              alignment: WrapAlignment.center,
-              children: List.generate(
-                8,
-                (i) => _shimmerBox(
-                  theme, ctrl.value,
-                  width: 65.0 + (i % 3) * 18, height: 62, radius: 12,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _shimmerBox(ThemeData theme, double v,
-      {required double width, required double height, double radius = 8}) {
-    final shimmer = LinearGradient(
-      begin: Alignment.centerLeft,
-      end: Alignment.centerRight,
-      colors: [
-        theme.colorScheme.surfaceContainer,
-        theme.colorScheme.surfaceContainerHighest,
-        theme.colorScheme.surfaceContainer,
-      ],
-      stops: [
-        (v - 0.3).clamp(0.0, 1.0),
-        v.clamp(0.0, 1.0),
-        (v + 0.3).clamp(0.0, 1.0),
-      ],
-    );
-    return ShaderMask(
-      shaderCallback: (bounds) => shimmer.createShader(bounds),
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(radius),
+      child: Center(
+        child: TextButton(
+          onPressed: () => ref
+              .invalidate(quranAyahWordsProvider((surah: surah, ayah: ayah))),
+          child: const Text('আবার চেষ্টা করুন'),
         ),
       ),
     );
